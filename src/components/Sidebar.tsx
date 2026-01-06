@@ -21,7 +21,12 @@ import {
 
 export default function Sidebar() {
   const [isReportOpen, setIsReportOpen] = useState(true);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(true);
   const pathname = usePathname();
+
+  if (pathname === '/login') {
+    return null;
+  }
 
   const isActive = (path: string) => pathname === path;
 
@@ -91,7 +96,29 @@ export default function Sidebar() {
             <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Others</span>
         </div>
         
-        <NavItem href="/settings" icon={<Settings size={20} />} label="System Settings" active={isActive('/settings')} />
+        <div>
+            <button 
+                onClick={() => setIsSettingsOpen(!isSettingsOpen)}
+                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg transition-colors group ${pathname.startsWith('/settings') ? 'bg-gray-50' : 'hover:bg-gray-50'}`}
+            >
+                <div className="flex items-center gap-3">
+                    <span className={`group-hover:text-slate-600 ${pathname.startsWith('/settings') ? 'text-slate-600' : 'text-slate-400'}`}>
+                        <Settings size={20} />
+                    </span>
+                    <span className={`font-medium ${pathname.startsWith('/settings') ? 'text-slate-800' : 'text-slate-600'}`}>System Settings</span>
+                </div>
+                <span className="text-slate-400 text-lg leading-none">{isSettingsOpen ? '−' : '+'}</span>
+            </button>
+
+            {isSettingsOpen && (
+                <div className="ml-4 mt-1 space-y-1 border-l border-gray-100 pl-2">
+                    <Link href="/settings/role-permissions" className={`flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer ${isActive('/settings/role-permissions') ? 'bg-blue-50 text-blue-600' : 'text-slate-500 hover:text-slate-700 hover:bg-gray-50'}`}>
+                        <div className={`w-1.5 h-1.5 rounded-full ${isActive('/settings/role-permissions') ? 'bg-blue-600' : 'bg-transparent border border-slate-400'}`}></div>
+                        <span className="font-medium text-sm">Role & Permissions</span>
+                    </Link>
+                </div>
+            )}
+        </div>
 
       </div>
     </div>
