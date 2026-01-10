@@ -22,6 +22,13 @@ function normalizeName(name: string): string {
   return name.toLowerCase().replace(/\s+/g, " ").trim();
 }
 
+function shouldExcludeRecommendation(recName: string, inputNameRaw: string): boolean {
+  const inputNorm = normalizeName(inputNameRaw);
+  if (!inputNorm || inputNorm.length < 4) return false;
+  const recNorm = normalizeName(recName);
+  return recNorm.includes(inputNorm);
+}
+
 function buildSourceMap(lines: string[]): Map<string, string> {
   const map = new Map<string, string>();
   for (const l of lines) {
@@ -143,7 +150,6 @@ export async function POST(req: NextRequest) {
     }
 
     const allLines = readDataset();
-    // Separate header from data to avoid processing it as a product
     const header = allLines.length > 0 ? allLines[0] : "";
     const dataLines = allLines.length > 1 ? allLines.slice(1) : [];
     
@@ -153,15 +159,13 @@ export async function POST(req: NextRequest) {
     const apiKeyFromBody = typeof body?.apiKey === "string" ? body.apiKey : undefined;
     const headerKey = req.headers.get("x-api-key") || undefined;
     
-    // API Key Rotation Logic
     const availableKeys = [
       apiKeyFromBody,
       headerKey,
       process.env.GOOGLE_API_KEY,
       process.env.GOOGLE_API_KEY_2
-    ].filter(Boolean) as string[]; // Filter out undefined/null/empty strings
+    ].filter(Boolean) as string[]; 
 
-    // Deduplicate keys
     const uniqueKeys = Array.from(new Set(availableKeys));
 
     if (uniqueKeys.length === 0) {
@@ -171,12 +175,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Use SMALLER context to fit within Free Tier token limits
-    // Free Tier RPM is 20, but TPM (Tokens Per Minute) is 1 million.
-    // However, some models have lower limits or shared limits.
-    // Reducing context size significantly helps avoid "Quota exceeded for metric ... input_token_count"
-    // 2M chars was ~500k tokens, which might be too heavy for rapid retries.
-    // Let's try 100k chars (~25k tokens) which is plenty for relevant context but much lighter.
+  
     const contextBody = getRelevantContext(dataLines, query, 100000);
     const context = header + "\n" + contextBody;
     
@@ -185,7 +184,6 @@ export async function POST(req: NextRequest) {
     let responseText: string | null = null;
     let lastError = null;
 
-    // Outer loop: Iterate through API keys
     for (const currentKey of uniqueKeys) {
       console.log(`Using API Key: ...${currentKey.slice(-4)}`);
       const ai = new GoogleGenAI({ apiKey: currentKey });
@@ -234,15 +232,16 @@ export async function POST(req: NextRequest) {
        
        // Re-fetch context but maybe with more lenient limit for fallback display
        const fallbackLines = getRelevantContext(dataLines, query, 5000).split("\n");
-       const fallbackRecs = fallbackLines
-         .map(l => {
-           const name = l.split(",")[0]?.trim();
-           return name ? { name } : null;
-         })
-         .filter(Boolean);
-       
-       // Deduplicate
-       const uniqueRecs = Array.from(new Map(fallbackRecs.map((r: any) => [r.name, r])).values()).slice(0, 5);
+      const fallbackRecs = fallbackLines
+        .map(l => {
+          const name = l.split(",")[0]?.trim();
+          return name ? { name } : null;
+        })
+        .filter(Boolean);
+
+      // Deduplicate
+      const filteredRecs = (fallbackRecs as any[]).filter(r => !shouldExcludeRecommendation(String(r.name || ""), message));
+      const uniqueRecs = Array.from(new Map(filteredRecs.map((r: any) => [r.name, r])).values()).slice(0, 5);
 
        const enriched = uniqueRecs.map((r: any) => {
           const name = String(r?.name || "");
@@ -265,7 +264,8 @@ export async function POST(req: NextRequest) {
 
     // We rely on the AI to exclude the input product name as per instructions.
     // We do NOT filter by string inclusion here to avoid blocking valid symptom-based results (e.g. "Demam" -> "Obat Demam").
-    const enriched = raw.recommendations.map((r: any) => {
+    const filtered = (raw.recommendations as any[]).filter(r => !shouldExcludeRecommendation(String(r?.name || ""), message));
+    const enriched = filtered.map((r: any) => {
       const name = String(r?.name || "");
       const src = sourceMap.get(normalizeName(name));
       return { name, source: src };
