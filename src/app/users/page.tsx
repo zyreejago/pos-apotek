@@ -79,6 +79,8 @@ export default function UsersPage() {
   });
 
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+  const userStr = typeof window !== 'undefined' ? localStorage.getItem('user') : null;
+  const currentUser = userStr ? JSON.parse(userStr) : null;
   const authHeaders: HeadersInit = token ? { 'Authorization': `Bearer ${token}` } : {};
 
   useEffect(() => {
@@ -239,6 +241,11 @@ export default function UsersPage() {
   };
 
   const handleDelete = (user: UserData) => {
+    if (currentUser && currentUser.id === user.id) {
+        showToast("You cannot delete your own account", "error");
+        return;
+    }
+
     setConfirmModal({
       isOpen: true,
       title: 'Delete User',
@@ -396,7 +403,7 @@ export default function UsersPage() {
                                     <Settings size={16} strokeWidth={2} />
                                 </button>
                                 )}
-                                {checkPermission('delete') && (
+                                {checkPermission('delete') && (!currentUser || currentUser.id !== user.id) && (
                                 <button 
                                     onClick={() => handleDelete(user)}
                                     className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all duration-200"
