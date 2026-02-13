@@ -63,7 +63,7 @@ export default function Sidebar() {
         <NavItem href="/stock-opname" icon={<ClipboardCheck size={20} />} label="Stock Opname" active={isActive('/stock-opname')} isCollapsed={isCollapsed} />
         <NavItem href="/suppliers" icon={<Users size={20} />} label="Suppliers" active={isActive('/suppliers')} isCollapsed={isCollapsed} />
         <NavItem href="/transactions" icon={<ShoppingCart size={20} />} label="Transactions" active={isActive('/transactions')} isCollapsed={isCollapsed} />
-        <NavItem href="/cashiers" icon={<UserCheck size={20} />} label="Management Cashier" active={isActive('/cashiers')} isCollapsed={isCollapsed} />
+        <NavItem href="/users" icon={<UserCheck size={20} />} label="Management Pengguna" active={isActive('/users')} isCollapsed={isCollapsed} />
         
         {/* Expandable Menu */}
         <div>
