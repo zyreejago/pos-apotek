@@ -11,8 +11,22 @@ import { useRequirePermission } from "@/hooks/useRequirePermission";
 type Role = { id: number; name: string };
 type PermItem = { module: string; create: boolean; edit: boolean; delete: boolean; show: boolean };
 
+const MODULE_CONFIG: Record<string, string[]> = {
+  'Management Product': ['create', 'edit', 'delete', 'show'],
+  'Management Stock': ['edit', 'show'],
+  'Outlets': ['create', 'edit', 'delete', 'show'],
+  'Transactions': ['create', 'show'],
+  'Management Pengguna': ['create', 'edit', 'delete', 'show'],
+  'Sales Report': ['show'],
+  'Peramalan Stok': ['show'],
+  'Substitutions': ['show'],
+  'Suppliers': ['create', 'edit', 'delete', 'show'],
+  'Stock Opname': ['create', 'show'],
+  'System Settings': ['create', 'edit', 'delete', 'show'],
+};
+
 export default function Page() {
-  const { loading: permLoading, hasPermission } = useRequirePermission('System Settings');
+  const { loading: permLoading, hasPermission, checkActionPermission } = useRequirePermission('System Settings');
   const { showToast } = useToast();
   const router = useRouter();
   const [roles, setRoles] = useState<Role[]>([]);
@@ -83,7 +97,20 @@ export default function Page() {
 
       if (res.ok) {
         const data: PermItem[] = await res.json();
-        setPerms(data);
+        const cleanedData = data.map(p => {
+             const config = MODULE_CONFIG[p.module];
+             if (config) {
+                 return {
+                     ...p,
+                     create: config.includes('create') ? p.create : false,
+                     edit: config.includes('edit') ? p.edit : false,
+                     delete: config.includes('delete') ? p.delete : false,
+                     show: config.includes('show') ? p.show : false,
+                 };
+             }
+             return p;
+        });
+        setPerms(cleanedData);
       }
     } catch (error) {
       console.error("Error fetching permissions:", error);
@@ -102,12 +129,20 @@ export default function Page() {
 
   const togglePerm = (m: string, a: keyof Omit<PermItem, "module">, val: boolean) => {
     if (!selectedRole) return;
+    if (!checkActionPermission('edit')) {
+      showToast('You do not have permission to edit permissions', 'error');
+      return;
+    }
     setPerms(prev => prev.map(x => x.module === m ? { ...x, [a]: val } : x));
     setHasChanges(true);
   };
 
   const handleSavePermissions = async () => {
     if (!selectedRole) return;
+    if (!checkActionPermission('edit')) {
+      showToast('You do not have permission to edit permissions', 'error');
+      return;
+    }
     setIsSaving(true);
     try {
       const res = await fetch("http://localhost:5000/api/rbac/permissions", {
@@ -141,6 +176,10 @@ export default function Page() {
   };
 
   const handleDeleteRole = (role: Role) => {
+    if (!checkActionPermission('delete')) {
+      showToast('You do not have permission to delete roles', 'error');
+      return;
+    }
     setConfirmModal({
       isOpen: true,
       title: 'Delete Role',
@@ -180,6 +219,10 @@ export default function Page() {
   };
 
   const addRole = async () => {
+    if (!checkActionPermission('create')) {
+      showToast('You do not have permission to create roles', 'error');
+      return;
+    }
     const name = newRole.trim();
     if (!name) return;
 
@@ -225,9 +268,11 @@ export default function Page() {
         subtitle="Manage roles and permissions"
         breadcrumbs={[{ label: 'Settings' }, { label: 'Role Permissions' }]}
         rightContent={
-          <button onClick={() => setShowAdd(true)} className="px-4 py-2 rounded-lg bg-blue-500 text-white text-sm font-semibold hover:bg-blue-600 transition-colors">
-            Add Role & Permissions
-          </button>
+          checkActionPermission('create') && (
+            <button onClick={() => setShowAdd(true)} className="px-4 py-2 rounded-lg bg-blue-500 text-white text-sm font-semibold hover:bg-blue-600 transition-colors">
+              Add Role & Permissions
+            </button>
+          )
         }
       />
 
@@ -255,14 +300,26 @@ export default function Page() {
               {!loading && filteredPerms.map(row => (
                 <tr key={row.module} className="border-t border-gray-100">
                   <td className="px-3 py-3 text-gray-800">{row.module}</td>
-                  {(["create","edit","delete","show"] as const).map(a => (
+                  {(["create","edit","delete","show"] as const).map(a => {
+                    const isAllowed = MODULE_CONFIG[row.module] ? MODULE_CONFIG[row.module].includes(a) : true;
+                    if (!isAllowed) {
+                        return <td key={a} className="px-3 py-3 text-center text-gray-300">-</td>;
+                    }
+                    return (
                     <td key={a} className="px-3 py-3 text-center">
-                      <label className="inline-flex items-center cursor-pointer">
-                        <input type="checkbox" className="sr-only peer" checked={row[a]} onChange={e => togglePerm(row.module, a, e.target.checked)} />
-                        <div className={`w-11 h-6 bg-gray-200 rounded-full peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all after:duration-300 peer-checked:bg-blue-600 relative transition-colors duration-300`}></div>
-                      </label>
-                    </td>
-                  ))}
+                    <label className="inline-flex items-center cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        className="sr-only peer" 
+                        checked={row[a]} 
+                        onChange={e => togglePerm(row.module, a, e.target.checked)} 
+                        disabled={!checkActionPermission('edit')}
+                      />
+                      <div className={`w-11 h-6 bg-gray-200 rounded-full peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all after:duration-300 peer-checked:bg-blue-600 relative transition-colors duration-300 ${!checkActionPermission('edit') ? 'opacity-50 cursor-not-allowed' : ''}`}></div>
+                    </label>
+                  </td>
+                    );
+                  })}
                 </tr>
               ))}
             </tbody>
@@ -280,21 +337,21 @@ export default function Page() {
           <div>1 of 1</div>
         </div>
         
-        {selectedRole && (
-          <div className="mt-6 flex justify-end">
-            <button 
-              onClick={handleSavePermissions}
-              disabled={!hasChanges || isSaving}
-              className={`px-6 py-2 rounded-lg font-medium transition-colors ${
-                hasChanges && !isSaving
-                  ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-sm'
-                  : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-              }`}
-            >
-              {isSaving ? 'Saving...' : 'Save Changes'}
-            </button>
-          </div>
-        )}
+          {selectedRole && checkActionPermission('edit') && (
+            <div className="mt-6 flex justify-end">
+              <button 
+                onClick={handleSavePermissions}
+                disabled={!hasChanges || isSaving}
+                className={`px-6 py-2 rounded-lg font-medium transition-colors ${
+                  hasChanges && !isSaving
+                    ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-sm'
+                    : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                }`}
+              >
+                {isSaving ? 'Saving...' : 'Save Changes'}
+              </button>
+            </div>
+          )}
       </div>
 
       <div className="bg-white border border-gray-100 rounded-xl p-4 md:p-6">
@@ -315,20 +372,24 @@ export default function Page() {
                   </td>
                   <td className="px-3 py-3 text-right">
                     <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button 
-                        onClick={(e) => { e.stopPropagation(); setSelectedRole(r); }}
-                        className="p-1 text-blue-600 hover:bg-blue-50 rounded"
-                        title="Edit Permissions"
-                      >
-                        <Edit size={16} />
-                      </button>
-                      <button 
-                        onClick={(e) => { e.stopPropagation(); handleDeleteRole(r); }}
-                        className="p-1 text-red-600 hover:bg-red-50 rounded"
-                        title="Delete"
-                      >
-                        <Trash2 size={16} />
-                      </button>
+                      {checkActionPermission('edit') && (
+                        <button 
+                          onClick={(e) => { e.stopPropagation(); setSelectedRole(r); }}
+                          className="p-1 text-blue-600 hover:bg-blue-50 rounded"
+                          title="Edit Permissions"
+                        >
+                          <Edit size={16} />
+                        </button>
+                      )}
+                      {checkActionPermission('delete') && (
+                        <button 
+                          onClick={(e) => { e.stopPropagation(); handleDeleteRole(r); }}
+                          className="p-1 text-red-600 hover:bg-red-50 rounded"
+                          title="Delete"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>

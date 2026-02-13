@@ -154,6 +154,36 @@ const initDB = async () => {
       )
     `);
 
+    // System Settings Table
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS system_settings (
+        setting_key VARCHAR(50) PRIMARY KEY,
+        setting_value VARCHAR(255)
+      )
+    `);
+
+    // Seed Default Settings
+    const [settings] = await connection.query('SELECT * FROM system_settings');
+    if (settings.length === 0) {
+      await connection.query(`
+        INSERT INTO system_settings (setting_key, setting_value) VALUES 
+        ('ppn_rate', '0'),
+        ('discount_rate', '0')
+      `);
+      console.log('Seeded system settings');
+    }
+
+    // Add tax and discount columns to transactions if not exists
+    try {
+      await connection.query(`ALTER TABLE transactions ADD COLUMN tax_amount DECIMAL(10, 2) DEFAULT 0`);
+    } catch (e) {}
+    try {
+      await connection.query(`ALTER TABLE transactions ADD COLUMN discount_amount DECIMAL(10, 2) DEFAULT 0`);
+    } catch (e) {}
+    try {
+        await connection.query(`ALTER TABLE transactions ADD COLUMN subtotal DECIMAL(10, 2) DEFAULT 0`);
+    } catch (e) {}
+
     // Add outlet_id to users if not exists
     try {
       await connection.query(`ALTER TABLE users ADD COLUMN outlet_id INT DEFAULT NULL`);
@@ -1019,9 +1049,53 @@ app.delete('/api/outlets/:id', authenticate, async (req, res) => {
   }
 });
 
+// === System Settings Endpoints ===
+
+// Get Settings
+app.get('/api/settings', authenticate, async (req, res) => {
+  try {
+    const connection = await pool.getConnection();
+    const [rows] = await connection.query('SELECT * FROM system_settings');
+    connection.release();
+    
+    const settings = {};
+    rows.forEach(row => {
+      settings[row.setting_key] = row.setting_value;
+    });
+    
+    res.json(settings);
+  } catch (error) {
+    console.error('Error fetching settings:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Update Settings
+app.put('/api/settings', authenticate, async (req, res) => {
+  const { ppn_rate, discount_rate } = req.body;
+  
+  try {
+    const connection = await pool.getConnection();
+    
+    if (ppn_rate !== undefined) {
+      await connection.query('INSERT INTO system_settings (setting_key, setting_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE setting_value = ?', ['ppn_rate', ppn_rate, ppn_rate]);
+    }
+    
+    if (discount_rate !== undefined) {
+      await connection.query('INSERT INTO system_settings (setting_key, setting_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE setting_value = ?', ['discount_rate', discount_rate, discount_rate]);
+    }
+    
+    connection.release();
+    res.json({ message: 'Settings updated successfully' });
+  } catch (error) {
+    console.error('Error updating settings:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 // Create a new transaction
 app.post('/api/transactions', async (req, res) => {
-  const { outlet_id, items, total_amount } = req.body;
+  const { outlet_id, items, total_amount, tax_amount, discount_amount, subtotal } = req.body;
   
   if (!items || items.length === 0) {
     return res.status(400).json({ message: 'No items in transaction' });
@@ -1033,8 +1107,8 @@ app.post('/api/transactions', async (req, res) => {
 
     // 1. Create Transaction Record
     const [transResult] = await connection.query(
-      'INSERT INTO transactions (outlet_id, total_amount) VALUES (?, ?)',
-      [outlet_id || null, total_amount]
+      'INSERT INTO transactions (outlet_id, total_amount, tax_amount, discount_amount, subtotal) VALUES (?, ?, ?, ?, ?)',
+      [outlet_id || null, total_amount, tax_amount || 0, discount_amount || 0, subtotal || 0]
     );
     const transactionId = transResult.insertId;
 

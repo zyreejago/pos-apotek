@@ -18,7 +18,8 @@ import {
   Repeat,
   ChevronLeft,
   ChevronRight,
-  Activity
+  Activity,
+  Percent
 } from 'lucide-react';
 
 interface Permission {
@@ -226,6 +227,10 @@ export default function Sidebar() {
                     <Link href="/settings/role-permissions" className={`flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer ${isActive('/settings/role-permissions') ? 'bg-blue-50 text-blue-600' : 'text-slate-500 hover:text-slate-700 hover:bg-gray-50'}`}>
                         <div className={`w-1.5 h-1.5 rounded-full ${isActive('/settings/role-permissions') ? 'bg-blue-600' : 'bg-transparent border border-slate-400'}`}></div>
                         <span className="font-medium text-sm">Role & Permissions</span>
+                    </Link>
+                    <Link href="/settings/transaction-settings" className={`flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer ${isActive('/settings/transaction-settings') ? 'bg-blue-50 text-blue-600' : 'text-slate-500 hover:text-slate-700 hover:bg-gray-50'}`}>
+                        <div className={`w-1.5 h-1.5 rounded-full ${isActive('/settings/transaction-settings') ? 'bg-blue-600' : 'bg-transparent border border-slate-400'}`}></div>
+                        <span className="font-medium text-sm">Transactions Settings</span>
                     </Link>
                 </div>
             )}

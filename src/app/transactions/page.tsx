@@ -38,14 +38,19 @@ export default function POSTransactionsPage() {
   const [selectedOutlet, setSelectedOutlet] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
+  const [settings, setSettings] = useState({ ppn_rate: 0, discount_rate: 0 });
 
   // Fetch Data
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [prodRes, outletRes] = await Promise.all([
+        const token = localStorage.getItem('token');
+        const [prodRes, outletRes, settingsRes] = await Promise.all([
           fetch('http://localhost:5000/api/products?limit=100'), // Get enough products
-          fetch('http://localhost:5000/api/outlets')
+          fetch('http://localhost:5000/api/outlets'),
+          fetch(`http://localhost:5000/api/settings?t=${Date.now()}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+          })
         ]);
         
         if (prodRes.ok) {
@@ -64,6 +69,14 @@ export default function POSTransactionsPage() {
             console.error('Outlets data is not an array:', outletData);
             setOutlets([]);
           }
+        }
+
+        if (settingsRes.ok) {
+            const settingsData = await settingsRes.json();
+            setSettings({
+                ppn_rate: Number(settingsData.ppn_rate) || 0,
+                discount_rate: Number(settingsData.discount_rate) || 0
+            });
         }
       } catch (error) {
         console.error('Error fetching data:', error);
@@ -110,8 +123,9 @@ export default function POSTransactionsPage() {
 
   // Calculations
   const subtotal = cart.reduce((sum, item) => sum + (item.selling_price * item.quantity), 0);
-  const discount = 0; // Future implementation
-  const total = subtotal - discount;
+  const ppn = settings.ppn_rate > 0 ? (subtotal * settings.ppn_rate / 100) : 0;
+  const discount = settings.discount_rate > 0 ? (subtotal * settings.discount_rate / 100) : 0;
+  const total = subtotal + ppn - discount;
 
   // Filter Products
   const filteredProducts = products.filter(p => 
@@ -138,7 +152,10 @@ export default function POSTransactionsPage() {
           quantity: item.quantity,
           price: item.selling_price
         })),
-        total_amount: total
+        total_amount: total,
+        subtotal: subtotal,
+        tax_amount: ppn,
+        discount_amount: discount
       };
 
       const res = await fetch('http://localhost:5000/api/transactions', {
@@ -290,11 +307,19 @@ export default function POSTransactionsPage() {
                     <span>Sub total</span>
                     <span className="font-medium">{formatCurrency(subtotal)}</span>
                 </div>
-                <div className="flex justify-between text-red-500">
-                    <span>Diskon</span>
-                    <span className="font-medium">-Rp 0</span>
-                </div>
-                <div className="flex justify-between text-gray-900 font-bold text-lg pt-2">
+                {settings.ppn_rate > 0 && (
+                    <div className="flex justify-between text-gray-600">
+                        <span>PPN ({settings.ppn_rate}%)</span>
+                        <span className="font-medium text-orange-600">+{formatCurrency(ppn)}</span>
+                    </div>
+                )}
+                {settings.discount_rate > 0 && (
+                    <div className="flex justify-between text-red-500">
+                        <span>Diskon ({settings.discount_rate}%)</span>
+                        <span className="font-medium">-{formatCurrency(discount)}</span>
+                    </div>
+                )}
+                <div className="flex justify-between text-gray-900 font-bold text-lg pt-2 border-t border-gray-100">
                     <span>Total</span>
                     <span>{formatCurrency(total)}</span>
                 </div>
