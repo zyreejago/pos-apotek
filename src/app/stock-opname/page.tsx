@@ -4,6 +4,8 @@ import React, { useState, useEffect } from 'react';
 import { Search, Filter, Save, AlertCircle } from 'lucide-react';
 import { useToast } from '@/components/ToastProvider';
 import ConfirmModal from '@/components/ConfirmModal';
+import { useRequirePermission } from '@/hooks/useRequirePermission';
+import Header from '@/components/Header';
 
 interface Product {
   id: number;
@@ -33,6 +35,9 @@ interface OpnameEntry {
 
 export default function StockOpnamePage() {
   const { showToast } = useToast();
+  // Permission Check
+  const { loading: permLoading, hasPermission, checkActionPermission } = useRequirePermission('Stock Opname');
+
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -95,9 +100,15 @@ export default function StockOpnamePage() {
       }
     }, 500);
     return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchQuery]);
 
   const handleStartOpname = () => {
+    // Permission Check
+    if (!checkActionPermission('create') && !checkActionPermission('edit')) {
+        showToast('You do not have permission to perform stock opname', 'error');
+        return;
+    }
     setIsOpnameActive(true);
     setOpnameData({});
   };
@@ -128,6 +139,12 @@ export default function StockOpnamePage() {
   };
 
   const handleSubmitOpname = async () => {
+    // Permission Check
+    if (!checkActionPermission('create') && !checkActionPermission('edit')) {
+        showToast('You do not have permission to submit stock opname', 'error');
+        return;
+    }
+
     // Collect all items that have changes
     const itemsToUpdate: OpnameItem[] = [];
     
@@ -215,25 +232,20 @@ export default function StockOpnamePage() {
   };
 
   return (
-    <div className="p-8">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
-        <div>
-          <div className="flex items-center gap-2 text-sm text-gray-500 mb-1">
-            <span>Inventory</span>
-            <span>/</span>
-            <span className="font-semibold text-gray-900">Stock Opname</span>
-          </div>
-          <h1 className="text-2xl font-bold text-gray-900">Stock Opname</h1>
-        </div>
-        <div className="flex items-center gap-3">
-          {!isOpnameActive ? (
+    <div className="bg-gray-50 min-h-screen relative">
+      <Header 
+        title="Stock Opname"
+        breadcrumbs={[{ label: 'Inventory' }, { label: 'Stock Opname' }]}
+        rightContent={
+          !isOpnameActive ? (
+            (checkActionPermission('create') || checkActionPermission('edit')) && (
             <button 
               onClick={handleStartOpname}
               className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm"
             >
               Mulai Stock Opname
             </button>
+            )
           ) : (
             <div className="flex gap-2">
               <button 
@@ -252,15 +264,13 @@ export default function StockOpnamePage() {
                 {isSubmitting ? 'Saving...' : 'Submit Opname'}
               </button>
             </div>
-          )}
-           <div className="w-10 h-10 rounded-full bg-gray-200 overflow-hidden ml-2">
-                <img src="https://ui-avatars.com/api/?name=Admin" alt="User" />
-            </div>
-        </div>
-      </div>
+          )
+        }
+      />
 
       {/* Main Content */}
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+      <div className="p-8 pt-0">
+        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
         {/* Toolbar */}
         <div className="p-4 flex flex-col md:flex-row justify-between items-center gap-4">
             <div className="w-full md:w-auto text-sm text-gray-500">
@@ -421,6 +431,7 @@ export default function StockOpnamePage() {
                 </div>
             </div>
         </div>
+      </div>
       </div>
       {/* Confirm Modal */}
       <ConfirmModal

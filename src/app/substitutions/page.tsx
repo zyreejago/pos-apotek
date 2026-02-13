@@ -1,8 +1,12 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useRequirePermission } from '@/hooks/useRequirePermission';
+import Header from '@/components/Header';
 
 export default function Page() {
+  useRequirePermission('Substitutions');
+
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<{ recommendations: { name: string; source?: string }[]; advice?: string; sources?: string[] } | null>(null);
@@ -41,8 +45,14 @@ export default function Page() {
   };
 
   return (
-    <div className="p-8">
-      <div className="text-sm text-gray-500 mb-2">Subtitusi Products</div>
+    <div className="bg-gray-50 min-h-screen relative">
+      <Header 
+        title="Substitutions"
+        subtitle="Subtitusi Products"
+        breadcrumbs={[{ label: 'Products' }, { label: 'Substitutions' }]}
+      />
+
+      <div className="p-8 pt-0">
       <div className="bg-white border border-gray-100 rounded-xl p-4 md:p-6">
         <div className="flex items-center justify-between mb-4">
           <div className="text-gray-600">Showing {Math.min(pageSize, total)} of {total} Products</div>
@@ -113,7 +123,7 @@ export default function Page() {
           </div>
         </div>
       </div>
-
+      </div>
     </div>
   );
 }

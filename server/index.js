@@ -309,6 +309,15 @@ const initDB = async () => {
       }
     }
 
+    // Migration: Rename Modules
+    try {
+      await connection.query("UPDATE role_permissions SET module = 'Peramalan Stok' WHERE module = 'Recommendations Stock'");
+      await connection.query("UPDATE role_permissions SET module = 'Management Pengguna' WHERE module = 'Management Cashier'");
+    } catch (e) {
+      // Ignore if fails, or maybe log it
+      console.log('Migration of module names skipped or failed:', e.message);
+    }
+
     console.log('Database initialized: tables ready');
     connection.release();
   } catch (error) {
@@ -369,14 +378,40 @@ const requireSuperadmin = (req, res, next) => {
   next();
 };
 
+const checkPermission = (moduleName, action) => {
+  return async (req, res, next) => {
+    if (req.user.role === 'superadmin') return next();
+    
+    try {
+      const [roles] = await pool.query('SELECT id FROM roles WHERE name = ?', [req.user.role]);
+      if (roles.length === 0) return res.status(403).json({ message: 'Forbidden' });
+      
+      const roleId = roles[0].id;
+      const [perms] = await pool.query(
+        'SELECT allowed FROM role_permissions WHERE role_id = ? AND module = ? AND action = ?',
+        [roleId, moduleName, action]
+      );
+      
+      if (perms.length > 0 && perms[0].allowed) {
+        next();
+      } else {
+        res.status(403).json({ message: 'Forbidden' });
+      }
+    } catch (e) {
+      console.error('Permission check error:', e);
+      res.status(500).json({ message: 'Server error' });
+    }
+  };
+};
+
 const RBAC_MODULES = [
   'Management Product',
   'Management Stock',
   'Outlets',
   'Transactions',
-  'Management Cashier',
+  'Management Pengguna',
   'Sales Report',
-  'Recommendations Stock',
+  'Peramalan Stok',
   'Substitutions',
   'Suppliers',
   'Stock Opname',
@@ -430,9 +465,32 @@ app.delete('/api/rbac/roles/:id', authenticate, requireSuperadmin, async (req, r
 
 app.get('/api/rbac/permissions', authenticate, async (req, res) => {
   const roleId = parseInt(req.query.roleId, 10);
-  if (!roleId) return res.status(400).json({ message: 'roleId required' });
+  const roleName = req.query.roleName;
+
+  if (!roleId && !roleName) return res.status(400).json({ message: 'roleId or roleName required' });
+  
   try {
-    const [rows] = await pool.query('SELECT module, action, allowed FROM role_permissions WHERE role_id = ?', [roleId]);
+    let targetRoleId = roleId;
+
+    // If roleName provided, look up ID
+    if (!targetRoleId && roleName) {
+      const [roles] = await pool.query('SELECT id FROM roles WHERE name = ?', [roleName]);
+      if (roles.length > 0) {
+        targetRoleId = roles[0].id;
+      } else {
+        // If role not found in roles table, return all false (or handle default)
+        // For superadmin, maybe we want to return all true? 
+        // But usually superadmin should be in roles table too if managed via RBAC.
+        // If hardcoded superadmin user exists but not in roles table, we might have issues.
+        // For now, let's assume roles exist.
+        return res.json(RBAC_MODULES.map(m => ({
+          module: m,
+          create: false, edit: false, delete: false, show: false
+        })));
+      }
+    }
+
+    const [rows] = await pool.query('SELECT module, action, allowed FROM role_permissions WHERE role_id = ?', [targetRoleId]);
     const actions = ['create','edit','delete','show'];
     const result = RBAC_MODULES.map(m => {
       const item = { module: m };
@@ -558,11 +616,16 @@ app.get('/api/users', authenticate, async (req, res) => {
 });
 
 // Create new user
-app.post('/api/users', authenticate, requireSuperadmin, async (req, res) => {
+app.post('/api/users', authenticate, checkPermission('Management Pengguna', 'create'), async (req, res) => {
   const { username, password, role, outlet_id, status } = req.body;
   
   if (!username || !password || !role) {
     return res.status(400).json({ message: 'Username, password, and role are required' });
+  }
+
+  // Prevent creating superadmin if not superadmin
+  if (role === 'superadmin' && req.user.role !== 'superadmin') {
+      return res.status(403).json({ message: 'Cannot create superadmin' });
   }
 
   try {
@@ -582,7 +645,7 @@ app.post('/api/users', authenticate, requireSuperadmin, async (req, res) => {
 });
 
 // Update user
-app.put('/api/users/:id', authenticate, requireSuperadmin, async (req, res) => {
+app.put('/api/users/:id', authenticate, checkPermission('Management Pengguna', 'edit'), async (req, res) => {
   const id = parseInt(req.params.id);
   const { username, password, role, outlet_id, status } = req.body;
 
@@ -592,6 +655,16 @@ app.put('/api/users/:id', authenticate, requireSuperadmin, async (req, res) => {
     // Check if user exists
     const [existing] = await pool.query('SELECT * FROM users WHERE id = ?', [id]);
     if (existing.length === 0) return res.status(404).json({ message: 'User not found' });
+
+    // Prevent modifying superadmin if not superadmin
+    if (existing[0].role === 'superadmin' && req.user.role !== 'superadmin') {
+        return res.status(403).json({ message: 'Cannot modify superadmin' });
+    }
+
+    // Prevent escalating role to superadmin
+    if (role === 'superadmin' && req.user.role !== 'superadmin') {
+        return res.status(403).json({ message: 'Cannot promote to superadmin' });
+    }
 
     let query = 'UPDATE users SET username = ?, role = ?, outlet_id = ?, status = ?';
     let params = [username, role, outlet_id || null, status || 'active'];
@@ -617,13 +690,22 @@ app.put('/api/users/:id', authenticate, requireSuperadmin, async (req, res) => {
 });
 
 // Delete user
-app.delete('/api/users/:id', authenticate, requireSuperadmin, async (req, res) => {
+app.delete('/api/users/:id', authenticate, checkPermission('Management Pengguna', 'delete'), async (req, res) => {
   const id = parseInt(req.params.id);
   
   try {
     // Prevent deleting self
     if (req.user.id === id) {
       return res.status(403).json({ message: 'Cannot delete your own account' });
+    }
+
+    // Check target user role
+    const [existing] = await pool.query('SELECT role FROM users WHERE id = ?', [id]);
+    if (existing.length === 0) return res.status(404).json({ message: 'User not found' });
+
+    // Prevent deleting superadmin if not superadmin
+    if (existing[0].role === 'superadmin' && req.user.role !== 'superadmin') {
+        return res.status(403).json({ message: 'Cannot delete superadmin' });
     }
 
     const [result] = await pool.query('DELETE FROM users WHERE id = ?', [id]);
@@ -772,6 +854,63 @@ app.delete('/api/products/:id', async (req, res) => {
   }
 });
 
+// Stock Adjustment Endpoint
+app.post('/api/inventory/adjust', authenticate, checkPermission('Management Stock', 'edit'), async (req, res) => {
+  const { productId, type, quantity, note } = req.body; // type: 'add' | 'reduce'
+
+  if (!productId || !type || !quantity) {
+    return res.status(400).json({ message: 'Missing required fields' });
+  }
+
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+
+    // Get current stock
+    const [products] = await connection.query('SELECT stock FROM products WHERE id = ?', [productId]);
+    if (products.length === 0) {
+      connection.release();
+      return res.status(404).json({ message: 'Product not found' });
+    }
+    const currentStock = products[0].stock;
+    let newStock = currentStock;
+    let change = 0;
+
+    if (type === 'add') {
+      newStock += quantity;
+      change = quantity;
+    } else if (type === 'reduce') {
+      if (currentStock < quantity) {
+        connection.release();
+        return res.status(400).json({ message: 'Insufficient stock' });
+      }
+      newStock -= quantity;
+      change = -quantity;
+    } else {
+      connection.release();
+      return res.status(400).json({ message: 'Invalid adjustment type' });
+    }
+
+    // Update product stock
+    await connection.query('UPDATE products SET stock = ? WHERE id = ?', [newStock, productId]);
+
+    // Record history
+    await connection.query(
+      'INSERT INTO inventory_history (product_id, type, quantity_change, previous_stock, new_stock, note) VALUES (?, ?, ?, ?, ?, ?)',
+      [productId, 'adjustment', change, currentStock, newStock, note || 'Manual Adjustment']
+    );
+
+    await connection.commit();
+    res.json({ message: 'Stock adjusted successfully', newStock });
+  } catch (error) {
+    await connection.rollback();
+    console.error('Error adjusting stock:', error);
+    res.status(500).json({ message: 'Server error' });
+  } finally {
+    connection.release();
+  }
+});
+
 // Stock Opname Endpoint
 app.post('/api/stock-opname', async (req, res) => {
   const { items, note } = req.body; // items: [{ id, system_stock, actual_stock }]
@@ -811,16 +950,6 @@ app.post('/api/stock-opname', async (req, res) => {
   }
 });
 
-// Get all outlets
-app.get('/api/outlets', async (req, res) => {
-  try {
-    const [rows] = await pool.query('SELECT * FROM outlets ORDER BY created_at DESC');
-    res.json(rows);
-  } catch (error) {
-    console.error('Error fetching outlets:', error);
-    res.status(500).json({ message: 'Server error' });
-  }
-});
 
 // Add a new outlet
 app.post('/api/outlets', async (req, res) => {
@@ -845,6 +974,47 @@ app.post('/api/outlets', async (req, res) => {
     res.status(201).json(newOutlet);
   } catch (error) {
     console.error('Error adding outlet:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Update an outlet
+app.put('/api/outlets/:id', authenticate, async (req, res) => {
+  const { id } = req.params;
+  const { name, location, status } = req.body;
+
+  try {
+    await pool.query(
+      'UPDATE outlets SET name = ?, location = ?, status = ? WHERE id = ?',
+      [name, location, status || 'Active', id]
+    );
+    res.json({ message: 'Outlet updated successfully' });
+  } catch (error) {
+    console.error('Error updating outlet:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Delete an outlet
+app.delete('/api/outlets/:id', authenticate, async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    // Check if outlet has transactions or users
+    const [users] = await pool.query('SELECT id FROM users WHERE outlet_id = ?', [id]);
+    if (users.length > 0) {
+      return res.status(400).json({ message: 'Cannot delete outlet with assigned users' });
+    }
+
+    const [transactions] = await pool.query('SELECT id FROM transactions WHERE outlet_id = ?', [id]);
+    if (transactions.length > 0) {
+      return res.status(400).json({ message: 'Cannot delete outlet with transactions' });
+    }
+
+    await pool.query('DELETE FROM outlets WHERE id = ?', [id]);
+    res.json({ message: 'Outlet deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting outlet:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -1051,6 +1221,244 @@ app.delete('/api/suppliers/:id', async (req, res) => {
     res.json({ message: 'Supplier deleted successfully' });
   } catch (error) {
     console.error('Error deleting supplier:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Financial Report: Profit & Loss
+app.get('/api/financial/profit-loss', authenticate, async (req, res) => {
+  const { month, year } = req.query;
+
+  if (!month || !year) {
+    return res.status(400).json({ message: 'Month and year are required' });
+  }
+
+  try {
+    const connection = await pool.getConnection();
+
+    // 1. Revenue (Pendapatan Penjualan)
+    // Month is 1-12 in query, but MySQL MONTH() returns 1-12.
+    const [revenueRows] = await connection.query(
+      'SELECT SUM(total_amount) as total_sales FROM transactions WHERE MONTH(transaction_date) = ? AND YEAR(transaction_date) = ?',
+      [month, year]
+    );
+    const totalRevenue = revenueRows[0].total_sales || 0;
+
+    // 2. COGS (Harga Pokok Penjualan) from Sales
+    // Join transaction_items -> transactions to filter by date
+    // Join transaction_items -> products to get cost_price
+    const [cogsRows] = await connection.query(`
+      SELECT SUM(ti.quantity * p.cost_price) as total_cogs
+      FROM transaction_items ti
+      JOIN transactions t ON ti.transaction_id = t.id
+      JOIN products p ON ti.product_id = p.id
+      WHERE MONTH(t.transaction_date) = ? AND YEAR(t.transaction_date) = ?
+    `, [month, year]);
+    const salesCOGS = cogsRows[0].total_cogs || 0;
+
+    // 3. Opname Difference (Selisih Persediaan)
+    // Calculate value of stock changes from opname
+    // Note: quantity_change is positive for gain, negative for loss.
+    // If we want "Cost" of opname, a negative change (loss) is an expense/cost.
+    // The image shows "Harga Pokok Penjualan Dari Opname". Usually this means inventory write-off (loss).
+    // If quantity_change is -5, and cost is 1000, value is -5000.
+    // We sum this value. If negative, it increases COGS? Or is it listed separately?
+    // In standard accounting: COGS = Opening Stock + Purchases - Closing Stock.
+    // Here we are doing Sales-based COGS + Variances.
+    // If we lost stock (negative change), it's a cost. So we should flip the sign if we treat it as a positive cost value, or just sum it.
+    // Let's sum (quantity_change * cost). If result is negative (loss), it reduces profit.
+    // The image shows "Harga Pokok Penjualan Dari Opname" as a positive number "Rp. 795.657" (in the example).
+    // This implies it's a COST. So a stock LOSS (negative quantity) becomes a positive COST.
+    // So we should take -1 * SUM(quantity_change * cost).
+    const [opnameRows] = await connection.query(`
+      SELECT SUM(ih.quantity_change * p.cost_price) as opname_value
+      FROM inventory_history ih
+      JOIN products p ON ih.product_id = p.id
+      WHERE ih.type = 'opname' AND MONTH(ih.created_at) = ? AND YEAR(ih.created_at) = ?
+    `, [month, year]);
+    
+    // If opname_value is negative (loss of stock), it is a cost. So -(-5000) = 5000 cost.
+    // If opname_value is positive (gain of stock), it reduces cost.
+    const rawOpnameValue = opnameRows[0].opname_value || 0;
+    const opnameCost = -rawOpnameValue; 
+
+    // 4. Expenses (Laba Daki / Lain-lain)
+    // We don't have an expenses table yet. We'll return 0 or hardcoded for demo.
+    // The image shows "Laba Daki" with a large negative number.
+    // Let's just return 0 for now.
+    const otherExpenses = 0;
+
+    connection.release();
+
+    res.json({
+      period: { month, year },
+      revenue: {
+        total: totalRevenue,
+        details: [
+          { label: 'Penjualan Barang', amount: totalRevenue },
+          // { label: 'Retur Penjualan', amount: 0 }
+        ]
+      },
+      cogs: {
+        total: Number(salesCOGS) + Number(opnameCost),
+        details: [
+          { label: 'Harga Pokok Penjualan', amount: salesCOGS },
+          { label: 'Harga Pokok Penjualan Dari Opname (Selisih Persediaan)', amount: opnameCost }
+        ]
+      },
+      gross_profit: (revenueRows[0].total_sales || 0) - (Number(salesCOGS) + Number(opnameCost)),
+      expenses: {
+        total: otherExpenses,
+        details: [
+          { label: 'Biaya Operasional (Demo)', amount: otherExpenses }
+        ]
+      },
+      net_profit: (revenueRows[0].total_sales || 0) - (Number(salesCOGS) + Number(opnameCost)) - otherExpenses
+    });
+  } catch (error) {
+    console.error('Error generating financial report:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Transaction Report Endpoint
+app.get('/api/reports/transactions', authenticate, async (req, res) => {
+  const { startDate, endDate } = req.query;
+
+  if (!startDate || !endDate) {
+    return res.status(400).json({ message: 'Start date and end date are required' });
+  }
+
+  try {
+    const connection = await pool.getConnection();
+
+    // 1. Get Transactions with Outlet Info
+    const [transactions] = await connection.query(`
+      SELECT t.id, t.transaction_date, t.total_amount, o.name as outlet_name
+      FROM transactions t
+      LEFT JOIN outlets o ON t.outlet_id = o.id
+      WHERE DATE(t.transaction_date) BETWEEN ? AND ?
+      ORDER BY t.transaction_date DESC
+    `, [startDate, endDate]);
+
+    // 2. Get Items for these transactions
+    const transactionIds = transactions.map(t => t.id);
+    let items = [];
+    if (transactionIds.length > 0) {
+      const [itemRows] = await connection.query(`
+        SELECT ti.transaction_id, ti.quantity, ti.price, p.name as product_name
+        FROM transaction_items ti
+        JOIN products p ON ti.product_id = p.id
+        WHERE ti.transaction_id IN (?)
+      `, [transactionIds]);
+      items = itemRows;
+    }
+
+    // Attach items to transactions
+    const transactionsWithItems = transactions.map(t => ({
+      ...t,
+      items: items.filter(i => i.transaction_id === t.id)
+    }));
+
+    // 3. Prepare Chart Data (Daily Sales)
+    const chartDataMap = {};
+    transactions.forEach(t => {
+      const date = new Date(t.transaction_date).toISOString().split('T')[0]; // YYYY-MM-DD
+      if (!chartDataMap[date]) {
+        chartDataMap[date] = 0;
+      }
+      chartDataMap[date] += Number(t.total_amount);
+    });
+
+    const chartData = Object.keys(chartDataMap).sort().map(date => ({
+      date,
+      total: chartDataMap[date]
+    }));
+
+    connection.release();
+
+    res.json({
+      transactions: transactionsWithItems,
+      chartData
+    });
+
+  } catch (error) {
+    console.error('Error generating transaction report:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Balance Sheet Endpoint
+app.get('/api/reports/balance', authenticate, async (req, res) => {
+  try {
+    const connection = await pool.getConnection();
+
+    // 1. Total Assets
+    // Cash: Sum of all transactions (simplified "Cash on Hand" from sales)
+    const [cashRows] = await connection.query('SELECT SUM(total_amount) as total_cash FROM transactions');
+    const cash = Number(cashRows[0].total_cash || 0);
+
+    // Inventory: Sum of stock * cost_price
+    const [inventoryRows] = await connection.query('SELECT SUM(stock * cost_price) as total_inventory FROM products');
+    const inventory = Number(inventoryRows[0].total_inventory || 0);
+    
+    // Receivables (Piutang): 0 for now (no credit sales tracking yet)
+    const receivables = 0;
+
+    const totalAssets = cash + inventory + receivables;
+
+    // 2. Liabilities
+    // Payables (Hutang Usaha): 0 for now (no purchase tracking yet)
+    const payables = 0;
+    // Consignment Debt: 0 for now
+    const consignmentDebt = 0;
+    
+    const totalLiabilities = payables + consignmentDebt;
+
+    // 3. Equity
+    // Retained Earnings (Laba Ditahan): Total Sales - Total COGS
+    // We need Total COGS for all time.
+    const [cogsRows] = await connection.query(`
+      SELECT SUM(ti.quantity * p.cost_price) as total_cogs
+      FROM transaction_items ti
+      JOIN products p ON ti.product_id = p.id
+    `);
+    const totalCOGS = Number(cogsRows[0].total_cogs || 0);
+    
+    // Retained Earnings = Revenue - COGS - Expenses (ignoring expenses for now as table doesn't exist)
+    const retainedEarnings = cash - totalCOGS;
+
+    // Initial Equity (Ekuitas Awal)
+    // To make it balance: Assets = Liabilities + Equity
+    // Equity = Initial Equity + Retained Earnings
+    // Initial Equity = Assets - Liabilities - Retained Earnings
+    // Initial Equity = (Cash + Inventory) - (0) - (Cash - COGS) = Inventory + COGS
+    const initialEquity = totalAssets - totalLiabilities - retainedEarnings;
+
+    connection.release();
+
+    res.json({
+      assets: {
+        cash,
+        inventory,
+        receivables,
+        total: totalAssets
+      },
+      liabilities: {
+        payables,
+        consignmentDebt,
+        total: totalLiabilities
+      },
+      equity: {
+        initial: initialEquity,
+        capitalChanges: 0, // Penambahan/Pengurangan Modal
+        retainedEarnings,
+        total: initialEquity + retainedEarnings
+      }
+    });
+
+  } catch (error) {
+    console.error('Error generating balance sheet:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });

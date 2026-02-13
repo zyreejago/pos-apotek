@@ -1,9 +1,12 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Search, Filter, MoreVertical, Plus, Edit, Trash2, X, AlertTriangle } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { Search, Filter, Plus, Edit, Trash2, X, ChevronLeft, ChevronRight, Package, MoreVertical, Upload } from 'lucide-react';
 import { useToast } from '@/components/ToastProvider';
 import ConfirmModal from '@/components/ConfirmModal';
+import Header from '@/components/Header';
+import { useRequirePermission } from '@/hooks/useRequirePermission';
 
 interface Product {
   id: number;
@@ -34,7 +37,11 @@ interface ProductFormData {
 }
 
 export default function ProductsPage() {
+  const router = useRouter();
   const { showToast } = useToast();
+  // Permission Check
+  const { loading: permLoading, hasPermission, checkActionPermission } = useRequirePermission('Management Product');
+
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -73,10 +80,24 @@ export default function ProductsPage() {
     category: 'General'
   });
 
+  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+  const authHeaders: HeadersInit = token ? { 'Authorization': `Bearer ${token}` } : {};
+
   const fetchProducts = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`http://localhost:5000/api/products?page=${currentPage}&limit=${itemsPerPage}&search=${searchQuery}`);
+      const res = await fetch(`http://localhost:5000/api/products?page=${currentPage}&limit=${itemsPerPage}&search=${searchQuery}`, {
+        headers: authHeaders
+      });
+
+      if (res.status === 401) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        document.cookie = "token=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+        router.push('/login');
+        return;
+      }
+
       const data = await res.json();
       setProducts(data.data);
       setPagination(data.pagination);
@@ -89,7 +110,12 @@ export default function ProductsPage() {
 
   useEffect(() => {
     fetchProducts();
-  }, [currentPage, itemsPerPage]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentPage]);
+
+  const checkPermission = (action: 'create' | 'edit' | 'delete') => {
+    return checkActionPermission(action);
+  };
 
   // Debounce search
   useEffect(() => {
@@ -177,6 +203,16 @@ export default function ProductsPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Permission check
+    if (modalMode === 'add' && !checkActionPermission('create')) {
+        showToast('You do not have permission to create products', 'error');
+        return;
+    }
+    if (modalMode === 'edit' && !checkActionPermission('edit')) {
+        showToast('You do not have permission to edit products', 'error');
+        return;
+    }
+
     const url = modalMode === 'add' 
       ? 'http://localhost:5000/api/products'
       : `http://localhost:5000/api/products/${selectedProduct?.id}`;
@@ -226,6 +262,12 @@ export default function ProductsPage() {
   };
 
   const handleConfirmDelete = async (product: Product) => {
+    // Permission check
+    if (!checkActionPermission('delete')) {
+        showToast('You do not have permission to delete products', 'error');
+        return;
+    }
+
     try {
       const res = await fetch(`http://localhost:5000/api/products/${product.id}`, {
         method: 'DELETE',
@@ -245,24 +287,26 @@ export default function ProductsPage() {
   };
 
   return (
-    <div className="p-8 bg-gray-50 min-h-screen relative">
-      {/* Header */}
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-800">Products</h1>
-          <p className="text-gray-500 mt-1">All Products: {pagination.total}</p>
-        </div>
-        <button 
-          onClick={handleOpenAddModal}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium transition-colors"
-        >
-          <Plus size={16} />
-          Add Products
-        </button>
-      </div>
+    <div className="bg-gray-50 min-h-screen relative">
+      <Header 
+        title="Products"
+        subtitle={`All Products: ${pagination.total}`}
+        rightContent={
+          checkPermission('create') && (
+            <button 
+              onClick={handleOpenAddModal}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium transition-colors"
+            >
+              <Plus size={16} />
+              Add Products
+            </button>
+          )
+        }
+      />
 
       {/* Main Content */}
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+      <div className="p-8 pt-0">
+        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
         {/* Toolbar */}
         <div className="p-4 flex flex-col md:flex-row justify-between items-center gap-4">
           <div className="text-sm text-gray-600 font-medium">
@@ -295,11 +339,11 @@ export default function ProductsPage() {
                   <input type="checkbox" className="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
                 </th>
                 {/* <th className="px-6 py-4 cursor-pointer hover:text-gray-700">ID ↕</th> */}
-                <th className="px-6 py-4 cursor-pointer hover:text-gray-700">Name ↕</th>
-                <th className="px-6 py-4 cursor-pointer hover:text-gray-700">Cost Price ↕</th>
-                <th className="px-6 py-4 cursor-pointer hover:text-gray-700">Selling Price ↕</th>
-                <th className="px-6 py-4 cursor-pointer hover:text-gray-700">Expired Date ↕</th>
-                <th className="px-6 py-4 cursor-pointer hover:text-gray-700">Stock ↕</th>
+                <th className="px-6 py-4 cursor-pointer hover:text-gray-700">Name </th>
+                <th className="px-6 py-4 cursor-pointer hover:text-gray-700">Cost Price </th>
+                <th className="px-6 py-4 cursor-pointer hover:text-gray-700">Selling Price </th>
+                <th className="px-6 py-4 cursor-pointer hover:text-gray-700">Expired Date </th>
+                <th className="px-6 py-4 cursor-pointer hover:text-gray-700">Stock </th>
                 <th className="px-6 py-4 text-right">Actions</th>
               </tr>
             </thead>
@@ -334,6 +378,7 @@ export default function ProductsPage() {
                     <td className="px-6 py-4 text-gray-600">{product.stock}</td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        {checkPermission('edit') && (
                         <button 
                           onClick={() => handleOpenEditModal(product)}
                           className="p-1 text-blue-600 hover:bg-blue-50 rounded"
@@ -341,6 +386,8 @@ export default function ProductsPage() {
                         >
                           <Edit size={16} />
                         </button>
+                        )}
+                        {checkPermission('delete') && (
                         <button 
                           onClick={() => handleOpenDeleteModal(product)}
                           className="p-1 text-red-600 hover:bg-red-50 rounded"
@@ -348,6 +395,7 @@ export default function ProductsPage() {
                         >
                           <Trash2 size={16} />
                         </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -401,6 +449,7 @@ export default function ProductsPage() {
             </div>
           </div>
         </div>
+      </div>
       </div>
 
       {/* Add/Edit Modal */}

@@ -5,11 +5,14 @@ import { useRouter } from "next/navigation";
 import { Trash2, Edit } from "lucide-react";
 import { useToast } from "@/components/ToastProvider";
 import ConfirmModal from "@/components/ConfirmModal";
+import Header from "@/components/Header";
+import { useRequirePermission } from "@/hooks/useRequirePermission";
 
 type Role = { id: number; name: string };
 type PermItem = { module: string; create: boolean; edit: boolean; delete: boolean; show: boolean };
 
 export default function Page() {
+  const { loading: permLoading, hasPermission } = useRequirePermission('System Settings');
   const { showToast } = useToast();
   const router = useRouter();
   const [roles, setRoles] = useState<Role[]>([]);
@@ -46,7 +49,7 @@ export default function Page() {
 
   const fetchRoles = async () => {
     try {
-      const res = await fetch("http://localhost:5000/api/rbac/roles", { headers: authHeaders });
+      const res = await fetch(`http://localhost:5000/api/rbac/roles?t=${Date.now()}`, { headers: authHeaders });
       
       if (res.status === 401) {
         showToast("Session expired. Please login again.", "error");
@@ -70,7 +73,7 @@ export default function Page() {
     setLoading(true);
     setHasChanges(false);
     try {
-      const res = await fetch(`http://localhost:5000/api/rbac/permissions?roleId=${roleId}`, { headers: authHeaders });
+      const res = await fetch(`http://localhost:5000/api/rbac/permissions?roleId=${roleId}&t=${Date.now()}`, { headers: authHeaders });
       
       if (res.status === 401) {
         showToast("Session expired. Please login again.", "error");
@@ -163,6 +166,7 @@ export default function Page() {
               setPerms([]);
             }
             showToast("Role deleted successfully", "success");
+            setConfirmModal(prev => ({ ...prev, isOpen: false }));
           } else {
             const data = await res.json();
             showToast(data.message || "Failed to delete role", "error");
@@ -212,16 +216,25 @@ export default function Page() {
     }
   };
 
-  return (
-    <div className="p-6 md:p-8">
-      <div className="flex items-center justify-between mb-6">
-        <div className="text-sm text-gray-500">Role & Permissions</div>
-        <button onClick={() => setShowAdd(true)} className="px-4 py-2 rounded-lg bg-blue-500 text-white text-sm font-semibold">Add Role & Permissions</button>
-      </div>
+  return (permLoading || !hasPermission) ? (
+    <div className="flex items-center justify-center min-h-screen bg-gray-50">Loading...</div>
+  ) : (
+    <div className="bg-gray-50 min-h-screen relative">
+      <Header 
+        title="Role Permissions"
+        subtitle="Manage roles and permissions"
+        breadcrumbs={[{ label: 'Settings' }, { label: 'Role Permissions' }]}
+        rightContent={
+          <button onClick={() => setShowAdd(true)} className="px-4 py-2 rounded-lg bg-blue-500 text-white text-sm font-semibold hover:bg-blue-600 transition-colors">
+            Add Role & Permissions
+          </button>
+        }
+      />
 
+      <div className="p-8 pt-0">
       <div className="bg-white border border-gray-100 rounded-xl p-4 md:p-6 mb-6">
         <div className="flex items-center gap-3 mb-4">
-          <input value={query} onChange={e => setQuery(e.target.value)} placeholder="like kasir" className="w-64 px-3 py-2 border border-gray-200 rounded-lg text-sm" />
+          <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Cari Permissions" className="w-64 px-3 py-2 border border-gray-200 rounded-lg text-sm" />
           {selectedRole && <div className="text-sm text-gray-500">Role: <span className="font-medium text-gray-700">{selectedRole.name}</span></div>}
         </div>
         <div className="overflow-x-auto">
@@ -246,9 +259,7 @@ export default function Page() {
                     <td key={a} className="px-3 py-3 text-center">
                       <label className="inline-flex items-center cursor-pointer">
                         <input type="checkbox" className="sr-only peer" checked={row[a]} onChange={e => togglePerm(row.module, a, e.target.checked)} />
-                        <div className="w-10 h-6 bg-gray-200 rounded-full peer-checked:bg-blue-500 transition-colors relative">
-                          <div className="absolute top-1 left-1 w-4 h-4 bg-white rounded-full peer-checked:left-5 transition-all"></div>
-                        </div>
+                        <div className={`w-11 h-6 bg-gray-200 rounded-full peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all after:duration-300 peer-checked:bg-blue-600 relative transition-colors duration-300`}></div>
                       </label>
                     </td>
                   ))}
@@ -340,7 +351,9 @@ export default function Page() {
           <div>1 of 1</div>
         </div>
       </div>
+      </div>
 
+      {/* Add Role Modal */}
       {showAdd && (
         <div className="fixed inset-0 bg-black/30 flex items-center justify-center">
           <div className="bg-white w-[420px] max-w-[90vw] rounded-xl p-6">

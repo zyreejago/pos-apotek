@@ -4,6 +4,8 @@ import React, { useState, useEffect } from 'react';
 import { Search, Filter, Plus, Edit, Trash2, X, AlertTriangle } from 'lucide-react';
 import { useToast } from '@/components/ToastProvider';
 import ConfirmModal from '@/components/ConfirmModal';
+import { useRequirePermission } from '@/hooks/useRequirePermission';
+import Header from '@/components/Header';
 
 interface Supplier {
   id: number;
@@ -29,6 +31,9 @@ interface SupplierFormData {
 
 export default function SuppliersPage() {
   const { showToast } = useToast();
+  // Permission Check
+  const { loading: permLoading, hasPermission, checkActionPermission } = useRequirePermission('Suppliers');
+
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -141,6 +146,17 @@ export default function SuppliersPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Permission check
+    if (modalMode === 'add' && !checkActionPermission('create')) {
+        showToast('You do not have permission to create suppliers', 'error');
+        return;
+    }
+    if (modalMode === 'edit' && !checkActionPermission('edit')) {
+        showToast('You do not have permission to edit suppliers', 'error');
+        return;
+    }
+
     try {
       const url = modalMode === 'add' 
         ? 'http://localhost:5000/api/suppliers' 
@@ -168,6 +184,12 @@ export default function SuppliersPage() {
   };
 
   const handleDelete = async (supplier: Supplier) => {
+    // Permission check
+    if (!checkActionPermission('delete')) {
+        showToast('You do not have permission to delete suppliers', 'error');
+        return;
+    }
+
     try {
       const res = await fetch(`http://localhost:5000/api/suppliers/${supplier.id}`, {
         method: 'DELETE'
@@ -186,28 +208,20 @@ export default function SuppliersPage() {
   };
 
   return (
-    <div className="p-8">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
-        <div>
-          <div className="flex items-center gap-2 text-sm text-gray-500 mb-1">
-            <span>Supplier</span>
-            <span>/</span>
-            <span className="font-semibold text-gray-900">Management Supplier</span>
-          </div>
-          <h1 className="text-2xl font-bold text-gray-900">Supplier</h1>
-        </div>
-        <div className="flex items-center gap-3">
-            <button className="bg-white border border-gray-200 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 flex items-center gap-2">
-                <Filter size={16} />
-                Select Outlets
-            </button>
-            <div className="w-10 h-10 rounded-full bg-gray-200 overflow-hidden">
-                <img src="https://ui-avatars.com/api/?name=Admin" alt="User" />
-            </div>
-        </div>
-      </div>
+    <div className="bg-gray-50 min-h-screen relative">
+      <Header 
+        title="Supplier"
+        subtitle="Management Supplier"
+        breadcrumbs={[{ label: 'Supplier' }, { label: 'Management Supplier' }]}
+        rightContent={
+          <button className="bg-white border border-gray-200 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 flex items-center gap-2">
+            <Filter size={16} />
+            Select Outlets
+          </button>
+        }
+      />
 
+      <div className="p-8 pt-0">
       {/* Main Content */}
       <div className="bg-white rounded-xl shadow-sm overflow-hidden">
         {/* Toolbar */}
@@ -231,12 +245,14 @@ export default function SuppliersPage() {
                     <Filter size={16} />
                     Filters
                 </button>
+                {checkActionPermission('create') && (
                 <button 
                     onClick={openAddModal}
                     className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 flex items-center gap-2 shadow-sm shadow-blue-200"
                 >
                     Add Supplier
                 </button>
+                )}
             </div>
         </div>
 
@@ -278,20 +294,24 @@ export default function SuppliersPage() {
                     <td className="px-6 py-4 text-gray-600">{supplier.phone || '-'}</td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button 
-                          onClick={() => openEditModal(supplier)}
-                          className="p-1 text-blue-600 hover:bg-blue-50 rounded"
-                          title="Edit"
-                        >
-                          <Edit size={16} />
-                        </button>
-                        <button 
-                          onClick={() => openDeleteModal(supplier)}
-                          className="p-1 text-red-600 hover:bg-red-50 rounded"
-                          title="Delete"
-                        >
-                          <Trash2 size={16} />
-                        </button>
+                        {checkActionPermission('edit') && (
+                          <button 
+                            onClick={() => openEditModal(supplier)}
+                            className="p-1 text-blue-600 hover:bg-blue-50 rounded"
+                            title="Edit"
+                          >
+                            <Edit size={16} />
+                          </button>
+                        )}
+                        {checkActionPermission('delete') && (
+                          <button 
+                            onClick={() => openDeleteModal(supplier)}
+                            className="p-1 text-red-600 hover:bg-red-50 rounded"
+                            title="Delete"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -352,6 +372,7 @@ export default function SuppliersPage() {
                 </div>
             </div>
         </div>
+      </div>
       </div>
 
       {/* Add/Edit Modal */}

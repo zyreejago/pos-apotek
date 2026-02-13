@@ -4,6 +4,8 @@ import React, { useState, useEffect } from 'react';
 import { Search, ShoppingCart, Plus, Minus, X, Store, CreditCard } from 'lucide-react';
 
 import { useToast } from '@/components/ToastProvider';
+import { useRequirePermission } from '@/hooks/useRequirePermission';
+import Header from '@/components/Header';
 
 interface Product {
   id: number;
@@ -26,6 +28,9 @@ interface CartItem extends Product {
 
 export default function POSTransactionsPage() {
   const { showToast } = useToast();
+  // Permission Check
+  const { loading: permLoading, hasPermission, checkActionPermission } = useRequirePermission('Transactions');
+
   const [products, setProducts] = useState<Product[]>([]);
   const [outlets, setOutlets] = useState<Outlet[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -115,6 +120,12 @@ export default function POSTransactionsPage() {
 
   // Handle Payment
   const handlePayment = async () => {
+    // Permission check for creating transaction (assuming 'create' is needed for payment)
+    if (!checkActionPermission('create')) {
+        showToast('You do not have permission to process transactions', 'error');
+        return;
+    }
+
     if (cart.length === 0) return showToast('Cart is empty', 'warning');
     if (!selectedOutlet) return showToast('Please select an outlet', 'warning');
 
@@ -157,14 +168,9 @@ export default function POSTransactionsPage() {
   return (
     <div className="flex flex-col h-screen bg-gray-50 overflow-hidden">
       {/* Header */}
-      <header className="bg-white px-6 py-4 flex justify-between items-center shrink-0 shadow-sm z-10">
-        <div className="flex items-center gap-4 text-sm text-gray-500">
-          <span>Transactions</span>
-          <span>/</span>
-          <span className="font-bold text-gray-900">Point Of Sales</span>
-        </div>
-        
-        <div className="flex items-center gap-3">
+      <Header 
+        breadcrumbs={[{ label: 'Transactions' }, { label: 'Point Of Sales' }]}
+        rightContent={
             <div className="relative">
                 <Store size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                 <select 
@@ -177,11 +183,8 @@ export default function POSTransactionsPage() {
                     ))}
                 </select>
             </div>
-            <div className="w-8 h-8 rounded-full bg-gray-200 overflow-hidden">
-                <img src="https://ui-avatars.com/api/?name=Admin" alt="User" />
-            </div>
-        </div>
-      </header>
+        }
+      />
 
       <div className="flex flex-1 overflow-hidden">
         {/* Left: Product Grid */}

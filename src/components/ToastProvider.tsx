@@ -29,7 +29,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
 
   const showToast = (message: string, type: ToastType) => {
-    const id = Math.random().toString(36).substr(2, 9);
+    const id = Date.now().toString();
     setToasts((prev) => [...prev, { id, message, type }]);
 
     // Auto-remove after 3 seconds

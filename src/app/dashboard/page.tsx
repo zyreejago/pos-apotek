@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { 
   LineChart, 
   Line, 
@@ -16,6 +17,7 @@ import {
   ArrowUpRight,
   ChevronDown
 } from 'lucide-react';
+import Header from '@/components/Header';
 
 // Interfaces
 interface StockRec {
@@ -43,6 +45,7 @@ interface Cashier {
 }
 
 export default function Dashboard() {
+  const router = useRouter();
   const [stockRecommendations, setStockRecommendations] = useState<StockRec[]>([]);
   const [earningsData, setEarningsData] = useState<Earning[]>([]);
   const [outlets, setOutlets] = useState<Outlet[]>([]);
@@ -69,6 +72,14 @@ export default function Dashboard() {
             'Authorization': `Bearer ${token}`
           }
         });
+
+        if (response.status === 401) {
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+          document.cookie = "token=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+          router.push('/login');
+          return;
+        }
 
         if (!response.ok) {
           throw new Error('Failed to fetch dashboard data');
@@ -118,36 +129,22 @@ export default function Dashboard() {
   const endIndex = Math.min(startIndex + itemsPerPage, filteredCashiers.length);
 
   return (
-    <div className="p-8 bg-gray-50 min-h-screen font-sans">
+    <div className="bg-gray-50 min-h-screen font-sans relative">
       {/* Top Header */}
-      <div className="flex justify-between items-center mb-8">
-        <div className="flex items-center text-gray-500 text-sm">
-          <span className="hover:text-gray-700 cursor-pointer">Dashboards</span>
-          <span className="mx-2">›</span>
-          <span className="text-gray-900 font-medium">Default</span>
-        </div>
-        
-        <div className="flex items-center gap-4">
+      <Header 
+        title="Dashboard"
+        subtitle="Sales Dashboard"
+        breadcrumbs={[{ label: 'Dashboards' }, { label: 'Default' }]}
+        rightContent={
           <button className="bg-white px-4 py-2 rounded-lg text-sm font-medium text-gray-700 shadow-sm border border-gray-200 flex items-center gap-2">
             <span className="w-2 h-2 bg-green-500 rounded-full"></span>
             Cabang XYZ
           </button>
-          <div className="w-10 h-10 rounded-full bg-gray-200 overflow-hidden border border-gray-200">
-            {/* Placeholder for User Avatar */}
-            <div className="w-full h-full bg-slate-300 flex items-center justify-center text-slate-500">
-               👤
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Dashboard Title */}
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-        <p className="text-gray-500 text-sm">Sales Dashboard</p>
-      </div>
+        }
+      />
 
       {/* Main Grid Content */}
+      <div className="p-8 pt-0">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
         {/* Card 1: Rekomendasi Stock Harian */}
@@ -356,6 +353,7 @@ export default function Dashboard() {
 
         </div>
 
+      </div>
       </div>
     </div>
   );
