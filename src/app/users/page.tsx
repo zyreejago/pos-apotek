@@ -11,6 +11,7 @@ import { useRequirePermission } from '@/hooks/useRequirePermission';
 interface UserData {
   id: number;
   username: string;
+  email: string;
   role: string;
   outlet_id: number | null;
   outlet_name: string | null;
@@ -38,6 +39,7 @@ interface Pagination {
 type CurrentUser = {
   id?: number;
   username?: string;
+  email?: string;
   role?: string;
 };
 
@@ -45,6 +47,7 @@ type ModalMode = 'add' | 'edit';
 
 type UserFormData = {
   username: string;
+  email: string;
   password: string;
   role: string;
   outlet_id: string;
@@ -76,6 +79,7 @@ export default function UsersPage() {
   
   const [formData, setFormData] = useState<UserFormData>({
     username: '',
+    email: '',
     password: '',
     role: 'Cashier',
     outlet_id: '',
@@ -213,6 +217,7 @@ export default function UsersPage() {
     setModalMode('add');
     setFormData({
       username: '',
+      email: '',
       password: '',
       role: 'Cashier',
       outlet_id: '',
@@ -226,6 +231,7 @@ export default function UsersPage() {
     setSelectedUser(user);
     setFormData({
       username: user.username,
+      email: user.email || '',
       password: '',
       role: user.role,
       outlet_id: user.outlet_id ? user.outlet_id.toString() : '',
@@ -264,6 +270,7 @@ export default function UsersPage() {
     try {
       const payload: Record<string, unknown> = {
         username: formData.username,
+        email: formData.email,
         role: formData.role,
         outlet_id: formData.outlet_id ? parseInt(formData.outlet_id) : null,
         status: formData.status
@@ -450,6 +457,7 @@ export default function UsersPage() {
                       </div>
                       <div className="min-w-0">
                         <h3 className="text-sm font-bold text-gray-900 leading-tight group-hover:text-blue-600 transition-colors truncate">{user.username}</h3>
+                        <p className="text-xs font-medium text-gray-500 mt-0.5 truncate">{user.email}</p>
                         <p className="text-xs font-medium text-gray-400 mt-0.5 truncate">{outletLabel}</p>
                       </div>
                     </div>
@@ -564,6 +572,18 @@ export default function UsersPage() {
                     onChange={(e) => setFormData(prev => ({ ...prev, username: e.target.value }))}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                     placeholder="Enter username"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                  <input
+                    type="email"
+                    required
+                    value={formData.email}
+                    onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                    placeholder="Enter email"
                   />
                 </div>
                 

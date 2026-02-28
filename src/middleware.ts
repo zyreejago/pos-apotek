@@ -20,12 +20,13 @@ export function middleware(request: NextRequest) {
   const token = request.cookies.get('token')?.value
   
   const isLoginPage = request.nextUrl.pathname === '/login'
+  const isForgotPasswordPage = request.nextUrl.pathname === '/forgot-password'
   
-  if (!token && !isLoginPage) {
+  if (!token && !isLoginPage && !isForgotPasswordPage) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
   
-  if (token && isLoginPage) {
+  if (token && (isLoginPage || isForgotPasswordPage)) {
     return NextResponse.redirect(new URL('/dashboard', request.url))
   }
  

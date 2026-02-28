@@ -30,9 +30,27 @@ const initDB = async () => {
       CREATE TABLE IF NOT EXISTS users (
         id INT AUTO_INCREMENT PRIMARY KEY,
         username VARCHAR(255) NOT NULL UNIQUE,
+        email VARCHAR(255) NOT NULL UNIQUE,
         password VARCHAR(255) NOT NULL,
         role VARCHAR(50) DEFAULT 'admin',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS password_reset_requests (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        email VARCHAR(255) NOT NULL,
+        code_hash VARCHAR(255) NOT NULL,
+        code_expires_at TIMESTAMP NOT NULL,
+        verified_at TIMESTAMP NULL,
+        reset_token_hash VARCHAR(255) NULL,
+        reset_token_expires_at TIMESTAMP NULL,
+        used_at TIMESTAMP NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_password_reset_email (email),
+        INDEX idx_password_reset_code_expires (code_expires_at),
+        INDEX idx_password_reset_token_expires (reset_token_expires_at)
       )
     `);
 
@@ -68,6 +86,32 @@ const initDB = async () => {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
+
+    try {
+      const [emailCols] = await connection.query(
+        `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'email'`
+      );
+      if (Array.isArray(emailCols) && emailCols.length === 0) {
+        await connection.query(`ALTER TABLE users ADD COLUMN email VARCHAR(255) NULL`);
+      }
+
+      await connection.query(
+        `UPDATE users SET email = CONCAT('user', id, '@example.com')
+         WHERE email IS NULL OR email = ''`
+      );
+      await connection.query(
+        `UPDATE users SET email = 'superadmin@example.com'
+         WHERE username = 'superadmin'`
+      );
+
+      try {
+        await connection.query(`ALTER TABLE users MODIFY email VARCHAR(255) NOT NULL`);
+      } catch (e) {}
+      try {
+        await connection.query(`ALTER TABLE users ADD UNIQUE KEY unique_users_email (email)`);
+      } catch (e) {}
+    } catch (e) {}
 
     try {
       await connection.query(`ALTER TABLE products CHANGE price cost_price DECIMAL(10, 2) DEFAULT 0`);
@@ -265,9 +309,18 @@ const initDB = async () => {
       const pwd = await bcrypt.hash('123456', 10);
       const [allOutlets] = await connection.query('SELECT id FROM outlets');
       if (allOutlets.length >= 2) {
-        await connection.query('INSERT INTO users (username, password, role, outlet_id) VALUES (?, ?, ?, ?)', ['kasir1', pwd, 'cashier', allOutlets[0].id]);
-        await connection.query('INSERT INTO users (username, password, role, outlet_id) VALUES (?, ?, ?, ?)', ['kasir2', pwd, 'cashier', allOutlets[0].id]);
-        await connection.query('INSERT INTO users (username, password, role, outlet_id) VALUES (?, ?, ?, ?)', ['kasir3', pwd, 'cashier', allOutlets[1].id]);
+        await connection.query(
+          'INSERT INTO users (username, email, password, role, outlet_id) VALUES (?, ?, ?, ?, ?)',
+          ['kasir1', 'kasir1@example.com', pwd, 'cashier', allOutlets[0].id]
+        );
+        await connection.query(
+          'INSERT INTO users (username, email, password, role, outlet_id) VALUES (?, ?, ?, ?, ?)',
+          ['kasir2', 'kasir2@example.com', pwd, 'cashier', allOutlets[0].id]
+        );
+        await connection.query(
+          'INSERT INTO users (username, email, password, role, outlet_id) VALUES (?, ?, ?, ?, ?)',
+          ['kasir3', 'kasir3@example.com', pwd, 'cashier', allOutlets[1].id]
+        );
       }
       console.log('Seeded cashiers');
     }
@@ -276,7 +329,10 @@ const initDB = async () => {
     if (users.length === 0) {
       const hashedPassword = await bcrypt.hash('password123', 10);
       try {
-        await connection.query('INSERT INTO users (username, password, role) VALUES (?, ?, ?)', ['superadmin', hashedPassword, 'superadmin']);
+        await connection.query(
+          'INSERT INTO users (username, email, password, role) VALUES (?, ?, ?, ?)',
+          ['superadmin', 'superadmin@example.com', hashedPassword, 'superadmin']
+        );
         console.log('Superadmin created: superadmin / password123');
       } catch (insertError) {
         if (insertError.code === 'ER_DUP_ENTRY') {
@@ -305,4 +361,3 @@ module.exports = {
   pool,
   initDB
 };
-

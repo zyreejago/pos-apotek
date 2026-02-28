@@ -14,15 +14,15 @@ module.exports = function registerUserRoutes(app, pool, bcrypt, authenticate, ch
       const connection = await pool.getConnection();
 
       let query =
-        'SELECT u.id, u.username, u.role, u.outlet_id, u.status, u.created_at, o.name as outlet_name FROM users u LEFT JOIN outlets o ON u.outlet_id = o.id';
+        'SELECT u.id, u.username, u.email, u.role, u.outlet_id, u.status, u.created_at, o.name as outlet_name FROM users u LEFT JOIN outlets o ON u.outlet_id = o.id';
       let countQuery = 'SELECT COUNT(*) as total FROM users u';
       let params = [];
 
       if (search) {
-        const searchCondition = ' WHERE u.username LIKE ? OR u.role LIKE ?';
+        const searchCondition = ' WHERE u.username LIKE ? OR u.email LIKE ? OR u.role LIKE ?';
         query += searchCondition;
         countQuery += searchCondition;
-        params.push(`%${search}%`, `%${search}%`);
+        params.push(`%${search}%`, `%${search}%`, `%${search}%`);
       }
 
       query += ' ORDER BY u.created_at DESC LIMIT ? OFFSET ?';
@@ -33,7 +33,7 @@ module.exports = function registerUserRoutes(app, pool, bcrypt, authenticate, ch
       // Get total count for pagination
       const [countResult] = await connection.query(
         countQuery,
-        search ? [`%${search}%`, `%${search}%`] : []
+        search ? [`%${search}%`, `%${search}%`, `%${search}%`] : []
       );
       const total = countResult[0].total;
 
@@ -61,12 +61,12 @@ module.exports = function registerUserRoutes(app, pool, bcrypt, authenticate, ch
     authenticate,
     checkPermission('Management Pengguna', 'create'),
     async (req, res) => {
-      const { username, password, role, outlet_id, status } = req.body;
+      const { username, email, password, role, outlet_id, status } = req.body;
 
-      if (!username || !password || !role) {
+      if (!username || !email || !password || !role) {
         return res
           .status(400)
-          .json({ message: 'Username, password, and role are required' });
+          .json({ message: 'Username, email, password, and role are required' });
       }
 
       // Prevent creating superadmin if not superadmin
@@ -77,19 +77,20 @@ module.exports = function registerUserRoutes(app, pool, bcrypt, authenticate, ch
       try {
         const hashedPassword = await bcrypt.hash(password, 10);
         const [result] = await pool.query(
-          'INSERT INTO users (username, password, role, outlet_id, status) VALUES (?, ?, ?, ?, ?)',
-          [username, hashedPassword, role, outlet_id || null, status || 'active']
+          'INSERT INTO users (username, email, password, role, outlet_id, status) VALUES (?, ?, ?, ?, ?, ?)',
+          [username, email, hashedPassword, role, outlet_id || null, status || 'active']
         );
         res.status(201).json({
           id: result.insertId,
           username,
+          email,
           role,
           outlet_id,
           status: status || 'active',
         });
       } catch (error) {
         if (error.code === 'ER_DUP_ENTRY') {
-          return res.status(409).json({ message: 'Username already exists' });
+          return res.status(409).json({ message: 'Username or Email already exists' });
         }
         console.error('Error creating user:', error);
         res.status(500).json({ message: 'Server error' });
@@ -104,7 +105,7 @@ module.exports = function registerUserRoutes(app, pool, bcrypt, authenticate, ch
     checkPermission('Management Pengguna', 'edit'),
     async (req, res) => {
       const id = parseInt(req.params.id);
-      const { username, password, role, outlet_id, status } = req.body;
+      const { username, email, password, role, outlet_id, status } = req.body;
 
       if (!id) return res.status(400).json({ message: 'Invalid ID' });
 
@@ -133,8 +134,8 @@ module.exports = function registerUserRoutes(app, pool, bcrypt, authenticate, ch
         }
 
         let query =
-          'UPDATE users SET username = ?, role = ?, outlet_id = ?, status = ?';
-        let params = [username, role, outlet_id || null, status || 'active'];
+          'UPDATE users SET username = ?, email = ?, role = ?, outlet_id = ?, status = ?';
+        let params = [username, email, role, outlet_id || null, status || 'active'];
 
         if (password) {
           const hashedPassword = await bcrypt.hash(password, 10);
@@ -149,7 +150,7 @@ module.exports = function registerUserRoutes(app, pool, bcrypt, authenticate, ch
         res.json({ message: 'User updated successfully' });
       } catch (error) {
         if (error.code === 'ER_DUP_ENTRY') {
-          return res.status(409).json({ message: 'Username already exists' });
+          return res.status(409).json({ message: 'Username or Email already exists' });
         }
         console.error('Error updating user:', error);
         res.status(500).json({ message: 'Server error' });

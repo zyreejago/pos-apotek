@@ -18,12 +18,13 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
 
     const token = localStorage.getItem('token');
     const isLoginPage = pathname === '/login';
+    const isForgotPasswordPage = pathname === '/forgot-password';
 
-    if (!token && !isLoginPage) {
+    if (!token && !isLoginPage && !isForgotPasswordPage) {
       router.push('/login');
     }
 
-    if (token && isLoginPage) {
+    if (token && (isLoginPage || isForgotPasswordPage)) {
       router.push('/dashboard');
     }
   }, [pathname, router, mounted]);
@@ -33,8 +34,9 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
   if (mounted && typeof window !== 'undefined') {
     const token = localStorage.getItem('token');
     const isLoginPage = pathname === '/login';
+    const isForgotPasswordPage = pathname === '/forgot-password';
     
-    if (!token && !isLoginPage) {
+    if (!token && !isLoginPage && !isForgotPasswordPage) {
         return null; // Or a loading spinner
     }
   }

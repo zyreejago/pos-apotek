@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
+const path = require('path');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const registerUserRoutes = require('./routes/users');
@@ -10,8 +11,12 @@ const registerSettingsRoutes = require('./routes/settings');
 const registerTransactionRoutes = require('./routes/transactions');
 const registerSupplierRoutes = require('./routes/suppliers');
 const registerReportRoutes = require('./routes/reports');
+const registerPasswordResetRoutes = require('./routes/password-reset');
+const registerProfileRoutes = require('./routes/profile');
 
-dotenv.config();
+const envPath = path.join(__dirname, '..', '.env');
+console.log('Loading .env from:', envPath);
+dotenv.config({ path: envPath });
 
 const { pool, initDB } = require('./db');
 
@@ -22,7 +27,9 @@ const JWT_SECRET = process.env.JWT_SECRET || 'your_super_secret_key';
 app.use(cors());
 app.use(express.json());
 
-initDB();
+initDB()
+  .then(() => console.log('Database initialized successfully'))
+  .catch(err => console.error('Database initialization failed:', err));
 
 app.get('/', (req, res) => {
   res.send('API is running...');
@@ -30,10 +37,10 @@ app.get('/', (req, res) => {
 
 // Login Endpoint
 app.post('/api/login', async (req, res) => {
-  const { username, password } = req.body;
+  const { email, password } = req.body;
 
   try {
-    const [users] = await pool.query('SELECT * FROM users WHERE username = ?', [username]);
+    const [users] = await pool.query('SELECT * FROM users WHERE email = ?', [email]);
     
     if (users.length === 0) {
       return res.status(401).json({ message: 'Invalid credentials' });
@@ -46,11 +53,11 @@ app.post('/api/login', async (req, res) => {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
-    const token = jwt.sign({ id: user.id, username: user.username, role: user.role }, JWT_SECRET, {
+    const token = jwt.sign({ id: user.id, username: user.username, role: user.role, email: user.email }, JWT_SECRET, {
       expiresIn: '1d'
     });
 
-    res.json({ token, user: { id: user.id, username: user.username, role: user.role } });
+    res.json({ token, user: { id: user.id, username: user.username, email: user.email, role: user.role } });
   } catch (error) {
     console.error('Login error:', error);
     res.status(500).json({ message: 'Server error' });
@@ -254,8 +261,12 @@ app.put('/api/rbac/permissions', authenticate, requireSuperadmin, async (req, re
   }
 });
 
+
+
 // Register feature routes
 registerUserRoutes(app, pool, bcrypt, authenticate, checkPermission);
+registerPasswordResetRoutes(app, pool, bcrypt);
+registerProfileRoutes(app, pool, bcrypt, authenticate);
 registerOutletRoutes(app, pool, authenticate, checkPermission);
 registerProductRoutes(app, pool, authenticate, checkPermission);
 registerSettingsRoutes(app, pool, authenticate);

@@ -2,8 +2,9 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { User, LogOut } from "lucide-react";
+import { User, LogOut, UserCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { goeyToast } from "@/components/ui/goey-toaster";
 
 export default function ProfileDropdown() {
@@ -53,6 +54,14 @@ export default function ProfileDropdown() {
           <div className="px-4 py-2 border-b border-gray-100">
             <p className="text-sm font-semibold text-gray-900">My Account</p>
           </div>
+          <Link
+            href="/profile"
+            onClick={() => setIsOpen(false)}
+            className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2 transition-colors"
+          >
+            <UserCircle size={16} />
+            Profile
+          </Link>
           <button
             onClick={handleLogout}
             className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 transition-colors"

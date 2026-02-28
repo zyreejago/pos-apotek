@@ -39,6 +39,7 @@ export default function Sidebar() {
   const [loading, setLoading] = useState(true);
   const pathname = usePathname();
   const lastRoleRef = useRef<string>('');
+  const isAuthPage = pathname === '/login' || pathname === '/forgot-password';
 
   const fetchPermissions = useCallback(async (role: string) => {
     if (role === 'superadmin') {
@@ -126,7 +127,7 @@ export default function Sidebar() {
   }, [fetchPermissions, permissions.length]);
 
   useEffect(() => {
-    if (pathname === '/login') {
+    if (isAuthPage) {
       lastRoleRef.current = '';
       setUserRole('');
       setPermissions([]);
@@ -134,11 +135,11 @@ export default function Sidebar() {
       return;
     }
     syncAuth();
-  }, [pathname, syncAuth]);
+  }, [isAuthPage, pathname, syncAuth]);
 
   useEffect(() => {
     const onAuthChanged = () => {
-      if (pathname === '/login') return;
+      if (isAuthPage) return;
       syncAuth();
     };
 
@@ -152,7 +153,7 @@ export default function Sidebar() {
       window.removeEventListener('auth:changed', onAuthChanged);
       window.removeEventListener('storage', onStorage);
     };
-  }, [pathname, syncAuth]);
+  }, [isAuthPage, pathname, syncAuth]);
 
   const canShow = (module: string) => {
     if (loading) return false;
@@ -161,7 +162,7 @@ export default function Sidebar() {
     return perm ? (perm.show || perm.create || perm.edit || perm.delete) : false;
   };
 
-  if (pathname === '/login') {
+  if (isAuthPage) {
     return null;
   }
 
