@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { Search, Filter, Save, AlertCircle } from 'lucide-react';
-import { useToast } from '@/components/ToastProvider';
+import { goeyToast } from "@/components/ui/goey-toaster";
 import ConfirmModal from '@/components/ConfirmModal';
 import { useRequirePermission } from '@/hooks/useRequirePermission';
 import Header from '@/components/Header';
@@ -22,21 +23,14 @@ interface Pagination {
   totalPages: number;
 }
 
-interface OpnameItem {
-  id: number;
-  system_stock: number;
-  actual_stock: number;
-}
-
 interface OpnameEntry {
   actual: number;
   system: number;
 }
 
 export default function StockOpnamePage() {
-  const { showToast } = useToast();
   // Permission Check
-  const { loading: permLoading, hasPermission, checkActionPermission } = useRequirePermission('Stock Opname');
+  const { checkActionPermission } = useRequirePermission('Stock Opname');
 
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
@@ -64,30 +58,41 @@ export default function StockOpnamePage() {
     variant: 'danger' as 'danger' | 'warning' | 'info'
   });
 
-  const fetchProducts = async () => {
+  const router = useRouter();
+  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+  const authHeaders = React.useMemo((): HeadersInit => (token ? { 'Authorization': `Bearer ${token}` } : {}), [token]);
+
+  const fetchProducts = useCallback(async (page: number, limit: number, search: string) => {
     setLoading(true);
     try {
-      const res = await fetch(`http://localhost:5000/api/products?page=${currentPage}&limit=${itemsPerPage}&search=${searchQuery}`);
+      const res = await fetch(`http://localhost:5000/api/products?page=${page}&limit=${limit}&search=${search}`, {
+        headers: authHeaders
+      });
+
+      if (res.status === 401) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        document.cookie = "token=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+        router.push('/login');
+        return;
+      }
+
       const data = await res.json();
       setProducts(data.data || []);
       setPagination(data.pagination || { total: 0, page: 1, limit: 10, totalPages: 1 });
-      
-      // Initialize opname data with current system stock if active
-      // Or keep existing inputs if navigating pages? 
-      // For simplicity, we might lose inputs on page change if not careful.
-      // But let's keep it simple: inputs are per-page for now or stored globally?
-      // Storing globally is better but more complex. 
-      // Let's assume user finishes one page or we store in a larger map.
-      // We'll store in `opnameData` which is preserved across page changes if we don't clear it.
     } catch (error) {
       console.error('Error fetching products:', error);
+      goeyToast.error('Gagal Mengambil Data Produk', {
+        description: "Terjadi kesalahan saat mengambil daftar produk. Silakan coba lagi."
+      });
     } finally {
       setLoading(false);
     }
-  };
+  }, [authHeaders, router]);
 
   useEffect(() => {
-    fetchProducts();
+    fetchProducts(currentPage, itemsPerPage, searchQuery);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentPage, itemsPerPage]);
 
   // Debounce search
@@ -96,7 +101,7 @@ export default function StockOpnamePage() {
       if (currentPage !== 1) {
         setCurrentPage(1);
       } else {
-        fetchProducts();
+        fetchProducts(currentPage, itemsPerPage, searchQuery);
       }
     }, 500);
     return () => clearTimeout(timer);
@@ -106,18 +111,23 @@ export default function StockOpnamePage() {
   const handleStartOpname = () => {
     // Permission Check
     if (!checkActionPermission('create') && !checkActionPermission('edit')) {
-        showToast('You do not have permission to perform stock opname', 'error');
+        goeyToast.error('Akses Ditolak', {
+          description: "Anda tidak memiliki izin untuk memulai proses stock opname."
+        });
         return;
     }
     setIsOpnameActive(true);
     setOpnameData({});
+    goeyToast.info('Mode Stock Opname Aktif', {
+      description: "Silakan masukkan jumlah stok aktual pada kolom yang tersedia."
+    });
   };
 
   const handleCancelOpname = () => {
     setConfirmModal({
       isOpen: true,
-      title: 'Cancel Stock Opname',
-      message: 'Are you sure you want to cancel stock opname? All unsaved changes will be lost.',
+      title: 'Batalkan Stock Opname',
+      message: 'Apakah Anda yakin ingin membatalkan stock opname? Semua perubahan yang belum disimpan akan hilang.',
       variant: 'warning',
       onConfirm: () => {
         setIsOpnameActive(false);
@@ -125,11 +135,6 @@ export default function StockOpnamePage() {
         setConfirmModal(prev => ({ ...prev, isOpen: false }));
       }
     });
-  };
-
-  const calculateDifference = (systemStock: number, actualStock: number | undefined) => {
-    if (actualStock === undefined) return 0;
-    return actualStock - systemStock;
   };
 
   const getDifferenceColor = (diff: number) => {
@@ -141,12 +146,13 @@ export default function StockOpnamePage() {
   const handleSubmitOpname = async () => {
     // Permission Check
     if (!checkActionPermission('create') && !checkActionPermission('edit')) {
-        showToast('You do not have permission to submit stock opname', 'error');
+        goeyToast.error('Anda tidak memiliki izin untuk mengirimkan stock opname', {
+          description: "Hubungi administrator untuk meminta akses."
+        });
         return;
     }
 
     // Collect all items that have changes
-    const itemsToUpdate: OpnameItem[] = [];
     
     // Iterate over all loaded products (Wait, this only updates current page products if we only have access to `products` state)
     // But `opnameData` has keys for modified items.
@@ -179,14 +185,16 @@ export default function StockOpnamePage() {
     }));
 
     if (payload.length === 0) {
-      showToast('No changes to save.', 'info');
+      goeyToast.info('Tidak Ada Perubahan', {
+        description: "Belum ada data stok opname yang dimasukkan. Silakan isi data terlebih dahulu."
+      });
       return;
     }
 
     setConfirmModal({
       isOpen: true,
-      title: 'Submit Stock Opname',
-      message: `Are you sure you want to submit stock opname for ${payload.length} items? This will update the system stock.`,
+      title: 'Kirim Stock Opname',
+      message: `Anda akan memperbarui stok untuk ${payload.length} produk. Lanjutkan?`,
       variant: 'info',
       onConfirm: async () => {
         setConfirmModal(prev => ({ ...prev, isOpen: false }));
@@ -194,21 +202,39 @@ export default function StockOpnamePage() {
         try {
           const res = await fetch('http://localhost:5000/api/stock-opname', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', ...authHeaders },
             body: JSON.stringify({ items: payload })
           });
     
+          if (res.status === 401) {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            document.cookie = "token=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+            router.push('/login');
+            return;
+          }
+
           if (res.ok) {
-            showToast(`Stock opname submitted successfully for ${payload.length} items!`, 'success');
+            const itemNames = payload.slice(0, 3).map(p => products.find(prod => prod.id === p.id)?.name).filter(Boolean).join(', ');
+            const remainingCount = payload.length - 3;
+            const detailText = remainingCount > 0 ? `${itemNames} dan ${remainingCount} lainnya` : itemNames;
+
+            goeyToast.success(`Stock Opname Selesai`, {
+                description: `Stok fisik untuk ${payload.length} produk (${detailText}) telah berhasil diperbarui di sistem.`
+            });
             setIsOpnameActive(false);
             setOpnameData({});
-            fetchProducts(); // Refresh data
+            fetchProducts(currentPage, itemsPerPage, searchQuery); // Refresh data
           } else {
-            showToast('Failed to submit stock opname', 'error');
+            goeyToast.error('Gagal Mengirim Data', {
+              description: "Terjadi kesalahan saat menyimpan hasil stock opname."
+            });
           }
         } catch (error) {
           console.error('Error submitting opname:', error);
-          showToast('Error submitting stock opname', 'error');
+          goeyToast.error('Terjadi kesalahan sistem', {
+            description: "Silakan coba lagi beberapa saat lagi."
+          });
         } finally {
           setIsSubmitting(false);
         }

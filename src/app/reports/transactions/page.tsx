@@ -1,9 +1,9 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Header from '@/components/Header';
-import { useToast } from '@/components/ToastProvider';
-import { Download, Calendar, Search, ChevronDown, ChevronUp } from 'lucide-react';
+import { goeyToast } from "@/components/ui/goey-toaster";
+import { Download, Calendar, Search } from 'lucide-react';
 import { 
   LineChart, 
   Line, 
@@ -23,12 +23,35 @@ declare module 'jspdf' {
   }
 }
 
+interface TransactionItem {
+  product_name: string;
+  quantity: number;
+  price: number;
+}
+
+interface Transaction {
+  id: number;
+  transaction_date: string;
+  outlet_name: string;
+  total_amount: number;
+  items: TransactionItem[];
+}
+
+interface ChartData {
+  date: string;
+  total: number;
+}
+
+interface ReportData {
+  transactions: Transaction[];
+  chartData: ChartData[];
+}
+
 export default function TransactionReportPage() {
-  const { showToast } = useToast();
   const reportRef = useRef<HTMLDivElement>(null);
   
   const [loading, setLoading] = useState(false);
-  const [data, setData] = useState<{ transactions: any[], chartData: any[] }>({ transactions: [], chartData: [] });
+  const [data, setData] = useState<ReportData>({ transactions: [], chartData: [] });
   
   // Default to current month
   const today = new Date();
@@ -36,15 +59,12 @@ export default function TransactionReportPage() {
   
   const [startDate, setStartDate] = useState(firstDay.toISOString().split('T')[0]);
   const [endDate, setEndDate] = useState(today.toISOString().split('T')[0]);
-  
-  // Expanded rows state
-  const [expandedRows, setExpandedRows] = useState<number[]>([]);
 
   const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
   const user = typeof window !== "undefined" ? JSON.parse(localStorage.getItem("user") || '{}') : {};
   const username = user.username || user.name || "Admin";
 
-  const processChartData = (rawChartData: any[], start: string, end: string) => {
+  const processChartData = (rawChartData: ChartData[], start: string, end: string) => {
     if (!start || !end) return rawChartData;
     
     const startDateObj = new Date(start);
@@ -62,7 +82,7 @@ export default function TransactionReportPage() {
     return filledData;
   };
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true);
     try {
       const res = await fetch(`http://localhost:5000/api/reports/transactions?startDate=${startDate}&endDate=${endDate}`, {
@@ -75,35 +95,33 @@ export default function TransactionReportPage() {
         setData({ ...result, chartData: filledChartData });
       } else {
         const err = await res.json();
-        showToast(err.message || "Failed to fetch transaction report", "error");
+        goeyToast.error(err.message || "Gagal mengambil laporan transaksi", {
+            description: "Terjadi kesalahan saat mengambil data laporan transaksi."
+        });
       }
     } catch (error) {
       console.error("Error fetching report:", error);
-      showToast("Error connecting to server", "error");
+      goeyToast.error("Gagal terhubung ke server", {
+        description: "Periksa koneksi internet Anda dan coba lagi."
+      });
     } finally {
       setLoading(false);
     }
-  };
+  }, [startDate, endDate, token]);
 
   useEffect(() => {
     fetchData();
-  }, []); // Initial load
+  }, [fetchData]); // Initial load
 
   const handleFilter = () => {
     fetchData();
   };
 
-  const toggleRow = (id: number) => {
-    if (expandedRows.includes(id)) {
-      setExpandedRows(expandedRows.filter(rowId => rowId !== id));
-    } else {
-      setExpandedRows([...expandedRows, id]);
-    }
-  };
-
   const handleDownloadPDF = async () => {
     try {
-      showToast("Generating PDF...", "info");
+      goeyToast.info("Sedang membuat PDF...", {
+        description: "Mohon tunggu sebentar, laporan sedang diproses."
+      });
       
       const doc = new jsPDF();
 
@@ -132,7 +150,7 @@ export default function TransactionReportPage() {
 
       // 3. Table Content
       const tableColumn = ["No", "Waktu", "Outlet", "Total", "Detail Item"];
-      const tableRows: any[] = [];
+      const tableRows: (string | number)[][] = [];
 
       data.transactions.forEach((t, index) => {
         const transactionData = [
@@ -141,7 +159,7 @@ export default function TransactionReportPage() {
           t.outlet_name || '-',
           formatCurrency(t.total_amount),
           // Format items as a simple list string
-          t.items.map((i: any) => `${i.product_name} (${i.quantity}x)`).join(', ')
+          t.items.map((i) => `${i.product_name} (${i.quantity}x)`).join(', ')
         ];
         tableRows.push(transactionData);
       });
@@ -184,20 +202,24 @@ export default function TransactionReportPage() {
       doc.text("Staff Admin", 140, signatureY + 36);
 
       doc.save(`Laporan_Transaksi_${startDate}_${endDate}.pdf`);
-      showToast("PDF Downloaded successfully", "success");
+      goeyToast.success("PDF berhasil diunduh", {
+        description: `Laporan Transaksi periode ${formatDate(startDate)} s/d ${formatDate(endDate)} telah berhasil disimpan.`
+      });
     } catch (error) {
       console.error("Error generating PDF:", error);
-      showToast("Failed to generate PDF", "error");
+      goeyToast.error("Gagal membuat PDF", {
+        description: "Terjadi kesalahan saat membuat file PDF. Silakan coba lagi."
+      });
     }
   };
 
-  const formatCurrency = (amount: number) => {
+  const formatCurrency = (amount: number | undefined | null) => {
     return new Intl.NumberFormat('id-ID', {
       style: 'currency',
       currency: 'IDR',
       minimumFractionDigits: 0,
       maximumFractionDigits: 0
-    }).format(amount);
+    }).format(amount || 0);
   };
 
   const formatDate = (dateStr: string) => {
@@ -297,7 +319,7 @@ export default function TransactionReportPage() {
                           />
                           <Tooltip 
                               contentStyle={{backgroundColor: '#fff', borderRadius: '8px', border: '1px solid #f0f0f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}}
-                              formatter={(value: number) => [formatCurrency(value), 'Penjualan']}
+                              formatter={(value: number | undefined) => [formatCurrency(value), 'Penjualan']}
                               labelFormatter={(label) => new Date(label).toLocaleDateString('id-ID', {weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'})}
                           />
                           <Line 
@@ -350,7 +372,7 @@ export default function TransactionReportPage() {
                                     <td className="px-6 py-4 text-gray-600 align-top">{t.outlet_name || '-'}</td>
                                     <td className="px-6 py-4 text-gray-600 align-top">
                                       <ul className="list-disc list-inside space-y-1">
-                                        {t.items.map((item: any, idx: number) => (
+                                        {t.items.map((item, idx: number) => (
                                           <li key={idx} className="text-sm">
                                             <span className="font-medium text-gray-800">{item.product_name}</span>
                                             <span className="text-gray-500 ml-1">x {item.quantity}</span>

@@ -256,12 +256,12 @@ app.put('/api/rbac/permissions', authenticate, requireSuperadmin, async (req, re
 
 // Register feature routes
 registerUserRoutes(app, pool, bcrypt, authenticate, checkPermission);
-registerOutletRoutes(app, pool, authenticate);
+registerOutletRoutes(app, pool, authenticate, checkPermission);
 registerProductRoutes(app, pool, authenticate, checkPermission);
 registerSettingsRoutes(app, pool, authenticate);
-registerTransactionRoutes(app, pool, authenticate);
-registerSupplierRoutes(app, pool);
-registerReportRoutes(app, pool, authenticate);
+registerTransactionRoutes(app, pool, authenticate, checkPermission);
+registerSupplierRoutes(app, pool, authenticate, checkPermission);
+registerReportRoutes(app, pool, authenticate, checkPermission);
 
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);

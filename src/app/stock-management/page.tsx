@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { Search, Filter, RefreshCw, History } from 'lucide-react';
-import { useToast } from '@/components/ToastProvider';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Search } from 'lucide-react';
+import { goeyToast } from "@/components/ui/goey-toaster";
 import { useRequirePermission } from '@/hooks/useRequirePermission';
 import { useRouter } from 'next/navigation';
 import Header from '@/components/Header';
@@ -26,14 +26,14 @@ interface Pagination {
 
 export default function StockManagementPage() {
   const router = useRouter();
-  const { showToast } = useToast();
-  const { loading: permLoading, checkActionPermission } = useRequirePermission('Management Stock');
+  const { checkActionPermission } = useRequirePermission('Management Stock');
 
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [itemsPerPage] = useState(10);
   const [pagination, setPagination] = useState<Pagination>({
     total: 0,
     page: 1,
@@ -49,12 +49,12 @@ export default function StockManagementPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-  const authHeaders: HeadersInit = token ? { 'Authorization': `Bearer ${token}` } : {};
+  const authHeaders = React.useMemo((): HeadersInit => (token ? { 'Authorization': `Bearer ${token}` } : {}), [token]);
 
-  const fetchProducts = async () => {
+  const fetchProducts = useCallback(async (page: number, limit: number, search: string) => {
     setLoading(true);
     try {
-      const res = await fetch(`http://localhost:5000/api/products?page=${currentPage}&limit=${itemsPerPage}&search=${searchQuery}`, {
+      const res = await fetch(`http://localhost:5000/api/products?page=${page}&limit=${limit}&search=${search}`, {
         headers: authHeaders
       });
 
@@ -71,31 +71,37 @@ export default function StockManagementPage() {
       setPagination(data.pagination);
     } catch (error) {
       console.error('Error fetching products:', error);
-      showToast('Error fetching products', 'error');
+      goeyToast.error('Gagal Mengambil Data Produk', {
+        description: "Terjadi kesalahan saat mengambil daftar produk. Silakan coba lagi."
+      });
     } finally {
       setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    fetchProducts();
-  }, [currentPage, itemsPerPage]);
+  }, [authHeaders, router]);
 
   // Debounce search
   useEffect(() => {
     const timer = setTimeout(() => {
-      if (currentPage !== 1) {
-        setCurrentPage(1);
-      } else {
-        fetchProducts();
-      }
+      setDebouncedSearchQuery(searchQuery);
     }, 500);
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
+  // Reset page when search changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [debouncedSearchQuery]);
+
+  // Fetch data
+  useEffect(() => {
+    fetchProducts(currentPage, itemsPerPage, debouncedSearchQuery);
+  }, [currentPage, itemsPerPage, debouncedSearchQuery, fetchProducts]);
+
   const handleOpenAdjustment = (product: Product, mode: 'add' | 'reduce') => {
     if (!checkActionPermission('edit')) {
-        showToast('You do not have permission to adjust stock', 'error');
+        goeyToast.error('Akses Ditolak', {
+            description: "Anda tidak memiliki izin untuk mengubah stok produk."
+        });
         return;
     }
     setSelectedProduct(product);
@@ -117,27 +123,29 @@ export default function StockManagementPage() {
     e.preventDefault();
     if (!selectedProduct || !adjustmentMode) return;
     if (!checkActionPermission('edit')) {
-        showToast('You do not have permission to adjust stock', 'error');
+        goeyToast.error('Akses Ditolak', {
+            description: "Anda tidak memiliki izin untuk mengubah stok produk."
+        });
         return;
     }
 
     const qty = parseInt(adjustmentQty);
     if (isNaN(qty) || qty <= 0) {
-        showToast('Please enter a valid quantity', 'warning');
+        goeyToast.error('Jumlah Tidak Valid', {
+            description: "Mohon masukkan jumlah stok yang valid (lebih dari 0)."
+        });
         return;
     }
 
     if (adjustmentMode === 'reduce' && qty > selectedProduct.stock) {
-        showToast('Insufficient stock', 'warning');
+        goeyToast.error('Stok Tidak Cukup', {
+            description: `Jumlah pengurangan (${qty}) melebihi stok yang tersedia saat ini (${selectedProduct.stock}).`
+        });
         return;
     }
 
     setIsSubmitting(true);
     try {
-        const newStock = adjustmentMode === 'add' 
-            ? selectedProduct.stock + qty 
-            : selectedProduct.stock - qty;
-
         // Use dedicated inventory adjustment endpoint
         const res = await fetch('http://localhost:5000/api/inventory/adjust', {
             method: 'POST',
@@ -154,16 +162,22 @@ export default function StockManagementPage() {
         });
 
         if (res.ok) {
-            showToast(`Stock ${adjustmentMode === 'add' ? 'added' : 'reduced'} successfully`, 'success');
-            fetchProducts();
+            goeyToast.success(`Stok berhasil ${adjustmentMode === 'add' ? 'ditambahkan' : 'dikurangi'}`, {
+                description: `Stok produk ${selectedProduct.name} berhasil ${adjustmentMode === 'add' ? 'ditambahkan' : 'dikurangi'} sebanyak ${qty}.${adjustmentNote ? ` Catatan: ${adjustmentNote}` : ''}`
+            });
+            fetchProducts(currentPage, itemsPerPage, searchQuery);
             handleCloseModal();
         } else {
             const data = await res.json();
-            showToast(data.message || 'Failed to update stock', 'error');
+            goeyToast.error('Gagal Memperbarui Stok', {
+                description: data.message || "Terjadi kesalahan saat memperbarui stok produk."
+            });
         }
     } catch (error) {
         console.error('Error updating stock:', error);
-        showToast('Error updating stock', 'error');
+        goeyToast.error('Terjadi Kesalahan Sistem', {
+            description: "Gagal terhubung ke server. Silakan periksa koneksi internet Anda."
+        });
     } finally {
         setIsSubmitting(false);
     }

@@ -1,9 +1,9 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { Search, Filter, Plus, Edit, Trash2, X, ChevronLeft, ChevronRight, Package, MoreVertical, Upload } from 'lucide-react';
-import { useToast } from '@/components/ToastProvider';
+import { Search, Filter, Plus, Edit, Trash2, X } from 'lucide-react';
+import { goeyToast } from "@/components/ui/goey-toaster";
 import ConfirmModal from '@/components/ConfirmModal';
 import Header from '@/components/Header';
 import { useRequirePermission } from '@/hooks/useRequirePermission';
@@ -38,13 +38,13 @@ interface ProductFormData {
 
 export default function ProductsPage() {
   const router = useRouter();
-  const { showToast } = useToast();
   // Permission Check
-  const { loading: permLoading, hasPermission, checkActionPermission } = useRequirePermission('Management Product');
+  const { checkActionPermission } = useRequirePermission('Management Product');
 
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
   const [pagination, setPagination] = useState<Pagination>({
@@ -58,7 +58,6 @@ export default function ProductsPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<'add' | 'edit'>('add');
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  const [productToDelete, setProductToDelete] = useState<Product | null>(null);
 
   // Confirm Modal State
   const [confirmModal, setConfirmModal] = useState({
@@ -81,12 +80,15 @@ export default function ProductsPage() {
   });
 
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-  const authHeaders: HeadersInit = token ? { 'Authorization': `Bearer ${token}` } : {};
+  const authHeaders = useMemo<Record<string, string>>(() => {
+    if (!token) return {} as Record<string, string>;
+    return { Authorization: `Bearer ${token}` };
+  }, [token]);
 
-  const fetchProducts = async () => {
+  const fetchProducts = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`http://localhost:5000/api/products?page=${currentPage}&limit=${itemsPerPage}&search=${searchQuery}`, {
+      const res = await fetch(`http://localhost:5000/api/products?page=${currentPage}&limit=${itemsPerPage}&search=${debouncedSearchQuery}`, {
         headers: authHeaders
       });
 
@@ -98,6 +100,15 @@ export default function ProductsPage() {
         return;
       }
 
+      if (res.status === 403) {
+        setProducts([]);
+        setPagination({ total: 0, page: 1, limit: itemsPerPage, totalPages: 1 });
+        goeyToast.error('Akses Ditolak', {
+          description: 'Anda tidak memiliki izin untuk melihat daftar produk.'
+        });
+        return;
+      }
+
       const data = await res.json();
       setProducts(data.data);
       setPagination(data.pagination);
@@ -106,12 +117,11 @@ export default function ProductsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [authHeaders, currentPage, itemsPerPage, debouncedSearchQuery, router]);
 
   useEffect(() => {
     fetchProducts();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentPage]);
+  }, [fetchProducts]);
 
   const checkPermission = (action: 'create' | 'edit' | 'delete') => {
     return checkActionPermission(action);
@@ -120,11 +130,8 @@ export default function ProductsPage() {
   // Debounce search
   useEffect(() => {
     const timer = setTimeout(() => {
-      if (currentPage !== 1) {
-        setCurrentPage(1);
-      } else {
-        fetchProducts();
-      }
+      setDebouncedSearchQuery(searchQuery);
+      setCurrentPage(1);
     }, 500);
     return () => clearTimeout(timer);
   }, [searchQuery]);
@@ -205,11 +212,15 @@ export default function ProductsPage() {
     
     // Permission check
     if (modalMode === 'add' && !checkActionPermission('create')) {
-        showToast('You do not have permission to create products', 'error');
+        goeyToast.error('Akses Ditolak', {
+            description: "Anda tidak memiliki izin untuk menambah produk baru."
+        });
         return;
     }
     if (modalMode === 'edit' && !checkActionPermission('edit')) {
-        showToast('You do not have permission to edit products', 'error');
+        goeyToast.error('Akses Ditolak', {
+            description: "Anda tidak memiliki izin untuk mengubah data produk."
+        });
         return;
     }
 
@@ -224,6 +235,7 @@ export default function ProductsPage() {
         method,
         headers: {
           'Content-Type': 'application/json',
+          ...authHeaders
         },
         body: JSON.stringify({
           ...formData,
@@ -234,21 +246,35 @@ export default function ProductsPage() {
         }),
       });
 
+      if (res.status === 401) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        document.cookie = "token=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+        router.push('/login');
+        return;
+      }
+
       if (res.ok) {
         handleCloseModal();
         fetchProducts();
-        showToast(`Product ${modalMode === 'add' ? 'created' : 'updated'} successfully`, 'success');
+        goeyToast.success(`Produk berhasil ${modalMode === 'add' ? 'ditambahkan' : 'diperbarui'}`, {
+          description: `Produk "${formData.name}" dengan harga ${formatCurrency(Number(formData.selling_price))} telah berhasil ${modalMode === 'add' ? 'ditambahkan ke katalog' : 'diperbarui'}.`
+        });
       } else {
-        showToast('Failed to save product', 'error');
+        const data = await res.json().catch(() => null);
+        goeyToast.error('Gagal menyimpan produk', {
+            description: data?.message || "Terjadi kesalahan saat menyimpan data produk."
+        });
       }
     } catch (error) {
       console.error('Error saving product:', error);
-      showToast('Error saving product', 'error');
+      goeyToast.error('Terjadi kesalahan sistem', {
+          description: "Gagal terhubung ke server. Silakan coba lagi."
+      });
     }
   };
 
   const handleOpenDeleteModal = (product: Product) => {
-    setProductToDelete(product);
     setConfirmModal({
       isOpen: true,
       title: 'Delete Product',
@@ -264,25 +290,42 @@ export default function ProductsPage() {
   const handleConfirmDelete = async (product: Product) => {
     // Permission check
     if (!checkActionPermission('delete')) {
-        showToast('You do not have permission to delete products', 'error');
+        goeyToast.error('Akses Ditolak', {
+          description: 'Anda tidak memiliki izin untuk menghapus produk.'
+        });
         return;
     }
 
     try {
       const res = await fetch(`http://localhost:5000/api/products/${product.id}`, {
         method: 'DELETE',
+        headers: authHeaders
       });
 
+      if (res.status === 401) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        document.cookie = "token=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+        router.push('/login');
+        return;
+      }
+
       if (res.ok) {
-        setProductToDelete(null);
         fetchProducts();
-        showToast('Product deleted successfully', 'success');
+        goeyToast.success('Produk Berhasil Dihapus', {
+          description: `Produk "${product.name}" telah berhasil dihapus dari katalog.`
+        });
       } else {
-        showToast('Failed to delete product', 'error');
+        const data = await res.json().catch(() => null);
+        goeyToast.error('Gagal Menghapus Produk', {
+          description: data?.message || 'Terjadi kesalahan saat menghapus produk.'
+        });
       }
     } catch (error) {
       console.error('Error deleting product:', error);
-      showToast('Error deleting product', 'error');
+      goeyToast.error('Terjadi Kesalahan', {
+        description: 'Gagal menghapus produk. Periksa koneksi internet Anda.'
+      });
     }
   };
 

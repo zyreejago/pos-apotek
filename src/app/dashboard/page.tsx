@@ -44,6 +44,13 @@ interface Cashier {
   description: string;
 }
 
+interface DashboardData {
+  stockRecommendations: StockRec[];
+  earnings: { name: string; value: string | number }[];
+  outlets: Outlet[];
+  cashiers: Cashier[];
+}
+
 export default function Dashboard() {
   const router = useRouter();
   const [stockRecommendations, setStockRecommendations] = useState<StockRec[]>([]);
@@ -85,9 +92,9 @@ export default function Dashboard() {
           throw new Error('Failed to fetch dashboard data');
         }
 
-        const data = await response.json();
+        const data: DashboardData = await response.json();
         setStockRecommendations(data.stockRecommendations || []);
-        setEarningsData((data.earnings || []).map((e: any) => ({ ...e, value: parseFloat(e.value) })));
+        setEarningsData((data.earnings || []).map((e) => ({ ...e, value: typeof e.value === 'string' ? parseFloat(e.value) : e.value })));
         setOutlets(data.outlets || []);
         setCashiers(data.cashiers || []);
       } catch (err) {
@@ -99,7 +106,7 @@ export default function Dashboard() {
     };
 
     fetchData();
-  }, []);
+  }, [router]);
 
   // Reset to page 1 when search changes
   useEffect(() => {
@@ -207,7 +214,7 @@ export default function Dashboard() {
                     tick={{fill: '#9ca3af', fontSize: 12}} 
                     tickFormatter={(value) => `${value/1000}k`}
                 />
-                <Tooltip formatter={(value: any) => `Rp ${Number(value).toLocaleString('id-ID')}`} />
+                <Tooltip formatter={(value: number | undefined) => `Rp ${(value || 0).toLocaleString('id-ID')}`} />
                 <Line 
                     type="monotone" 
                     dataKey="value" 

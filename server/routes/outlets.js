@@ -1,5 +1,9 @@
-module.exports = function registerOutletRoutes(app, pool, authenticate) {
-  app.get('/api/outlets', authenticate, async (req, res) => {
+module.exports = function registerOutletRoutes(app, pool, authenticate, checkPermission) {
+  app.get(
+    '/api/outlets',
+    authenticate,
+    checkPermission('Outlets', 'show'),
+    async (req, res) => {
     try {
       const [outlets] = await pool.query(
         'SELECT * FROM outlets ORDER BY name ASC'
@@ -9,9 +13,14 @@ module.exports = function registerOutletRoutes(app, pool, authenticate) {
       console.error('Error fetching outlets:', error);
       res.status(500).json({ message: 'Server error' });
     }
-  });
+    }
+  );
 
-  app.post('/api/outlets', async (req, res) => {
+  app.post(
+    '/api/outlets',
+    authenticate,
+    checkPermission('Outlets', 'create'),
+    async (req, res) => {
     const { name, location } = req.body;
     if (!name || !location) {
       return res
@@ -37,9 +46,14 @@ module.exports = function registerOutletRoutes(app, pool, authenticate) {
       console.error('Error adding outlet:', error);
       res.status(500).json({ message: 'Server error' });
     }
-  });
+    }
+  );
 
-  app.put('/api/outlets/:id', authenticate, async (req, res) => {
+  app.put(
+    '/api/outlets/:id',
+    authenticate,
+    checkPermission('Outlets', 'edit'),
+    async (req, res) => {
     const { id } = req.params;
     const { name, location, status } = req.body;
 
@@ -53,9 +67,14 @@ module.exports = function registerOutletRoutes(app, pool, authenticate) {
       console.error('Error updating outlet:', error);
       res.status(500).json({ message: 'Server error' });
     }
-  });
+    }
+  );
 
-  app.delete('/api/outlets/:id', authenticate, async (req, res) => {
+  app.delete(
+    '/api/outlets/:id',
+    authenticate,
+    checkPermission('Outlets', 'delete'),
+    async (req, res) => {
     const { id } = req.params;
 
     try {
@@ -85,6 +104,6 @@ module.exports = function registerOutletRoutes(app, pool, authenticate) {
       console.error('Error deleting outlet:', error);
       res.status(500).json({ message: 'Server error' });
     }
-  });
+    }
+  );
 };
-

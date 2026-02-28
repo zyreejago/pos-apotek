@@ -1,5 +1,9 @@
 module.exports = function registerProductRoutes(app, pool, authenticate, checkPermission) {
-  app.get('/api/products', async (req, res) => {
+  app.get(
+    '/api/products',
+    authenticate,
+    checkPermission('Management Product', 'show'),
+    async (req, res) => {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const search = req.query.search || '';
@@ -45,9 +49,14 @@ module.exports = function registerProductRoutes(app, pool, authenticate, checkPe
       console.error('Error fetching products:', error);
       res.status(500).json({ message: 'Server error' });
     }
-  });
+    }
+  );
 
-  app.post('/api/products', async (req, res) => {
+  app.post(
+    '/api/products',
+    authenticate,
+    checkPermission('Management Product', 'create'),
+    async (req, res) => {
     const { name, cost_price, selling_price, stock, category, unit, expired_date } =
       req.body;
 
@@ -87,9 +96,14 @@ module.exports = function registerProductRoutes(app, pool, authenticate, checkPe
       console.error('Error adding product:', error);
       res.status(500).json({ message: 'Server error' });
     }
-  });
+    }
+  );
 
-  app.put('/api/products/:id', async (req, res) => {
+  app.put(
+    '/api/products/:id',
+    authenticate,
+    checkPermission('Management Product', 'edit'),
+    async (req, res) => {
     const { id } = req.params;
     const { name, cost_price, selling_price, stock, category, unit, expired_date } =
       req.body;
@@ -107,9 +121,14 @@ module.exports = function registerProductRoutes(app, pool, authenticate, checkPe
       console.error('Error updating product:', error);
       res.status(500).json({ message: 'Server error' });
     }
-  });
+    }
+  );
 
-  app.delete('/api/products/:id', async (req, res) => {
+  app.delete(
+    '/api/products/:id',
+    authenticate,
+    checkPermission('Management Product', 'delete'),
+    async (req, res) => {
     const id = parseInt(req.params.id);
 
     try {
@@ -143,7 +162,8 @@ module.exports = function registerProductRoutes(app, pool, authenticate, checkPe
       console.error('Error deleting product:', error);
       res.status(500).json({ message: 'Server error' });
     }
-  });
+    }
+  );
 
   app.post(
     '/api/inventory/adjust',
@@ -216,7 +236,11 @@ module.exports = function registerProductRoutes(app, pool, authenticate, checkPe
     }
   );
 
-  app.post('/api/stock-opname', async (req, res) => {
+  app.post(
+    '/api/stock-opname',
+    authenticate,
+    checkPermission('Stock Opname', 'create'),
+    async (req, res) => {
     const { items, note } = req.body;
 
     if (!items || !Array.isArray(items)) {
@@ -260,6 +284,6 @@ module.exports = function registerProductRoutes(app, pool, authenticate, checkPe
     } finally {
       connection.release();
     }
-  });
+    }
+  );
 };
-

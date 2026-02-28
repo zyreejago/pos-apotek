@@ -1,25 +1,26 @@
 "use client";
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import Header from '@/components/Header';
-import { useToast } from '@/components/ToastProvider';
+import { goeyToast } from "@/components/ui/goey-toaster";
 import { Download, Calendar, Loader2 } from 'lucide-react';
 import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
-
-// Extend jsPDF type to include autoTable
-declare module 'jspdf' {
-  interface jsPDF {
-    lastAutoTable: { finalY: number };
-  }
-}
+type ReportItem = { label: string; amount: number };
+type ReportSection = { total: number; details: ReportItem[] };
+type ProfitLossReport = {
+  period: { month: string | number; year: string | number };
+  revenue: ReportSection;
+  cogs: ReportSection;
+  gross_profit: number;
+  expenses: { total: number; details: ReportItem[] };
+  net_profit: number;
+};
 
 export default function Page() {
-  const { showToast } = useToast();
   const reportRef = useRef<HTMLDivElement>(null);
   
   const [loading, setLoading] = useState(false);
-  const [data, setData] = useState<any>(null);
+  const [data, setData] = useState<ProfitLossReport | null>(null);
   
   const currentDate = new Date();
   const [month, setMonth] = useState(currentDate.getMonth() + 1);
@@ -29,7 +30,7 @@ export default function Page() {
   const user = typeof window !== "undefined" ? JSON.parse(localStorage.getItem("user") || '{}') : {};
   const username = user.username || user.name || "Admin";
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true);
     try {
       const res = await fetch(`http://localhost:5000/api/financial/profit-loss?month=${month}&year=${year}`, {
@@ -37,27 +38,33 @@ export default function Page() {
       });
       
       if (res.ok) {
-        const result = await res.json();
+        const result: ProfitLossReport = await res.json();
         setData(result);
       } else {
         const err = await res.json();
-        showToast(err.message || "Failed to fetch financial report", "error");
+        goeyToast.error(err.message || "Gagal mengambil laporan keuangan", {
+          description: "Terjadi kesalahan saat mengambil data laporan keuangan."
+        });
       }
     } catch (error) {
       console.error("Error fetching report:", error);
-      showToast("Error connecting to server", "error");
+      goeyToast.error("Gagal terhubung ke server", {
+        description: "Periksa koneksi internet Anda dan coba lagi."
+      });
     } finally {
       setLoading(false);
     }
-  };
+  }, [month, year, token]);
 
   useEffect(() => {
     fetchData();
-  }, [month, year]);
+  }, [fetchData]);
 
   const handleDownloadPDF = async () => {
     try {
-      showToast("Generating PDF...", "info");
+      goeyToast.info("Sedang membuat PDF...", {
+        description: "Mohon tunggu sebentar, laporan sedang diproses."
+      });
       
       const doc = new jsPDF();
 
@@ -87,7 +94,7 @@ export default function Page() {
       let currentY = 70;
 
       // Helper for sections
-      const addSection = (title: string, items: any[], total: number) => {
+      const addSection = (title: string, items: ReportItem[], total: number) => {
         // Section Title
         doc.setFontSize(11);
         doc.setFont("helvetica", "bold");
@@ -169,10 +176,14 @@ export default function Page() {
       doc.text("Staff Admin", 140, signatureY + 36);
 
       doc.save(`Laporan_Laba_Rugi_${month}_${year}.pdf`);
-      showToast("PDF Downloaded successfully", "success");
+      goeyToast.success("PDF berhasil diunduh", {
+        description: `Laporan Laba Rugi periode ${getMonthName(month)} ${year} telah berhasil disimpan sebagai Laporan_Laba_Rugi_${month}_${year}.pdf`
+      });
     } catch (error) {
       console.error("Error generating PDF:", error);
-      showToast("Failed to generate PDF", "error");
+      goeyToast.error("Gagal membuat PDF", {
+        description: "Terjadi kesalahan saat membuat file PDF. Silakan coba lagi."
+      });
     }
   };
 
@@ -259,7 +270,7 @@ export default function Page() {
                 <div>
                   <h3 className="text-blue-500 font-semibold mb-4 text-sm uppercase tracking-wide">Pendapatan Penjualan</h3>
                   <div className="space-y-3 text-sm">
-                    {data.revenue.details.map((item: any, idx: number) => (
+                    {data.revenue.details.map((item, idx) => (
                       <div key={idx} className="flex justify-between items-center text-gray-600">
                         <span>{idx + 1}. {item.label}</span>
                         <span>{formatCurrency(item.amount)}</span>
@@ -276,7 +287,7 @@ export default function Page() {
                 <div>
                   <h3 className="text-blue-500 font-semibold mb-4 text-sm uppercase tracking-wide">Harga Pokok Penjualan</h3>
                   <div className="space-y-3 text-sm">
-                    {data.cogs.details.map((item: any, idx: number) => (
+                    {data.cogs.details.map((item, idx) => (
                       <div key={idx} className="flex justify-between items-center text-gray-600">
                         <span>{idx + 1}. {item.label}</span>
                         <span>{formatCurrency(item.amount)}</span>
@@ -302,7 +313,7 @@ export default function Page() {
                 <div>
                   <h3 className="text-blue-500 font-semibold mb-4 text-sm uppercase tracking-wide">Beban & Penyesuaian Lainnya</h3>
                   <div className="space-y-3 text-sm">
-                    {data.expenses.details.map((item: any, idx: number) => (
+                    {data.expenses.details.map((item, idx) => (
                       <div key={idx} className="flex justify-between items-center text-gray-600">
                         <span>{idx + 1}. {item.label}</span>
                         <span>{formatCurrency(item.amount)}</span>

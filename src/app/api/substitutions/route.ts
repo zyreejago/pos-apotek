@@ -68,7 +68,7 @@ function getRelevantContext(dataset: string[], query: string, maxChars: number =
   // Filter matches with score > 0
   const matches = scored.filter(s => s.score > 0);
 
-  let selected = matches.length > 0 ? matches : scored.slice(0, 50);
+  const selected = matches.length > 0 ? matches : scored.slice(0, 50);
   
   // Limit by size
   let currentChars = 0;
@@ -120,7 +120,7 @@ function buildPrompt(inputUser: string, context: string) {
   );
 }
 
-function extractJson(input: string): any | null {
+function extractJson(input: string): { recommendations?: { name: string }[]; advice?: string; sources?: string[] } | null {
   if (!input) return null;
   let s = input.trim();
   s = s.replace(/```json/gi, "");
@@ -182,7 +182,6 @@ export async function POST(req: NextRequest) {
     const prompt = buildPrompt(message, context);
 
     let responseText: string | null = null;
-    let lastError = null;
 
     for (const currentKey of uniqueKeys) {
       console.log(`Using API Key: ...${currentKey.slice(-4)}`);
@@ -193,7 +192,7 @@ export async function POST(req: NextRequest) {
         try {
           console.log(`Trying model: ${modelName}`);
           
-          const config: any = {};
+          const config: { thinkingConfig?: { thinkingBudget: number } } = {};
           if (modelName === "gemini-2.5-flash") {
             config.thinkingConfig = { thinkingBudget: 2 };
           }
@@ -209,9 +208,8 @@ export async function POST(req: NextRequest) {
             console.log(`Model ${modelName} succeeded with key ...${currentKey.slice(-4)}`);
             break; // Break inner loop (models)
           }
-        } catch (e: any) {
+        } catch (e: unknown) {
           console.error(`Model ${modelName} failed with key ...${currentKey.slice(-4)}:`, e);
-          lastError = e;
           // Continue to next model
         }
       }
@@ -237,14 +235,14 @@ export async function POST(req: NextRequest) {
           const name = l.split(",")[0]?.trim();
           return name ? { name } : null;
         })
-        .filter(Boolean);
+        .filter((item): item is { name: string } => item !== null);
 
       // Deduplicate
-      const filteredRecs = (fallbackRecs as any[]).filter(r => !shouldExcludeRecommendation(String(r.name || ""), message));
-      const uniqueRecs = Array.from(new Map(filteredRecs.map((r: any) => [r.name, r])).values()).slice(0, 5);
+      const filteredRecs = fallbackRecs.filter(r => !shouldExcludeRecommendation(r.name, message));
+      const uniqueRecs = Array.from(new Map(filteredRecs.map((r) => [r.name, r])).values()).slice(0, 5);
 
-       const enriched = uniqueRecs.map((r: any) => {
-          const name = String(r?.name || "");
+       const enriched = uniqueRecs.map((r) => {
+          const name = r.name;
           const src = sourceMap.get(normalizeName(name));
           return { name, source: src };
         });
@@ -264,9 +262,9 @@ export async function POST(req: NextRequest) {
 
     // We rely on the AI to exclude the input product name as per instructions.
     // We do NOT filter by string inclusion here to avoid blocking valid symptom-based results (e.g. "Demam" -> "Obat Demam").
-    const filtered = (raw.recommendations as any[]).filter(r => !shouldExcludeRecommendation(String(r?.name || ""), message));
-    const enriched = filtered.map((r: any) => {
-      const name = String(r?.name || "");
+    const filtered = (raw.recommendations || []).filter((r: { name: string }) => !shouldExcludeRecommendation(r?.name || "", message));
+    const enriched = filtered.map((r: { name: string }) => {
+      const name = r?.name || "";
       const src = sourceMap.get(normalizeName(name));
       return { name, source: src };
     });

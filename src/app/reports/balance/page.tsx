@@ -1,25 +1,22 @@
 "use client";
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import Header from '@/components/Header';
-import { useToast } from '@/components/ToastProvider';
+import { goeyToast } from "@/components/ui/goey-toaster";
 import { Download, Calendar, Loader2 } from 'lucide-react';
 import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
 
-// Extend jsPDF type to include autoTable
-declare module 'jspdf' {
-  interface jsPDF {
-    lastAutoTable: { finalY: number };
-  }
-}
+type BalanceReport = {
+  assets: { cash: number; inventory: number; receivables: number; total: number };
+  liabilities: { payables: number; consignmentDebt: number; total: number };
+  equity: { initial: number; capitalChanges: number; retainedEarnings: number; total: number };
+};
 
 export default function Page() {
-  const { showToast } = useToast();
   const reportRef = useRef<HTMLDivElement>(null);
   
   const [loading, setLoading] = useState(false);
-  const [data, setData] = useState<any>(null);
+  const [data, setData] = useState<BalanceReport | null>(null);
   
   const currentDate = new Date();
   const [month, setMonth] = useState(currentDate.getMonth() + 1);
@@ -29,7 +26,7 @@ export default function Page() {
   const user = typeof window !== "undefined" ? JSON.parse(localStorage.getItem("user") || '{}') : {};
   const username = user.username || user.name || "Admin";
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true);
     try {
       // Note: The backend endpoint currently returns current snapshot, ignoring month/year query params
@@ -39,27 +36,33 @@ export default function Page() {
       });
       
       if (res.ok) {
-        const result = await res.json();
+        const result: BalanceReport = await res.json();
         setData(result);
       } else {
         const err = await res.json();
-        showToast(err.message || "Failed to fetch balance sheet", "error");
+        goeyToast.error(err.message || "Gagal mengambil neraca keuangan", {
+          description: "Terjadi kesalahan saat mengambil data neraca keuangan."
+        });
       }
     } catch (error) {
       console.error("Error fetching report:", error);
-      showToast("Error connecting to server", "error");
+      goeyToast.error("Gagal terhubung ke server", {
+        description: "Periksa koneksi internet Anda dan coba lagi."
+      });
     } finally {
       setLoading(false);
     }
-  };
+  }, [month, year, token]);
 
   useEffect(() => {
     fetchData();
-  }, [month, year]);
+  }, [fetchData]);
 
   const handleDownloadPDF = async () => {
     try {
-      showToast("Generating PDF...", "info");
+      goeyToast.info("Sedang membuat PDF...", {
+        description: "Mohon tunggu sebentar, laporan sedang diproses."
+      });
       
       const doc = new jsPDF();
 
@@ -168,10 +171,14 @@ export default function Page() {
       doc.text("Staff Admin", 140, signatureY + 36);
 
       doc.save(`Neraca_Keuangan_${month}_${year}.pdf`);
-      showToast("PDF Downloaded successfully", "success");
+      goeyToast.success("PDF berhasil diunduh", {
+        description: `Neraca Keuangan periode ${getMonthName(month)} ${year} telah berhasil disimpan sebagai Neraca_Keuangan_${month}_${year}.pdf`
+      });
     } catch (error) {
       console.error("Error generating PDF:", error);
-      showToast("Failed to generate PDF", "error");
+      goeyToast.error("Gagal membuat PDF", {
+        description: "Terjadi kesalahan saat membuat file PDF. Silakan coba lagi."
+      });
     }
   };
 

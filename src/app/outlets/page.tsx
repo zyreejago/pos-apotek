@@ -4,7 +4,6 @@ import React, { useState, useEffect } from 'react';
 import { 
   Search, 
   Plus, 
-  MoreVertical, 
   ChevronDown, 
   Filter, 
   X,
@@ -14,9 +13,9 @@ import {
   Edit,
   Trash2
 } from 'lucide-react';
-import Image from 'next/image';
 import Header from '@/components/Header';
 import { useRequirePermission } from '@/hooks/useRequirePermission';
+import { goeyToast } from '@/components/ui/goey-toaster';
 
 interface Outlet {
   id: number;
@@ -27,16 +26,10 @@ interface Outlet {
 
 export default function OutletsPage() {
   // Permission Check
-  const { loading: permLoading, hasPermission, checkActionPermission } = useRequirePermission('Outlets');
+  const { checkActionPermission } = useRequirePermission('Outlets');
 
   const [outlets, setOutlets] = useState<Outlet[]>([]);
   const [loading, setLoading] = useState(true);
-  const [pagination, setPagination] = useState({
-    total: 0,
-    page: 1,
-    limit: 10,
-    totalPages: 1
-  });
 
   // Modal States
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -89,11 +82,15 @@ export default function OutletsPage() {
     
     // Permission Check
     if (modalMode === 'add' && !checkActionPermission('create')) {
-      alert('You do not have permission to create outlets');
+      goeyToast.error('Akses Ditolak', {
+        description: 'Anda tidak memiliki izin untuk membuat outlet baru.'
+      });
       return;
     }
     if (modalMode === 'edit' && !checkActionPermission('edit')) {
-      alert('You do not have permission to edit outlets');
+      goeyToast.error('Akses Ditolak', {
+        description: 'Anda tidak memiliki izin untuk mengedit outlet.'
+      });
       return;
     }
 
@@ -123,44 +120,60 @@ export default function OutletsPage() {
         setIsModalOpen(false);
         setName('');
         setLocation('');
+        goeyToast.success(modalMode === 'add' ? 'Outlet Berhasil Ditambahkan' : 'Outlet Berhasil Diperbarui', {
+          description: `Outlet "${name}" yang berlokasi di ${location} telah berhasil ${modalMode === 'add' ? 'ditambahkan ke sistem' : 'diperbarui'}.`
+        });
       } else {
         const data = await response.json();
-        alert(data.message || 'Failed to save outlet');
+        goeyToast.error('Gagal Menyimpan Outlet', {
+          description: data.message || 'Terjadi kesalahan saat menyimpan data outlet. Silakan coba lagi.'
+        });
       }
     } catch (error) {
       console.error('Error saving outlet:', error);
-      alert('Error saving outlet');
+      goeyToast.error('Terjadi Kesalahan', {
+        description: 'Gagal menyimpan outlet. Periksa koneksi internet Anda.'
+      });
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleDelete = async (id: number) => {
+  const handleDelete = async (outlet: Outlet) => {
     if (!checkActionPermission('delete')) {
-        alert('You do not have permission to delete outlets');
+        goeyToast.error('Akses Ditolak', {
+          description: 'Anda tidak memiliki izin untuk menghapus outlet.'
+        });
         return;
     }
     
-    if (!confirm('Are you sure you want to delete this outlet?')) return;
+    if (!confirm(`Are you sure you want to delete outlet ${outlet.name}?`)) return;
 
     try {
         const token = localStorage.getItem('token');
         const headers: HeadersInit = token ? { 'Authorization': `Bearer ${token}` } : {};
         
-        const response = await fetch(`http://localhost:5000/api/outlets/${id}`, {
+        const response = await fetch(`http://localhost:5000/api/outlets/${outlet.id}`, {
             method: 'DELETE',
             headers
         });
         
         if (response.ok) {
             fetchOutlets();
+            goeyToast.success('Outlet Berhasil Dihapus', {
+                description: `Outlet "${outlet.name}" yang berlokasi di ${outlet.location} telah dihapus dari sistem.`
+            });
         } else {
             const data = await response.json();
-            alert(data.message || 'Failed to delete outlet');
+            goeyToast.error('Gagal Menghapus Outlet', {
+                description: data.message || 'Terjadi kesalahan saat menghapus outlet.'
+            });
         }
     } catch (error) {
         console.error('Error deleting outlet:', error);
-        alert('Error deleting outlet');
+        goeyToast.error('Terjadi Kesalahan', {
+            description: 'Gagal menghapus outlet. Periksa koneksi internet Anda.'
+        });
     }
   };
 
@@ -280,7 +293,7 @@ export default function OutletsPage() {
                       )}
                       {checkActionPermission('delete') && (
                         <button 
-                          onClick={() => handleDelete(outlet.id)}
+                          onClick={() => handleDelete(outlet)}
                           className="text-red-600 hover:text-red-900 p-1 hover:bg-red-50 rounded"
                         >
                           <Trash2 size={18} />

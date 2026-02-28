@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { Search, Filter, Plus, Edit, Trash2, X, AlertTriangle } from 'lucide-react';
-import { useToast } from '@/components/ToastProvider';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Search, Filter, Edit, Trash2, X } from 'lucide-react';
+import { goeyToast } from "@/components/ui/goey-toaster";
 import ConfirmModal from '@/components/ConfirmModal';
 import { useRequirePermission } from '@/hooks/useRequirePermission';
 import Header from '@/components/Header';
@@ -30,9 +30,8 @@ interface SupplierFormData {
 }
 
 export default function SuppliersPage() {
-  const { showToast } = useToast();
   // Permission Check
-  const { loading: permLoading, hasPermission, checkActionPermission } = useRequirePermission('Suppliers');
+  const { checkActionPermission } = useRequirePermission('Suppliers');
 
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [loading, setLoading] = useState(true);
@@ -50,7 +49,6 @@ export default function SuppliersPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<'add' | 'edit'>('add');
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
-  const [supplierToDelete, setSupplierToDelete] = useState<Supplier | null>(null);
 
   // Confirm Modal State
   const [confirmModal, setConfirmModal] = useState({
@@ -69,7 +67,7 @@ export default function SuppliersPage() {
     address: ''
   });
 
-  const fetchSuppliers = async () => {
+  const fetchSuppliers = useCallback(async () => {
     setLoading(true);
     try {
       const res = await fetch(`http://localhost:5000/api/suppliers?page=${currentPage}&limit=${itemsPerPage}&search=${searchQuery}`);
@@ -81,11 +79,11 @@ export default function SuppliersPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentPage, itemsPerPage, searchQuery]);
 
   useEffect(() => {
     fetchSuppliers();
-  }, [currentPage, itemsPerPage]);
+  }, [fetchSuppliers]);
 
   // Debounce search
   useEffect(() => {
@@ -97,7 +95,7 @@ export default function SuppliersPage() {
       }
     }, 500);
     return () => clearTimeout(timer);
-  }, [searchQuery]);
+  }, [searchQuery, currentPage, fetchSuppliers]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -131,7 +129,6 @@ export default function SuppliersPage() {
   };
 
   const openDeleteModal = (supplier: Supplier) => {
-    setSupplierToDelete(supplier);
     setConfirmModal({
       isOpen: true,
       title: 'Delete Supplier',
@@ -149,11 +146,15 @@ export default function SuppliersPage() {
     
     // Permission check
     if (modalMode === 'add' && !checkActionPermission('create')) {
-        showToast('You do not have permission to create suppliers', 'error');
+        goeyToast.error('Akses Ditolak', {
+            description: "Anda tidak memiliki izin untuk menambahkan supplier baru."
+        });
         return;
     }
     if (modalMode === 'edit' && !checkActionPermission('edit')) {
-        showToast('You do not have permission to edit suppliers', 'error');
+        goeyToast.error('Akses Ditolak', {
+            description: "Anda tidak memiliki izin untuk mengubah data supplier ini."
+        });
         return;
     }
 
@@ -173,20 +174,28 @@ export default function SuppliersPage() {
       if (res.ok) {
         setIsModalOpen(false);
         fetchSuppliers();
-        showToast(`Supplier ${modalMode === 'add' ? 'added' : 'updated'} successfully`, 'success');
+        goeyToast.success(`Supplier berhasil ${modalMode === 'add' ? 'ditambahkan' : 'diperbarui'}`, {
+          description: `Data supplier "${formData.name}" ${formData.contact_person ? `(CP: ${formData.contact_person})` : ''} telah berhasil ${modalMode === 'add' ? 'disimpan ke dalam sistem' : 'diperbarui'}.`
+        });
       } else {
-        showToast('Failed to save supplier', 'error');
+        goeyToast.error(modalMode === 'add' ? 'Gagal Menambah Supplier' : 'Gagal Memperbarui Supplier', {
+            description: "Terjadi kesalahan saat menyimpan data. Silakan periksa kembali input Anda."
+        });
       }
     } catch (error) {
       console.error('Error saving supplier:', error);
-      showToast('Error saving supplier', 'error');
+      goeyToast.error('Terjadi kesalahan sistem', {
+          description: "Gagal terhubung ke server. Silakan coba lagi."
+      });
     }
   };
 
   const handleDelete = async (supplier: Supplier) => {
     // Permission check
     if (!checkActionPermission('delete')) {
-        showToast('You do not have permission to delete suppliers', 'error');
+        goeyToast.error('Akses Ditolak', {
+            description: "Anda tidak memiliki izin untuk menghapus supplier."
+        });
         return;
     }
 
@@ -197,13 +206,19 @@ export default function SuppliersPage() {
 
       if (res.ok) {
         fetchSuppliers();
-        showToast('Supplier deleted successfully', 'success');
+        goeyToast.success('Supplier Berhasil Dihapus', {
+          description: `Supplier "${supplier.name}" telah dihapus permanen dari sistem.`
+        });
       } else {
-        showToast('Failed to delete supplier', 'error');
+        goeyToast.error('Gagal Menghapus Supplier', {
+            description: "Terjadi kesalahan saat mencoba menghapus data supplier."
+        });
       }
     } catch (error) {
       console.error('Error deleting supplier:', error);
-      showToast('Error deleting supplier', 'error');
+      goeyToast.error('Terjadi kesalahan sistem', {
+          description: "Gagal terhubung ke server. Silakan coba lagi."
+      });
     }
   };
 
@@ -406,6 +421,18 @@ export default function SuppliersPage() {
               </div>
 
               <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Contact Person</label>
+                <input 
+                  type="text" 
+                  name="contact_person"
+                  className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="e.g. John Doe"
+                  value={formData.contact_person}
+                  onChange={handleInputChange}
+                />
+              </div>
+
+              <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
                 <input 
                   type="text" 
@@ -413,6 +440,18 @@ export default function SuppliersPage() {
                   className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="e.g. 08123456789"
                   value={formData.phone}
+                  onChange={handleInputChange}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
+                <textarea 
+                  name="address"
+                  className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="e.g. Jl. Sudirman No. 1"
+                  rows={3}
+                  value={formData.address}
                   onChange={handleInputChange}
                 />
               </div>

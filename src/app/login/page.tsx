@@ -36,11 +36,12 @@ export default function LoginPage() {
         // Save to cookie for Middleware protection
         document.cookie = `token=${data.token}; path=/; max-age=86400`; // 1 day
 
+        window.dispatchEvent(new Event('auth:changed'));
         router.push('/dashboard');
       } else {
         setError(data.message || 'Login failed');
       }
-    } catch (err) {
+    } catch {
       setError('Something went wrong. Please try again.');
     } finally {
       setLoading(false);

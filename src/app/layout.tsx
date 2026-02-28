@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Poppins } from "next/font/google";
 import "./globals.css";
 import Sidebar from "@/components/Sidebar";
-import { ToastProvider } from "@/components/ToastProvider";
+import { GoeyToaster } from "@/components/ui/goey-toaster";
 import AuthProvider from "@/components/AuthProvider";
 
 const poppins = Poppins({
@@ -26,14 +26,13 @@ export default function RootLayout({
       <body
         className={`${poppins.variable} antialiased flex h-screen bg-gray-50 font-sans`}
       >
-        <ToastProvider>
-          <AuthProvider>
-            <Sidebar />
-            <main className="flex-1 overflow-y-auto">
-              {children}
-            </main>
-          </AuthProvider>
-        </ToastProvider>
+        <AuthProvider>
+          <Sidebar />
+          <main className="flex-1 overflow-y-auto">
+            {children}
+          </main>
+          <GoeyToaster />
+        </AuthProvider>
       </body>
     </html>
   );

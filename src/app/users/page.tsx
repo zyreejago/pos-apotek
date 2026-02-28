@@ -1,9 +1,9 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Search, Filter, Plus, Settings, X, ChevronLeft, ChevronRight, User, MoreVertical, Edit, Trash2 } from 'lucide-react';
-import { useToast } from '@/components/ToastProvider';
+import { Search, Filter, Plus, Edit, X, Trash2 } from 'lucide-react';
+import { goeyToast } from "@/components/ui/goey-toaster";
 import ConfirmModal from '@/components/ConfirmModal';
 import Header from '@/components/Header';
 import { useRequirePermission } from '@/hooks/useRequirePermission';
@@ -15,7 +15,7 @@ interface UserData {
   outlet_id: number | null;
   outlet_name: string | null;
   created_at: string;
-  status?: string; // Optional, might need to add to DB or infer
+  status?: string;
 }
 
 interface Outlet {
@@ -35,17 +35,32 @@ interface Pagination {
   totalPages: number;
 }
 
+type CurrentUser = {
+  id?: number;
+  username?: string;
+  role?: string;
+};
+
+type ModalMode = 'add' | 'edit';
+
+type UserFormData = {
+  username: string;
+  password: string;
+  role: string;
+  outlet_id: string;
+  status: 'active' | 'inactive';
+};
+
 export default function UsersPage() {
   const router = useRouter();
-  const { showToast } = useToast();
-  // Permission Check
-  const { loading: permLoading, hasPermission, checkActionPermission } = useRequirePermission('Management Pengguna');
+  const { checkActionPermission } = useRequirePermission('Management Pengguna');
 
   const [users, setUsers] = useState<UserData[]>([]);
   const [outlets, setOutlets] = useState<Outlet[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [pagination, setPagination] = useState<Pagination>({
@@ -55,13 +70,11 @@ export default function UsersPage() {
     totalPages: 1
   });
 
-  // Modal States
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [modalMode, setModalMode] = useState<'add' | 'edit'>('add');
+  const [modalMode, setModalMode] = useState<ModalMode>('add');
   const [selectedUser, setSelectedUser] = useState<UserData | null>(null);
   
-  // Form State
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<UserFormData>({
     username: '',
     password: '',
     role: 'Cashier',
@@ -69,7 +82,6 @@ export default function UsersPage() {
     status: 'active'
   });
 
-  // Confirm Modal
   const [confirmModal, setConfirmModal] = useState({
     isOpen: false,
     title: '',
@@ -79,87 +91,122 @@ export default function UsersPage() {
   });
 
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-  const userStr = typeof window !== 'undefined' ? localStorage.getItem('user') : null;
-  const currentUser = userStr ? JSON.parse(userStr) : null;
-  const authHeaders: HeadersInit = token ? { 'Authorization': `Bearer ${token}` } : {};
+  const currentUser = useMemo<CurrentUser | null>(() => {
+    if (typeof window === 'undefined') return null;
+    const userStr = localStorage.getItem('user');
+    if (!userStr) return null;
+    try {
+      return JSON.parse(userStr) as CurrentUser;
+    } catch {
+      return null;
+    }
+  }, []);
+  
+  const authHeaders = useMemo((): HeadersInit => {
+    return token ? { 'Authorization': `Bearer ${token}` } : {};
+  }, [token]);
 
-  useEffect(() => {
-    fetchUsers();
-    fetchOutlets();
-    fetchRoles();
-  }, [currentPage, itemsPerPage]);
+  const handleUnauthorized = useCallback(() => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    document.cookie = "token=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+    router.push('/login');
+  }, [router]);
 
-  const checkPermission = (action: 'create' | 'edit' | 'delete') => {
-    return checkActionPermission(action);
-  };
+  const safeJson = useCallback(async <T,>(res: Response): Promise<T | null> => {
+    try {
+      return (await res.json()) as T;
+    } catch {
+      return null;
+    }
+  }, []);
 
-  // Debounce search
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (currentPage !== 1) {
-        setCurrentPage(1);
-      } else {
-        fetchUsers();
-      }
-    }, 500);
-    return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchQuery]);
-
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`http://localhost:5000/api/users?page=${currentPage}&limit=${itemsPerPage}&search=${searchQuery}`, {
+      const res = await fetch(`http://localhost:5000/api/users?page=${currentPage}&limit=${itemsPerPage}&search=${debouncedSearchQuery}`, {
         headers: authHeaders
       });
       
       if (res.status === 401) {
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-        document.cookie = "token=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT";
-        router.push('/login');
+        handleUnauthorized();
         return;
       }
 
       if (res.ok) {
-        const data = await res.json();
+        const data = await safeJson<{ data: UserData[]; pagination: Pagination }>(res);
+        if (!data) return;
         setUsers(data.data);
         setPagination(data.pagination);
+      } else if (res.status === 403) {
+        setUsers([]);
+        setPagination({ total: 0, page: 1, limit: itemsPerPage, totalPages: 1 });
+        goeyToast.error('Akses Ditolak', {
+          description: 'Anda tidak memiliki izin untuk melihat daftar pengguna.'
+        });
       }
     } catch (error) {
       console.error('Error fetching users:', error);
     } finally {
       setLoading(false);
     }
-  };
+  }, [authHeaders, currentPage, debouncedSearchQuery, handleUnauthorized, itemsPerPage, safeJson]);
 
-  const fetchOutlets = async () => {
+  const fetchOutlets = useCallback(async () => {
     try {
       const res = await fetch('http://localhost:5000/api/outlets', { headers: authHeaders });
+      if (res.status === 401) {
+        handleUnauthorized();
+        return;
+      }
       if (res.ok) {
-        const data = await res.json();
+        const data = await safeJson<unknown>(res);
         if (Array.isArray(data)) {
-          setOutlets(data);
+          setOutlets(data as Outlet[]);
         } else {
-          console.error('Outlets data is not an array:', data);
           setOutlets([]);
         }
       }
     } catch (error) {
       console.error('Error fetching outlets:', error);
     }
-  };
+  }, [authHeaders, handleUnauthorized, safeJson]);
 
-  const fetchRoles = async () => {
+  const fetchRoles = useCallback(async () => {
     try {
       const res = await fetch('http://localhost:5000/api/rbac/roles', { headers: authHeaders });
+      if (res.status === 401) {
+        handleUnauthorized();
+        return;
+      }
       if (res.ok) {
-        const data = await res.json();
-        setRoles(data);
+        const data = await safeJson<Role[]>(res);
+        setRoles(Array.isArray(data) ? data : []);
       }
     } catch (error) {
       console.error('Error fetching roles:', error);
     }
+  }, [authHeaders, handleUnauthorized, safeJson]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+      setCurrentPage(1);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  useEffect(() => {
+    fetchUsers();
+  }, [fetchUsers]);
+
+  useEffect(() => {
+    fetchOutlets();
+    fetchRoles();
+  }, [fetchOutlets, fetchRoles]);
+
+  const normalizeStatus = (status?: string): 'active' | 'inactive' => {
+    return status === 'inactive' ? 'inactive' : 'active';
   };
   
   const handleOpenAddModal = () => {
@@ -179,10 +226,10 @@ export default function UsersPage() {
     setSelectedUser(user);
     setFormData({
       username: user.username,
-      password: '', // Don't show password
+      password: '',
       role: user.role,
       outlet_id: user.outlet_id ? user.outlet_id.toString() : '',
-      status: user.status || 'active'
+      status: normalizeStatus(user.status)
     });
     setIsModalOpen(true);
   };
@@ -195,13 +242,16 @@ export default function UsersPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Permission check
     if (modalMode === 'add' && !checkActionPermission('create')) {
-        showToast('You do not have permission to create users', 'error');
+        goeyToast.error('Akses Ditolak', {
+          description: 'Anda tidak memiliki izin untuk membuat pengguna baru.'
+        });
         return;
     }
     if (modalMode === 'edit' && !checkActionPermission('edit')) {
-        showToast('You do not have permission to edit users', 'error');
+        goeyToast.error('Akses Ditolak', {
+          description: 'Anda tidak memiliki izin untuk mengedit pengguna.'
+        });
         return;
     }
 
@@ -212,49 +262,71 @@ export default function UsersPage() {
     const method = modalMode === 'add' ? 'POST' : 'PUT';
     
     try {
+      const payload: Record<string, unknown> = {
+        username: formData.username,
+        role: formData.role,
+        outlet_id: formData.outlet_id ? parseInt(formData.outlet_id) : null,
+        status: formData.status
+      };
+
+      if (modalMode === 'add' || formData.password.trim().length > 0) {
+        payload.password = formData.password;
+      }
+
       const res = await fetch(url, {
         method,
         headers: {
           'Content-Type': 'application/json',
           ...authHeaders
         },
-        body: JSON.stringify({
-          ...formData,
-          outlet_id: formData.outlet_id ? parseInt(formData.outlet_id) : null,
-          status: formData.status
-        }),
+        body: JSON.stringify(payload),
       });
 
-      const data = await res.json();
+      if (res.status === 401) {
+        handleUnauthorized();
+        return;
+      }
+
+      const data = await safeJson<{ message?: string }>(res);
 
       if (res.ok) {
         handleCloseModal();
         fetchUsers();
-        showToast(`User ${modalMode === 'add' ? 'created' : 'updated'} successfully`, 'success');
+        goeyToast.success(modalMode === 'add' ? 'Pengguna Berhasil Ditambahkan' : 'Pengguna Berhasil Diperbarui', {
+          description: `Pengguna "${formData.username}" dengan role "${formData.role}" telah berhasil ${modalMode === 'add' ? 'ditambahkan ke sistem' : 'diperbarui'}.`
+        });
       } else {
-        showToast(data.message || 'Failed to save user', 'error');
+        goeyToast.error('Gagal Menyimpan Pengguna', {
+          description: data?.message || 'Terjadi kesalahan saat menyimpan data pengguna.'
+        });
       }
     } catch (error) {
       console.error('Error saving user:', error);
-      showToast('Error saving user', 'error');
+      goeyToast.error('Terjadi Kesalahan', {
+        description: 'Gagal menyimpan pengguna. Periksa koneksi internet Anda.'
+      });
     }
   };
 
   const handleDelete = (user: UserData) => {
     if (currentUser && currentUser.id === user.id) {
-        showToast("You cannot delete your own account", "error");
+        goeyToast.error("Aksi Ditolak", {
+          description: "Anda tidak dapat menghapus akun Anda sendiri."
+        });
         return;
     }
 
     setConfirmModal({
       isOpen: true,
-      title: 'Delete User',
-      message: `Are you sure you want to delete ${user.username}? This action cannot be undone.`,
+      title: 'Hapus Pengguna',
+      message: `Apakah Anda yakin ingin menghapus pengguna "${user.username}"? Tindakan ini tidak dapat dibatalkan.`,
       variant: 'danger',
       onConfirm: async () => {
-        // Permission check
         if (!checkActionPermission('delete')) {
-            showToast('You do not have permission to delete users', 'error');
+            goeyToast.error('Akses Ditolak', {
+              description: 'Anda tidak memiliki izin untuk menghapus pengguna.'
+            });
+            setConfirmModal(prev => ({ ...prev, isOpen: false }));
             return;
         }
         
@@ -264,16 +336,27 @@ export default function UsersPage() {
             headers: authHeaders
           });
           
+          if (res.status === 401) {
+            handleUnauthorized();
+            return;
+          }
+
           if (res.ok) {
             fetchUsers();
-            showToast('User deleted successfully', 'success');
+            goeyToast.success('Pengguna Berhasil Dihapus', {
+              description: `Pengguna "${user.username}" telah berhasil dihapus dari sistem.`
+            });
           } else {
-            const data = await res.json();
-            showToast(data.message || 'Failed to delete user', 'error');
+            const data = await safeJson<{ message?: string }>(res);
+            goeyToast.error('Gagal Menghapus Pengguna', {
+              description: data?.message || 'Terjadi kesalahan saat menghapus pengguna.'
+            });
           }
         } catch (error) {
           console.error('Error deleting user:', error);
-          showToast('Error deleting user', 'error');
+          goeyToast.error('Terjadi Kesalahan', {
+            description: 'Gagal menghapus pengguna. Periksa koneksi internet Anda.'
+          });
         } finally {
           setConfirmModal(prev => ({ ...prev, isOpen: false }));
         }
@@ -282,19 +365,29 @@ export default function UsersPage() {
   };
 
   const getInitials = (name: string) => {
-    return name.slice(0, 2).toUpperCase();
+    const cleaned = name.trim();
+    if (!cleaned) return '??';
+    return cleaned.slice(0, 2).toUpperCase();
   };
 
-  // Helper to generate a consistent color based on name
   const getAvatarColor = (name: string) => {
     const colors = [
       'bg-red-500', 'bg-blue-500', 'bg-emerald-500', 
       'bg-amber-500', 'bg-purple-500', 'bg-pink-500', 
       'bg-indigo-500', 'bg-cyan-500'
     ];
-    const index = name.length % colors.length;
+    const sum = name.split('').reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
+    const index = sum % colors.length;
     return colors[index];
   };
+
+  const showingText = useMemo(() => {
+    const total = pagination.total;
+    if (total === 0) return 'Menampilkan 0 pengguna';
+    const start = (currentPage - 1) * itemsPerPage + 1;
+    const end = Math.min(currentPage * itemsPerPage, total);
+    return `Menampilkan ${start}-${end} dari ${total} pengguna`;
+  }, [currentPage, itemsPerPage, pagination.total]);
 
   return (
     <div className="bg-gray-50 min-h-screen relative">
@@ -302,123 +395,149 @@ export default function UsersPage() {
         title="Manage Pengguna"
         breadcrumbs={[{ label: 'Pengguna' }, { label: 'Manage Pengguna' }]}
         rightContent={
-          <button className="bg-white border border-gray-200 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 flex items-center gap-2">
-            <Settings size={16} />
-            Select Outlets
-          </button>
+          checkActionPermission('create') && (
+            <button 
+              onClick={handleOpenAddModal}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium transition-colors"
+            >
+              <Plus size={16} />
+              Add Pengguna
+            </button>
+          )
         }
       />
 
       <div className="p-8 pt-0">
-        <div className="flex justify-end mb-6">
-          {checkPermission('create') && (
-          <button 
-            onClick={handleOpenAddModal}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium transition-colors"
-          >
-            Add Pengguna
-          </button>
-          )}
-      </div>
-
-      {/* Main Content */}
-      <div>
-        <div className="flex justify-between items-center mb-4">
-            <div className="text-sm font-medium text-gray-700">
-                Showing {users.length} Users
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="p-4 flex flex-col md:flex-row justify-between items-center gap-4 border-b border-gray-100">
+            <div className="text-sm font-medium text-gray-700">{showingText}</div>
+            <div className="flex items-center gap-2 w-full md:w-auto">
+              <button className="flex items-center gap-2 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors">
+                <Filter size={16} />
+                Filters
+              </button>
+              <div className="relative flex-1 md:w-72">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                <input 
+                  type="text" 
+                  placeholder="Cari pengguna..."
+                  className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </div>
             </div>
-            <div className="flex gap-2">
-                 <div className="flex items-center gap-2 bg-white border border-gray-200 px-3 py-1.5 rounded-lg text-xs font-medium text-gray-600">
-                    Status <span className="font-bold text-gray-900">Active</span> <X size={12} className="cursor-pointer" />
-                 </div>
-                 <div className="flex items-center gap-2 bg-white border border-gray-200 px-3 py-1.5 rounded-lg text-xs font-medium text-gray-600">
-                    Sort <span className="font-bold text-gray-900">Latest</span> <X size={12} className="cursor-pointer" />
-                 </div>
-                 <button className="flex items-center gap-2 bg-blue-50 text-blue-600 px-3 py-1.5 rounded-lg text-xs font-medium">
-                    <Filter size={12} /> Filters
-                 </button>
-                 <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
-                    <input 
-                        type="text" 
-                        placeholder="Type name," 
-                        className="pl-9 pr-4 py-1.5 border border-gray-200 rounded-lg text-xs w-48 focus:outline-none focus:border-blue-500"
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                    />
-                 </div>
-            </div>
-        </div>
+          </div>
 
-        {/* User List - Cards */}
-        <div className="space-y-6">
+          <div className="p-4 space-y-3">
             {loading ? (
-                <div className="text-center py-8 text-gray-500">Loading users...</div>
+              <div className="text-center py-8 text-gray-500">Loading users...</div>
             ) : users.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">No users found.</div>
+              <div className="text-center py-8 text-gray-500">No users found.</div>
             ) : (
-                users.map((user) => {
-                    // Logic for status - for now randomizing or assuming active if not present
-                    // In real app, user.status would come from DB
-                    const isActive = user.status === 'inactive' ? false : true; 
-                    
-                    return (
-                    <div key={user.id} className="group bg-white p-3 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md hover:border-blue-100 transition-all duration-200 flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                            <div className="relative">
-                                <div className={`w-10 h-10 rounded-full flex items-center justify-center text-base font-bold text-white shadow-sm ${getAvatarColor(user.username)}`}>
-                                    {getInitials(user.username)}
-                                </div>
-                                <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white ${isActive ? 'bg-emerald-500' : 'bg-rose-500'}`}></div>
-                            </div>
-                            <div>
-                                <h3 className="text-sm font-bold text-gray-900 leading-tight group-hover:text-blue-600 transition-colors">{user.username}</h3>
-                                <p className="text-[10px] font-medium text-gray-400 mt-0.5">{user.username.toLowerCase()}@example.com</p>
-                            </div>
+              users.map((user) => {
+                const isActive = user.status !== 'inactive';
+                const outletLabel = user.outlet_name ? user.outlet_name : 'Tanpa outlet';
+
+                return (
+                  <div key={user.id} className="group bg-white p-4 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md hover:border-blue-100 transition-all duration-200 flex items-center justify-between">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="relative shrink-0">
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center text-base font-bold text-white shadow-sm ${getAvatarColor(user.username)}`}>
+                          {getInitials(user.username)}
                         </div>
-                        
-                        <div className="flex items-center gap-4">
-                            {/* Role Box */}
-                            <div className="flex flex-col items-center justify-center border border-dashed border-gray-300 bg-gray-50/50 rounded-xl px-3 py-1 min-w-[80px]">
-                                <span className="text-xs font-bold text-gray-900 capitalize">{user.role}</span>
-                                <span className="text-[9px] font-semibold text-gray-400 uppercase tracking-wider mt-0.5">Role</span>
-                            </div>
-                            
-                            {/* Status Box */}
-                            <div className={`flex flex-col items-center justify-center border border-dashed rounded-xl px-3 py-1 min-w-[80px] ${isActive ? 'border-emerald-200 bg-emerald-50/30' : 'border-rose-200 bg-rose-50/30'}`}>
-                                <span className={`text-xs font-bold ${isActive ? 'text-emerald-600' : 'text-rose-600'}`}>
-                                    {isActive ? 'Active' : 'Inactive'}
-                                </span>
-                                <span className={`text-[9px] font-semibold uppercase tracking-wider mt-0.5 ${isActive ? 'text-emerald-400' : 'text-rose-400'}`}>Status</span>
-                            </div>
-                            
-                            {/* Actions */}
-                            <div className="flex items-center gap-1 pl-2 border-l border-gray-100">
-                                {checkPermission('edit') && (
-                                <button 
-                                    onClick={() => handleOpenEditModal(user)}
-                                    className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all duration-200"
-                                    title="Edit User"
-                                >
-                                    <Settings size={16} strokeWidth={2} />
-                                </button>
-                                )}
-                                {checkPermission('delete') && (!currentUser || currentUser.id !== user.id) && (
-                                <button 
-                                    onClick={() => handleDelete(user)}
-                                    className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all duration-200"
-                                    title="Delete User"
-                                >
-                                    <Trash2 size={16} strokeWidth={2} />
-                                </button>
-                                )}
-                            </div>
-                        </div>
+                        <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white ${isActive ? 'bg-emerald-500' : 'bg-rose-500'}`}></div>
+                      </div>
+                      <div className="min-w-0">
+                        <h3 className="text-sm font-bold text-gray-900 leading-tight group-hover:text-blue-600 transition-colors truncate">{user.username}</h3>
+                        <p className="text-xs font-medium text-gray-400 mt-0.5 truncate">{outletLabel}</p>
+                      </div>
                     </div>
-                )})
+                    
+                    <div className="flex items-center gap-3">
+                      <div className="hidden sm:flex flex-col items-center justify-center border border-dashed border-gray-300 bg-gray-50/50 rounded-xl px-3 py-1 min-w-[88px]">
+                        <span className="text-xs font-bold text-gray-900 capitalize">{user.role}</span>
+                        <span className="text-[9px] font-semibold text-gray-400 uppercase tracking-wider mt-0.5">Role</span>
+                      </div>
+                      
+                      <div className={`hidden sm:flex flex-col items-center justify-center border border-dashed rounded-xl px-3 py-1 min-w-[88px] ${isActive ? 'border-emerald-200 bg-emerald-50/30' : 'border-rose-200 bg-rose-50/30'}`}>
+                        <span className={`text-xs font-bold ${isActive ? 'text-emerald-600' : 'text-rose-600'}`}>
+                          {isActive ? 'Active' : 'Inactive'}
+                        </span>
+                        <span className={`text-[9px] font-semibold uppercase tracking-wider mt-0.5 ${isActive ? 'text-emerald-400' : 'text-rose-400'}`}>Status</span>
+                      </div>
+                      
+                      <div className="flex items-center gap-1 pl-2 border-l border-gray-100">
+                        {checkActionPermission('edit') && (
+                          <button 
+                            onClick={() => handleOpenEditModal(user)}
+                            className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all duration-200"
+                            title="Edit User"
+                          >
+                            <Edit size={16} strokeWidth={2} />
+                          </button>
+                        )}
+                        {checkActionPermission('delete') && (!currentUser || currentUser.id !== user.id) && (
+                          <button 
+                            onClick={() => handleDelete(user)}
+                            className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all duration-200"
+                            title="Delete User"
+                          >
+                            <Trash2 size={16} strokeWidth={2} />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
             )}
+          </div>
+
+          <div className="p-4 flex flex-col sm:flex-row justify-between items-center gap-4 text-sm text-gray-500 border-t border-gray-100">
+            <div className="flex items-center gap-2">
+              <span>Show</span>
+              <select
+                className="border border-gray-200 rounded px-2 py-1 focus:outline-none focus:border-blue-500"
+                value={itemsPerPage}
+                onChange={(e) => {
+                  setItemsPerPage(Number(e.target.value));
+                  setCurrentPage(1);
+                }}
+              >
+                <option value={5}>5</option>
+                <option value={10}>10</option>
+                <option value={20}>20</option>
+              </select>
+              <span>per page</span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span>
+                {(pagination.total === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1)}-{(pagination.total === 0 ? 0 : Math.min(currentPage * itemsPerPage, pagination.total))} of {pagination.total}
+              </span>
+              <div className="flex gap-1">
+                <button
+                  className={`w-8 h-8 flex items-center justify-center rounded border ${currentPage === 1 ? 'text-gray-300 border-gray-200 cursor-not-allowed' : 'text-gray-600 border-gray-300 hover:bg-gray-50'}`}
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                >
+                  ←
+                </button>
+                <span className="w-8 h-8 flex items-center justify-center rounded bg-blue-600 text-white font-medium">
+                  {currentPage}
+                </span>
+                <button
+                  className={`w-8 h-8 flex items-center justify-center rounded border ${currentPage === pagination.totalPages ? 'text-gray-300 border-gray-200 cursor-not-allowed' : 'text-gray-600 border-gray-300 hover:bg-gray-50'}`}
+                  onClick={() => setCurrentPage(p => Math.min(pagination.totalPages, p + 1))}
+                  disabled={currentPage === pagination.totalPages}
+                >
+                  →
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
-      </div>
       </div>
 
       {/* Add/Edit Modal */}
@@ -449,9 +568,7 @@ export default function UsersPage() {
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    {modalMode === 'edit' ? 'Password (leave blank to keep)' : 'Password'}
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">{modalMode === 'edit' ? 'Password (opsional)' : 'Password'}</label>
                   <input
                     type="password"
                     required={modalMode === 'add'}
@@ -480,7 +597,7 @@ export default function UsersPage() {
                   <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
                   <select
                     value={formData.status}
-                    onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value }))}
+                    onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value as 'active' | 'inactive' }))}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                   >
                     <option value="active">Active</option>

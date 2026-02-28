@@ -1,11 +1,12 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Search, ShoppingCart, Plus, Minus, X, Store, CreditCard } from 'lucide-react';
 
-import { useToast } from '@/components/ToastProvider';
+import { goeyToast } from "@/components/ui/goey-toaster";
 import { useRequirePermission } from '@/hooks/useRequirePermission';
 import Header from '@/components/Header';
+import { useRouter } from 'next/navigation';
 
 interface Product {
   id: number;
@@ -27,9 +28,9 @@ interface CartItem extends Product {
 }
 
 export default function POSTransactionsPage() {
-  const { showToast } = useToast();
+  const router = useRouter();
   // Permission Check
-  const { loading: permLoading, hasPermission, checkActionPermission } = useRequirePermission('Transactions');
+  const { checkActionPermission } = useRequirePermission('Transactions');
 
   const [products, setProducts] = useState<Product[]>([]);
   const [outlets, setOutlets] = useState<Outlet[]>([]);
@@ -45,17 +46,30 @@ export default function POSTransactionsPage() {
     const fetchData = async () => {
       try {
         const token = localStorage.getItem('token');
+        const authHeaders: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
         const [prodRes, outletRes, settingsRes] = await Promise.all([
-          fetch('http://localhost:5000/api/products?limit=100'), // Get enough products
-          fetch('http://localhost:5000/api/outlets'),
+          fetch('http://localhost:5000/api/products?limit=100', { headers: authHeaders }), // Get enough products
+          fetch('http://localhost:5000/api/outlets', { headers: authHeaders }),
           fetch(`http://localhost:5000/api/settings?t=${Date.now()}`, {
-            headers: { 'Authorization': `Bearer ${token}` }
+            headers: authHeaders
           })
         ]);
+
+        if (prodRes.status === 401 || outletRes.status === 401 || settingsRes.status === 401) {
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+          document.cookie = "token=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+          router.push('/login');
+          return;
+        }
         
         if (prodRes.ok) {
           const prodData = await prodRes.json();
           setProducts(prodData.data || []);
+        } else if (prodRes.status === 403) {
+          goeyToast.error('Akses Ditolak', {
+            description: 'Anda tidak memiliki izin untuk melihat daftar produk.'
+          });
         }
 
         if (outletRes.ok) {
@@ -69,6 +83,10 @@ export default function POSTransactionsPage() {
             console.error('Outlets data is not an array:', outletData);
             setOutlets([]);
           }
+        } else if (outletRes.status === 403) {
+          goeyToast.error('Akses Ditolak', {
+            description: 'Anda tidak memiliki izin untuk melihat daftar outlet.'
+          });
         }
 
         if (settingsRes.ok) {
@@ -85,7 +103,7 @@ export default function POSTransactionsPage() {
       }
     };
     fetchData();
-  }, []);
+  }, [router]);
 
   // Cart Logic
   const addToCart = (product: Product) => {
@@ -136,15 +154,18 @@ export default function POSTransactionsPage() {
   const handlePayment = async () => {
     // Permission check for creating transaction (assuming 'create' is needed for payment)
     if (!checkActionPermission('create')) {
-        showToast('You do not have permission to process transactions', 'error');
+        goeyToast.error('Akses Ditolak', {
+            description: "Anda tidak memiliki izin untuk memproses transaksi penjualan."
+        });
         return;
     }
 
-    if (cart.length === 0) return showToast('Cart is empty', 'warning');
-    if (!selectedOutlet) return showToast('Please select an outlet', 'warning');
+    if (cart.length === 0) return goeyToast.error('Keranjang Kosong', { description: "Silakan pilih produk terlebih dahulu sebelum melanjutkan pembayaran." });
+    if (!selectedOutlet) return goeyToast.error('Outlet Belum Dipilih', { description: "Harap pilih lokasi outlet untuk transaksi ini." });
 
     setProcessing(true);
     try {
+      const token = localStorage.getItem('token');
       const payload = {
         outlet_id: selectedOutlet,
         items: cart.map(item => ({
@@ -160,23 +181,39 @@ export default function POSTransactionsPage() {
 
       const res = await fetch('http://localhost:5000/api/transactions', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
         body: JSON.stringify(payload)
       });
 
+      if (res.status === 401) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        document.cookie = "token=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+        router.push('/login');
+        return;
+      }
+
       if (res.ok) {
-        showToast('Transaction successful!', 'success');
+        goeyToast.success('Transaksi Berhasil', {
+          description: `Pembayaran senilai ${formatCurrency(total)} berhasil diproses. ${cart.length} item telah tercatat dalam sistem penjualan.`
+        });
         setCart([]); // Clear cart
         // Refresh products to update stock
-        const prodRes = await fetch('http://localhost:5000/api/products?limit=100');
+        const prodRes = await fetch('http://localhost:5000/api/products?limit=100', {
+          headers: token ? { Authorization: `Bearer ${token}` } : {}
+        });
         const prodData = await prodRes.json();
         setProducts(prodData.data || []);
       } else {
-        showToast('Transaction failed', 'error');
+        goeyToast.error('Transaksi gagal', {
+            description: "Terjadi kesalahan saat memproses transaksi."
+        });
       }
     } catch (error) {
-      console.error('Payment error:', error);
-      showToast('Error processing payment', 'error');
+      console.error("Payment error:", error);
+      goeyToast.error('Gagal memproses pembayaran', {
+          description: "Periksa koneksi internet Anda dan coba lagi."
+      });
     } finally {
       setProcessing(false);
     }

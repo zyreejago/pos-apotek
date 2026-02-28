@@ -1,5 +1,9 @@
-module.exports = function registerTransactionRoutes(app, pool, authenticate) {
-  app.post('/api/transactions', async (req, res) => {
+module.exports = function registerTransactionRoutes(app, pool, authenticate, checkPermission) {
+  app.post(
+    '/api/transactions',
+    authenticate,
+    checkPermission('Transactions', 'create'),
+    async (req, res) => {
     const { outlet_id, items, total_amount, tax_amount, discount_amount, subtotal } =
       req.body;
 
@@ -40,7 +44,8 @@ module.exports = function registerTransactionRoutes(app, pool, authenticate) {
     } finally {
       connection.release();
     }
-  });
+    }
+  );
 
   app.get('/api/dashboard', authenticate, async (req, res) => {
     try {
@@ -106,4 +111,3 @@ module.exports = function registerTransactionRoutes(app, pool, authenticate) {
     }
   });
 };
-

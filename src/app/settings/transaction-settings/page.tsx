@@ -2,13 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useToast } from "@/components/ToastProvider";
+import { goeyToast } from "@/components/ui/goey-toaster";
 import Header from "@/components/Header";
 import { useRequirePermission } from "@/hooks/useRequirePermission";
 
 export default function Page() {
   const { loading: permLoading, hasPermission, checkActionPermission } = useRequirePermission('System Settings');
-  const { showToast } = useToast();
   const router = useRouter();
   
   const [settings, setSettings] = useState<{
@@ -22,40 +21,44 @@ export default function Page() {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    fetchSettings();
-  }, []);
+    const fetchSettings = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) {
+          router.push('/login');
+          return;
+        }
 
-  const fetchSettings = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        router.push('/login');
-        return;
+        const res = await fetch(`http://localhost:5000/api/settings?t=${Date.now()}`, {
+          headers: { 'Authorization': `Bearer ${token}` },
+          cache: 'no-store'
+        });
+        
+        if (!res.ok) throw new Error('Failed to fetch settings');
+        
+        const data = await res.json();
+        setSettings({
+          ppn_rate: Number(data.ppn_rate) || 0,
+          discount_rate: Number(data.discount_rate) || 0
+        });
+      } catch (error) {
+        console.error(error);
+        goeyToast.error('Gagal memuat pengaturan', {
+            description: "Terjadi kesalahan saat memuat data pengaturan."
+        });
+      } finally {
+        setLoading(false);
       }
+    };
 
-      const res = await fetch(`http://localhost:5000/api/settings?t=${Date.now()}`, {
-        headers: { 'Authorization': `Bearer ${token}` },
-        cache: 'no-store'
-      });
-      
-      if (!res.ok) throw new Error('Failed to fetch settings');
-      
-      const data = await res.json();
-      setSettings({
-        ppn_rate: Number(data.ppn_rate) || 0,
-        discount_rate: Number(data.discount_rate) || 0
-      });
-    } catch (error) {
-      console.error(error);
-      showToast('Error loading settings', 'error');
-    } finally {
-      setLoading(false);
-    }
-  };
+    fetchSettings();
+  }, [router]);
 
   const handleSave = async () => {
     if (!checkActionPermission('edit')) {
-        showToast('You do not have permission to edit settings', 'error');
+        goeyToast.error('Akses Ditolak', {
+            description: "Anda tidak memiliki izin untuk mengubah pengaturan sistem."
+        });
         return;
     }
 
@@ -79,10 +82,14 @@ export default function Page() {
       if (!res.ok) throw new Error('Failed to save settings');
       
       setSettings(sanitizedSettings);
-      showToast('Settings saved successfully', 'success');
+      goeyToast.success('Pengaturan berhasil disimpan', {
+        description: `Tarif PPN ${sanitizedSettings.ppn_rate}% dan Diskon ${sanitizedSettings.discount_rate}% telah disimpan.`
+      });
     } catch (error) {
       console.error(error);
-      showToast('Error saving settings', 'error');
+      goeyToast.error('Gagal menyimpan pengaturan', {
+          description: "Terjadi kesalahan saat menyimpan perubahan pengaturan."
+      });
     } finally {
       setSaving(false);
     }

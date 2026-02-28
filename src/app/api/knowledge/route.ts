@@ -16,7 +16,7 @@ export async function GET() {
       .filter((line) => line.length > 0);
 
     return NextResponse.json({ data: lines });
-  } catch (error) {
+  } catch {
     return NextResponse.json({ data: [] }, { status: 500 });
   }
 }

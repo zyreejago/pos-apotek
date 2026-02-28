@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useRequirePermission } from '@/hooks/useRequirePermission';
 import Header from '@/components/Header';
 
@@ -17,10 +17,7 @@ export default function Page() {
   const items = data?.recommendations || [];
   const total = items.length;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
-  const current = useMemo(() => {
-    const start = (page - 1) * pageSize;
-    return items.slice(start, start + pageSize);
-  }, [items, page, pageSize]);
+  const current = items.slice((page - 1) * pageSize, (page - 1) * pageSize + pageSize);
 
   const search = async () => {
     setLoading(true);

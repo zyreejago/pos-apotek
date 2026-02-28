@@ -1,5 +1,9 @@
-module.exports = function registerReportRoutes(app, pool, authenticate) {
-  app.get('/api/financial/profit-loss', authenticate, async (req, res) => {
+module.exports = function registerReportRoutes(app, pool, authenticate, checkPermission) {
+  app.get(
+    '/api/financial/profit-loss',
+    authenticate,
+    checkPermission('Sales Report', 'show'),
+    async (req, res) => {
     const { month, year } = req.query;
 
     if (!month || !year) {
@@ -78,9 +82,14 @@ module.exports = function registerReportRoutes(app, pool, authenticate) {
       console.error('Error generating financial report:', error);
       res.status(500).json({ message: 'Server error' });
     }
-  });
+    }
+  );
 
-  app.get('/api/reports/transactions', authenticate, async (req, res) => {
+  app.get(
+    '/api/reports/transactions',
+    authenticate,
+    checkPermission('Sales Report', 'show'),
+    async (req, res) => {
     const { startDate, endDate } = req.query;
 
     if (!startDate || !endDate) {
@@ -149,9 +158,14 @@ module.exports = function registerReportRoutes(app, pool, authenticate) {
       console.error('Error generating transaction report:', error);
       res.status(500).json({ message: 'Server error' });
     }
-  });
+    }
+  );
 
-  app.get('/api/reports/balance', authenticate, async (req, res) => {
+  app.get(
+    '/api/reports/balance',
+    authenticate,
+    checkPermission('Sales Report', 'show'),
+    async (req, res) => {
     try {
       const connection = await pool.getConnection();
 
@@ -212,6 +226,6 @@ module.exports = function registerReportRoutes(app, pool, authenticate) {
       console.error('Error generating balance sheet:', error);
       res.status(500).json({ message: 'Server error' });
     }
-  });
+    }
+  );
 }
-

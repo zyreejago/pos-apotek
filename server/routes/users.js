@@ -1,6 +1,10 @@
 module.exports = function registerUserRoutes(app, pool, bcrypt, authenticate, checkPermission) {
   // Get all users with pagination and search
-  app.get('/api/users', authenticate, async (req, res) => {
+  app.get(
+    '/api/users',
+    authenticate,
+    checkPermission('Management Pengguna', 'show'),
+    async (req, res) => {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const search = req.query.search || '';
@@ -48,7 +52,8 @@ module.exports = function registerUserRoutes(app, pool, bcrypt, authenticate, ch
       console.error('Error fetching users:', error);
       res.status(500).json({ message: 'Server error' });
     }
-  });
+    }
+  );
 
   // Create new user
   app.post(
@@ -200,4 +205,3 @@ module.exports = function registerUserRoutes(app, pool, bcrypt, authenticate, ch
     }
   );
 };
-

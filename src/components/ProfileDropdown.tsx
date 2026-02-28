@@ -4,13 +4,12 @@
 import { useState, useRef, useEffect } from "react";
 import { User, LogOut } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useToast } from "./ToastProvider";
+import { goeyToast } from "@/components/ui/goey-toaster";
 
 export default function ProfileDropdown() {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
-  const { showToast } = useToast();
 
   const handleLogout = () => {
     localStorage.removeItem("token");
@@ -18,7 +17,10 @@ export default function ProfileDropdown() {
     // Clear cookie
     document.cookie = "token=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT";
     
-    showToast("Logged out successfully", "success");
+    goeyToast.success("Berhasil keluar", {
+      description: "Anda telah berhasil keluar dari sistem dengan aman."
+    });
+    window.dispatchEvent(new Event('auth:changed'));
     router.push("/login");
   };
 

@@ -1,5 +1,9 @@
-module.exports = function registerSupplierRoutes(app, pool) {
-  app.get('/api/suppliers', async (req, res) => {
+module.exports = function registerSupplierRoutes(app, pool, authenticate, checkPermission) {
+  app.get(
+    '/api/suppliers',
+    authenticate,
+    checkPermission('Suppliers', 'show'),
+    async (req, res) => {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const search = req.query.search || '';
@@ -42,9 +46,14 @@ module.exports = function registerSupplierRoutes(app, pool) {
       console.error('Error fetching suppliers:', error);
       res.status(500).json({ message: 'Server error' });
     }
-  });
+    }
+  );
 
-  app.post('/api/suppliers', async (req, res) => {
+  app.post(
+    '/api/suppliers',
+    authenticate,
+    checkPermission('Suppliers', 'create'),
+    async (req, res) => {
     const { name, contact_person, phone, address } = req.body;
     if (!name) return res.status(400).json({ message: 'Name is required' });
 
@@ -60,9 +69,14 @@ module.exports = function registerSupplierRoutes(app, pool) {
       console.error('Error adding supplier:', error);
       res.status(500).json({ message: 'Server error' });
     }
-  });
+    }
+  );
 
-  app.put('/api/suppliers/:id', async (req, res) => {
+  app.put(
+    '/api/suppliers/:id',
+    authenticate,
+    checkPermission('Suppliers', 'edit'),
+    async (req, res) => {
     const { id } = req.params;
     const { name, contact_person, phone, address } = req.body;
 
@@ -76,9 +90,14 @@ module.exports = function registerSupplierRoutes(app, pool) {
       console.error('Error updating supplier:', error);
       res.status(500).json({ message: 'Server error' });
     }
-  });
+    }
+  );
 
-  app.delete('/api/suppliers/:id', async (req, res) => {
+  app.delete(
+    '/api/suppliers/:id',
+    authenticate,
+    checkPermission('Suppliers', 'delete'),
+    async (req, res) => {
     const { id } = req.params;
 
     try {
@@ -88,6 +107,6 @@ module.exports = function registerSupplierRoutes(app, pool) {
       console.error('Error deleting supplier:', error);
       res.status(500).json({ message: 'Server error' });
     }
-  });
+    }
+  );
 };
-

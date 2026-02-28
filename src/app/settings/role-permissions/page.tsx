@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Trash2, Edit } from "lucide-react";
-import { useToast } from "@/components/ToastProvider";
+import { Trash2 } from "lucide-react";
+import { goeyToast } from "@/components/ui/goey-toaster";
 import ConfirmModal from "@/components/ConfirmModal";
 import Header from "@/components/Header";
 import { useRequirePermission } from "@/hooks/useRequirePermission";
@@ -26,8 +26,8 @@ const MODULE_CONFIG: Record<string, string[]> = {
 };
 
 export default function Page() {
-  const { loading: permLoading, hasPermission, checkActionPermission } = useRequirePermission('System Settings');
-  const { showToast } = useToast();
+  const { loading: permLoading, hasPermission, currentUserRole } =
+    useRequirePermission("System Settings");
   const router = useRouter();
   const [roles, setRoles] = useState<Role[]>([]);
   const [selectedRole, setSelectedRole] = useState<Role | null>(null);
@@ -53,20 +53,26 @@ export default function Page() {
   const [hasChanges, setHasChanges] = useState(false);
 
   const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+  const authHeaders = useMemo<Record<string, string>>(() => {
+    if (!token) return {} as Record<string, string>;
+    return { Authorization: `Bearer ${token}` };
+  }, [token]);
 
   const filteredPerms = useMemo(() => {
     if (!query) return perms;
     return perms.filter(p => p.module.toLowerCase().includes(query.toLowerCase()));
   }, [perms, query]);
 
-  const authHeaders: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
+  const canManage = currentUserRole === "superadmin";
 
-  const fetchRoles = async () => {
+  const fetchRoles = useCallback(async () => {
     try {
       const res = await fetch(`http://localhost:5000/api/rbac/roles?t=${Date.now()}`, { headers: authHeaders });
       
       if (res.status === 401) {
-        showToast("Session expired. Please login again.", "error");
+        goeyToast.error("Sesi berakhir. Silakan login kembali.", {
+            description: "Token akses Anda sudah tidak valid."
+        });
         router.push("/login");
         return;
       }
@@ -74,23 +80,25 @@ export default function Page() {
       if (res.ok) {
         const data: Role[] = await res.json();
         setRoles(data);
-        if (!selectedRole && data.length > 0) setSelectedRole(data[0]);
+        setSelectedRole((prev) => prev ?? (data.length > 0 ? data[0] : null));
       } else {
         console.error("Failed to fetch roles:", res.statusText);
       }
     } catch (error) {
       console.error("Error fetching roles:", error);
     }
-  };
+  }, [authHeaders, router]);
 
-  const fetchPerms = async (roleId: number) => {
+  const fetchPerms = useCallback(async (roleId: number) => {
     setLoading(true);
     setHasChanges(false);
     try {
       const res = await fetch(`http://localhost:5000/api/rbac/permissions?roleId=${roleId}&t=${Date.now()}`, { headers: authHeaders });
       
       if (res.status === 401) {
-        showToast("Session expired. Please login again.", "error");
+        goeyToast.error("Sesi berakhir. Silakan login kembali.", {
+            description: "Token akses Anda sudah tidak valid."
+        });
         router.push("/login");
         return;
       }
@@ -117,32 +125,49 @@ export default function Page() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [authHeaders, router]);
 
   useEffect(() => {
     fetchRoles();
-  }, []);
+  }, [fetchRoles]);
 
   useEffect(() => {
     if (selectedRole) fetchPerms(selectedRole.id);
-  }, [selectedRole?.id]);
+  }, [selectedRole, fetchPerms]);
 
   const togglePerm = (m: string, a: keyof Omit<PermItem, "module">, val: boolean) => {
     if (!selectedRole) return;
-    if (!checkActionPermission('edit')) {
-      showToast('You do not have permission to edit permissions', 'error');
-      return;
-    }
-    setPerms(prev => prev.map(x => x.module === m ? { ...x, [a]: val } : x));
+    if (!canManage) return;
+    setPerms((prev) =>
+      prev.map((x) => {
+        if (x.module !== m) return x;
+
+        const config = MODULE_CONFIG[x.module] ?? ["create", "edit", "delete", "show"];
+        const next: PermItem = { ...x, [a]: val } as PermItem;
+
+        for (const act of ["create", "edit", "delete", "show"] as const) {
+          if (!config.includes(act)) next[act] = false;
+        }
+
+        if (a !== "show" && val && config.includes("show")) {
+          next.show = true;
+        }
+
+        if (a === "show" && !val) {
+          next.create = false;
+          next.edit = false;
+          next.delete = false;
+        }
+
+        return next;
+      })
+    );
     setHasChanges(true);
   };
 
   const handleSavePermissions = async () => {
     if (!selectedRole) return;
-    if (!checkActionPermission('edit')) {
-      showToast('You do not have permission to edit permissions', 'error');
-      return;
-    }
+    if (!canManage) return;
     setIsSaving(true);
     try {
       const res = await fetch("http://localhost:5000/api/rbac/permissions", {
@@ -155,35 +180,40 @@ export default function Page() {
       });
 
       if (res.status === 401) {
-        showToast("Session expired. Please login again.", "error");
+        goeyToast.error("Sesi berakhir. Silakan login kembali.", {
+            description: "Token akses Anda sudah tidak valid."
+        });
         router.push("/login");
         return;
       }
 
       if (res.ok) {
-        showToast("Permissions saved successfully", "success");
+        goeyToast.success("Hak akses berhasil disimpan", {
+          description: `Izin akses untuk role ${selectedRole.name} telah diperbarui.`
+        });
         setHasChanges(false);
       } else {
         const data = await res.json();
-        showToast(data.message || "Failed to save permissions", "error");
+        goeyToast.error(data.message || "Gagal menyimpan hak akses", {
+            description: "Terjadi kesalahan saat menyimpan perubahan hak akses."
+        });
       }
     } catch (error) {
       console.error("Error saving permissions:", error);
-      showToast("Error saving permissions", "error");
+      goeyToast.error("Terjadi kesalahan saat menyimpan hak akses", {
+          description: "Periksa koneksi internet Anda dan coba lagi."
+      });
     } finally {
       setIsSaving(false);
     }
   };
 
   const handleDeleteRole = (role: Role) => {
-    if (!checkActionPermission('delete')) {
-      showToast('You do not have permission to delete roles', 'error');
-      return;
-    }
+    if (!canManage) return;
     setConfirmModal({
       isOpen: true,
-      title: 'Delete Role',
-      message: `Are you sure you want to delete role "${role.name}"? This action cannot be undone.`,
+      title: 'Hapus Role',
+      message: `Apakah Anda yakin ingin menghapus role "${role.name}"? Tindakan ini tidak dapat dibatalkan.`,
       variant: 'danger',
       onConfirm: async () => {
         try {
@@ -193,7 +223,9 @@ export default function Page() {
           });
 
           if (res.status === 401) {
-            showToast("Session expired. Please login again.", "error");
+            goeyToast.error("Sesi berakhir. Silakan login kembali.", {
+                description: "Token akses Anda sudah tidak valid."
+            });
             router.push("/login");
             return;
           }
@@ -204,25 +236,29 @@ export default function Page() {
               setSelectedRole(null);
               setPerms([]);
             }
-            showToast("Role deleted successfully", "success");
-            setConfirmModal(prev => ({ ...prev, isOpen: false }));
+            goeyToast.success("Role berhasil dihapus", {
+              description: `Role ${role.name} telah dihapus dari sistem.`
+            });
           } else {
             const data = await res.json();
-            showToast(data.message || "Failed to delete role", "error");
+            goeyToast.error(data.message || "Gagal menghapus role", {
+                description: "Terjadi kesalahan saat menghapus role."
+            });
           }
         } catch (error) {
           console.error("Error deleting role:", error);
-          showToast("Error deleting role", "error");
+          goeyToast.error("Terjadi kesalahan saat menghapus role", {
+              description: "Periksa koneksi internet Anda dan coba lagi."
+          });
+        } finally {
+          setConfirmModal(prev => ({ ...prev, isOpen: false }));
         }
       }
     });
   };
 
   const addRole = async () => {
-    if (!checkActionPermission('create')) {
-      showToast('You do not have permission to create roles', 'error');
-      return;
-    }
+    if (!canManage) return;
     const name = newRole.trim();
     if (!name) return;
 
@@ -235,7 +271,9 @@ export default function Page() {
       });
       
       if (res.status === 401) {
-        showToast("Session expired. Please login again.", "error");
+        goeyToast.error("Sesi Berakhir", {
+            description: "Silakan login kembali untuk melanjutkan."
+        });
         router.push("/login");
         return;
       }
@@ -247,13 +285,19 @@ export default function Page() {
         setSelectedRole(data);
         setShowAdd(false);
         setNewRole("");
-        showToast("Role added successfully", "success");
+        goeyToast.success("Role berhasil ditambahkan", {
+          description: `Role baru ${data.name} telah berhasil dibuat.`
+        });
       } else {
-        showToast(data.message || "Failed to add role", "error");
+        goeyToast.error(data.message || "Gagal menambahkan role", {
+            description: "Terjadi kesalahan saat menambahkan role baru."
+        });
       }
     } catch (error) {
       console.error("Error adding role:", error);
-      showToast("Error adding role", "error");
+      goeyToast.error("Terjadi kesalahan saat menambahkan role", {
+          description: "Periksa koneksi internet Anda dan coba lagi."
+      });
     } finally {
       setIsSaving(false);
     }
@@ -268,150 +312,185 @@ export default function Page() {
         subtitle="Manage roles and permissions"
         breadcrumbs={[{ label: 'Settings' }, { label: 'Role Permissions' }]}
         rightContent={
-          checkActionPermission('create') && (
+          canManage && (
             <button onClick={() => setShowAdd(true)} className="px-4 py-2 rounded-lg bg-blue-500 text-white text-sm font-semibold hover:bg-blue-600 transition-colors">
               Add Role & Permissions
             </button>
           )
         }
       />
-
       <div className="p-8 pt-0">
-      <div className="bg-white border border-gray-100 rounded-xl p-4 md:p-6 mb-6">
-        <div className="flex items-center gap-3 mb-4">
-          <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Cari Permissions" className="w-64 px-3 py-2 border border-gray-200 rounded-lg text-sm" />
-          {selectedRole && <div className="text-sm text-gray-500">Role: <span className="font-medium text-gray-700">{selectedRole.name}</span></div>}
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-gray-500">
-                <th className="text-left font-medium px-3 py-2">Permissions</th>
-                <th className="font-medium px-3 py-2 text-center">create</th>
-                <th className="font-medium px-3 py-2 text-center">edit</th>
-                <th className="font-medium px-3 py-2 text-center">delete</th>
-                <th className="font-medium px-3 py-2 text-center">show</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading && (
-                <tr><td className="px-3 py-4" colSpan={5}>Loading...</td></tr>
-              )}
-              {!loading && filteredPerms.map(row => (
-                <tr key={row.module} className="border-t border-gray-100">
-                  <td className="px-3 py-3 text-gray-800">{row.module}</td>
-                  {(["create","edit","delete","show"] as const).map(a => {
-                    const isAllowed = MODULE_CONFIG[row.module] ? MODULE_CONFIG[row.module].includes(a) : true;
-                    if (!isAllowed) {
-                        return <td key={a} className="px-3 py-3 text-center text-gray-300">-</td>;
-                    }
-                    return (
-                    <td key={a} className="px-3 py-3 text-center">
-                    <label className="inline-flex items-center cursor-pointer">
-                      <input 
-                        type="checkbox" 
-                        className="sr-only peer" 
-                        checked={row[a]} 
-                        onChange={e => togglePerm(row.module, a, e.target.checked)} 
-                        disabled={!checkActionPermission('edit')}
-                      />
-                      <div className={`w-11 h-6 bg-gray-200 rounded-full peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all after:duration-300 peer-checked:bg-blue-600 relative transition-colors duration-300 ${!checkActionPermission('edit') ? 'opacity-50 cursor-not-allowed' : ''}`}></div>
-                    </label>
-                  </td>
-                    );
-                  })}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        <div className="flex items-center justify-between mt-4 text-xs text-gray-500">
-          <div className="flex items-center gap-2">
-            <span>Show</span>
-            <select className="border border-gray-200 rounded px-2 py-1">
-              <option>10</option>
-              <option>25</option>
-            </select>
-            <span>per page</span>
+        {!canManage ? (
+          <div className="bg-amber-50 border border-amber-100 text-amber-800 rounded-xl px-4 py-3 mb-6 text-sm">
+            Halaman ini hanya bisa dikelola oleh superadmin.
           </div>
-          <div>1 of 1</div>
-        </div>
-        
-          {selectedRole && checkActionPermission('edit') && (
-            <div className="mt-6 flex justify-end">
-              <button 
-                onClick={handleSavePermissions}
-                disabled={!hasChanges || isSaving}
-                className={`px-6 py-2 rounded-lg font-medium transition-colors ${
-                  hasChanges && !isSaving
-                    ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-sm'
-                    : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                }`}
-              >
-                {isSaving ? 'Saving...' : 'Save Changes'}
-              </button>
-            </div>
-          )}
-      </div>
+        ) : null}
 
-      <div className="bg-white border border-gray-100 rounded-xl p-4 md:p-6">
-        <div className="text-gray-800 font-semibold mb-3">List Role</div>
-        <div className="overflow-hidden border border-gray-100 rounded-lg">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-gray-500">
-                <th className="text-left font-medium px-3 py-2">Name</th>
-                <th className="text-right font-medium px-3 py-2">Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {roles.map(r => (
-                <tr key={r.id} className={`border-t border-gray-100 transition-colors group ${selectedRole?.id === r.id ? 'bg-blue-50' : 'hover:bg-gray-50'}`}>
-                  <td className="px-3 py-3">
-                    <button className="text-left w-full" onClick={() => setSelectedRole(r)}>{r.name}</button>
-                  </td>
-                  <td className="px-3 py-3 text-right">
-                    <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                      {checkActionPermission('edit') && (
-                        <button 
-                          onClick={(e) => { e.stopPropagation(); setSelectedRole(r); }}
-                          className="p-1 text-blue-600 hover:bg-blue-50 rounded"
-                          title="Edit Permissions"
-                        >
-                          <Edit size={16} />
-                        </button>
-                      )}
-                      {checkActionPermission('delete') && (
-                        <button 
-                          onClick={(e) => { e.stopPropagation(); handleDeleteRole(r); }}
-                          className="p-1 text-red-600 hover:bg-red-50 rounded"
-                          title="Delete"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-              {roles.length === 0 && (
-                <tr><td className="px-3 py-4 text-gray-500">No roles</td></tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-        <div className="flex items-center justify-between mt-4 text-xs text-gray-500">
-          <div className="flex items-center gap-2">
-            <span>Show</span>
-            <select className="border border-gray-200 rounded px-2 py-1">
-              <option>10</option>
-              <option>25</option>
-            </select>
-            <span>per page</span>
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          <div className="lg:col-span-4 bg-white border border-gray-100 rounded-xl p-4 md:p-6">
+            <div className="flex items-center justify-between mb-3">
+              <div className="text-gray-800 font-semibold">List Role</div>
+              <div className="text-xs text-gray-500">{roles.length} role</div>
+            </div>
+            <div className="overflow-hidden border border-gray-100 rounded-lg">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-gray-500">
+                    <th className="text-left font-medium px-3 py-2">Name</th>
+                    <th className="text-right font-medium px-3 py-2">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {roles.map((r) => (
+                    <tr
+                      key={r.id}
+                      className={`border-t border-gray-100 transition-colors group ${
+                        selectedRole?.id === r.id ? "bg-blue-50" : "hover:bg-gray-50"
+                      }`}
+                      onClick={() => setSelectedRole(r)}
+                      role="button"
+                      tabIndex={0}
+                    >
+                      <td className="px-3 py-3">
+                        <div className="font-medium text-gray-800">{r.name}</div>
+                      </td>
+                      <td className="px-3 py-3 text-right">
+                        <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                          {canManage ? (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteRole(r);
+                              }}
+                              className="p-1 text-red-600 hover:bg-red-50 rounded"
+                              title="Delete"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          ) : null}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                  {roles.length === 0 ? (
+                    <tr>
+                      <td className="px-3 py-4 text-gray-500" colSpan={2}>
+                        No roles
+                      </td>
+                    </tr>
+                  ) : null}
+                </tbody>
+              </table>
+            </div>
           </div>
-          <div>1 of 1</div>
+
+          <div className="lg:col-span-8 bg-white border border-gray-100 rounded-xl p-4 md:p-6">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
+              <div>
+                <div className="text-gray-800 font-semibold">Permissions</div>
+                <div className="text-xs text-gray-500">
+                  {selectedRole ? (
+                    <>
+                      Role: <span className="font-medium text-gray-700">{selectedRole.name}</span>
+                    </>
+                  ) : (
+                    "Pilih role untuk mulai mengatur hak akses"
+                  )}
+                </div>
+              </div>
+              <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Cari module"
+                className="w-full md:w-64 px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                disabled={!selectedRole}
+              />
+            </div>
+
+            {!selectedRole ? (
+              <div className="border border-dashed border-gray-200 rounded-lg p-6 text-sm text-gray-500">
+                Pilih role di sebelah kiri untuk melihat dan mengubah permissions.
+              </div>
+            ) : (
+              <>
+                <div className="overflow-x-auto border border-gray-100 rounded-lg">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="text-gray-500 bg-gray-50">
+                        <th className="text-left font-medium px-3 py-2">Module</th>
+                        <th className="font-medium px-3 py-2 text-center">create</th>
+                        <th className="font-medium px-3 py-2 text-center">edit</th>
+                        <th className="font-medium px-3 py-2 text-center">delete</th>
+                        <th className="font-medium px-3 py-2 text-center">show</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {loading ? (
+                        <tr>
+                          <td className="px-3 py-4 text-gray-500" colSpan={5}>
+                            Loading...
+                          </td>
+                        </tr>
+                      ) : (
+                        filteredPerms.map((row) => (
+                          <tr key={row.module} className="border-t border-gray-100">
+                            <td className="px-3 py-3 text-gray-800">{row.module}</td>
+                            {(["create", "edit", "delete", "show"] as const).map((a) => {
+                              const isAllowed = MODULE_CONFIG[row.module]
+                                ? MODULE_CONFIG[row.module].includes(a)
+                                : true;
+                              if (!isAllowed) {
+                                return (
+                                  <td key={a} className="px-3 py-3 text-center text-gray-300">
+                                    -
+                                  </td>
+                                );
+                              }
+                              return (
+                                <td key={a} className="px-3 py-3 text-center">
+                                  <label className="inline-flex items-center cursor-pointer">
+                                    <input
+                                      type="checkbox"
+                                      className="sr-only peer"
+                                      checked={row[a]}
+                                      onChange={(e) => togglePerm(row.module, a, e.target.checked)}
+                                      disabled={!canManage}
+                                    />
+                                    <div
+                                      className={`w-11 h-6 bg-gray-200 rounded-full peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all after:duration-300 peer-checked:bg-blue-600 relative transition-colors duration-300 ${
+                                        !canManage ? "opacity-50 cursor-not-allowed" : ""
+                                      }`}
+                                    ></div>
+                                  </label>
+                                </td>
+                              );
+                            })}
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                {canManage ? (
+                  <div className="mt-6 flex justify-end">
+                    <button
+                      onClick={handleSavePermissions}
+                      disabled={!hasChanges || isSaving}
+                      className={`px-6 py-2 rounded-lg font-medium transition-colors ${
+                        hasChanges && !isSaving
+                          ? "bg-blue-600 text-white hover:bg-blue-700 shadow-sm"
+                          : "bg-gray-100 text-gray-400 cursor-not-allowed"
+                      }`}
+                    >
+                      {isSaving ? "Saving..." : "Save Changes"}
+                    </button>
+                  </div>
+                ) : null}
+              </>
+            )}
+          </div>
         </div>
-      </div>
       </div>
 
       {/* Add Role Modal */}

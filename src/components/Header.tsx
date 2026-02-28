@@ -2,7 +2,6 @@
 
 import React from 'react';
 import ProfileDropdown from './ProfileDropdown';
-import { ChevronRight } from 'lucide-react';
 
 interface Breadcrumb {
   label: string;

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { 
@@ -18,8 +18,7 @@ import {
   Repeat,
   ChevronLeft,
   ChevronRight,
-  Activity,
-  Percent
+  Activity
 } from 'lucide-react';
 
 interface Permission {
@@ -39,30 +38,21 @@ export default function Sidebar() {
   const [userRole, setUserRole] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const pathname = usePathname();
+  const lastRoleRef = useRef<string>('');
 
-  useEffect(() => {
-    const userStr = localStorage.getItem('user');
-    if (userStr) {
-      try {
-        const user = JSON.parse(userStr);
-        setUserRole(user.role);
-        fetchPermissions(user.role);
-      } catch (e) {
-        console.error("Error parsing user from local storage", e);
-        setLoading(false);
-      }
-    } else {
-      setLoading(false);
-    }
-  }, []);
-
-  const fetchPermissions = async (role: string) => {
+  const fetchPermissions = useCallback(async (role: string) => {
     if (role === 'superadmin') {
+      setPermissions([]);
       setLoading(false);
       return;
     }
     try {
       const token = localStorage.getItem('token');
+      if (!token) {
+        setPermissions([]);
+        setLoading(false);
+        return;
+      }
       const res = await fetch(`http://localhost:5000/api/rbac/permissions?roleName=${role}&t=${Date.now()}`, {
         headers: { 'Authorization': `Bearer ${token}` },
         cache: 'no-store'
@@ -72,6 +62,8 @@ export default function Sidebar() {
         localStorage.removeItem('token');
         localStorage.removeItem('user');
         document.cookie = "token=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+        setPermissions([]);
+        setUserRole('');
         router.push('/login');
         return;
       }
@@ -85,13 +77,88 @@ export default function Sidebar() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [router]);
+
+  const syncAuth = useCallback(async () => {
+    const userStr = localStorage.getItem('user');
+    const token = localStorage.getItem('token');
+
+    if (!userStr || !token) {
+      lastRoleRef.current = '';
+      setUserRole('');
+      setPermissions([]);
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const user = JSON.parse(userStr);
+      const role = typeof user?.role === 'string' ? user.role : '';
+      setUserRole(role);
+
+      if (!role) {
+        lastRoleRef.current = '';
+        setPermissions([]);
+        setLoading(false);
+        return;
+      }
+
+      if (lastRoleRef.current !== role) {
+        setLoading(true);
+        lastRoleRef.current = role;
+        await fetchPermissions(role);
+        return;
+      }
+
+      if (permissions.length === 0 && role !== 'superadmin') {
+        setLoading(true);
+        await fetchPermissions(role);
+      } else {
+        setLoading(false);
+      }
+    } catch (e) {
+      console.error("Error parsing user from local storage", e);
+      lastRoleRef.current = '';
+      setUserRole('');
+      setPermissions([]);
+      setLoading(false);
+    }
+  }, [fetchPermissions, permissions.length]);
+
+  useEffect(() => {
+    if (pathname === '/login') {
+      lastRoleRef.current = '';
+      setUserRole('');
+      setPermissions([]);
+      setLoading(false);
+      return;
+    }
+    syncAuth();
+  }, [pathname, syncAuth]);
+
+  useEffect(() => {
+    const onAuthChanged = () => {
+      if (pathname === '/login') return;
+      syncAuth();
+    };
+
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === 'token' || e.key === 'user') onAuthChanged();
+    };
+
+    window.addEventListener('auth:changed', onAuthChanged);
+    window.addEventListener('storage', onStorage);
+    return () => {
+      window.removeEventListener('auth:changed', onAuthChanged);
+      window.removeEventListener('storage', onStorage);
+    };
+  }, [pathname, syncAuth]);
 
   const canShow = (module: string) => {
     if (loading) return false;
     if (userRole === 'superadmin') return true;
     const perm = permissions.find(p => p.module === module);
-    return perm ? perm.show : false;
+    return perm ? (perm.show || perm.create || perm.edit || perm.delete) : false;
   };
 
   if (pathname === '/login') {
