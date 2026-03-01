@@ -47,6 +47,11 @@ app.post('/api/login', async (req, res) => {
     }
 
     const user = users[0];
+
+    if (user.status === 'inactive') {
+      return res.status(403).json({ message: 'Anda tidak bisa login karena akun anda inactive silahkan hubungi administrator' });
+    }
+
     const isMatch = await bcrypt.compare(password, user.password);
 
     if (!isMatch) {

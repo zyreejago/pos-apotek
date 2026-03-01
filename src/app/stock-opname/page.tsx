@@ -319,10 +319,10 @@ export default function StockOpnamePage() {
                     onChange={(e) => setSearchQuery(e.target.value)}
                     />
                 </div>
-                <button className="px-4 py-2 bg-blue-50 text-blue-600 rounded-lg text-sm font-medium hover:bg-blue-100 flex items-center gap-2">
+                {/* <button className="px-4 py-2 bg-blue-50 text-blue-600 rounded-lg text-sm font-medium hover:bg-blue-100 flex items-center gap-2">
                     <Filter size={16} />
                     Filters
-                </button>
+                </button> */}
             </div>
         </div>
 
@@ -331,9 +331,6 @@ export default function StockOpnamePage() {
           <table className="w-full">
             <thead className="bg-gray-50 text-gray-500 font-medium text-sm">
               <tr>
-                <th className="px-6 py-4 text-left w-10">
-                  <input type="checkbox" className="rounded border-gray-300" disabled={isOpnameActive} />
-                </th>
                 <th className="px-6 py-4 text-left">Name</th>
                 <th className="px-6 py-4 text-left">Stock Sistem</th>
                 <th className="px-6 py-4 text-left">Stock Faktual</th>
@@ -364,9 +361,6 @@ export default function StockOpnamePage() {
 
                   return (
                     <tr key={product.id} className="hover:bg-gray-50 transition-colors">
-                        <td className="px-6 py-4">
-                        <input type="checkbox" className="rounded border-gray-300" disabled={isOpnameActive} />
-                        </td>
                         <td className="px-6 py-4">
                         <div className="font-medium text-gray-900">{product.name}</div>
                         <div className="text-xs text-gray-500">{product.category}</div>

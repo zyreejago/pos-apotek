@@ -366,10 +366,10 @@ export default function ProductsPage() {
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
-            <button className="flex items-center gap-2 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors">
+            {/* <button className="flex items-center gap-2 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors">
               <Filter size={16} />
               Filters
-            </button>
+            </button> */}
           </div>
         </div>
 
@@ -378,9 +378,6 @@ export default function ProductsPage() {
           <table className="w-full text-sm text-left">
             <thead className="bg-gray-50 text-gray-500 font-medium">
               <tr>
-                <th className="px-6 py-4 w-12">
-                  <input type="checkbox" className="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
-                </th>
                 {/* <th className="px-6 py-4 cursor-pointer hover:text-gray-700">ID ↕</th> */}
                 <th className="px-6 py-4 cursor-pointer hover:text-gray-700">Name </th>
                 <th className="px-6 py-4 cursor-pointer hover:text-gray-700">Cost Price </th>
@@ -406,9 +403,6 @@ export default function ProductsPage() {
               ) : (
                 products.map((product) => (
                   <tr key={product.id} className="hover:bg-gray-50 transition-colors group">
-                    <td className="px-6 py-4">
-                      <input type="checkbox" className="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
-                    </td>
                     {/* <td className="px-6 py-4 text-gray-500">#{product.id}</td> */}
                     <td className="px-6 py-4 font-medium text-gray-900">{product.name}</td>
                     <td className="px-6 py-4 text-gray-600">{formatCurrency(product.cost_price)}</td>

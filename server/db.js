@@ -100,10 +100,6 @@ const initDB = async () => {
         `UPDATE users SET email = CONCAT('user', id, '@example.com')
          WHERE email IS NULL OR email = ''`
       );
-      await connection.query(
-        `UPDATE users SET email = 'superadmin@example.com'
-         WHERE username = 'superadmin'`
-      );
 
       try {
         await connection.query(`ALTER TABLE users MODIFY email VARCHAR(255) NOT NULL`);

@@ -224,22 +224,22 @@ export default function OutletsPage() {
             </div>
             
             <div className="flex items-center gap-2">
-              <div className="flex items-center gap-1 px-3 py-1.5 border border-gray-200 rounded-lg text-sm bg-gray-50 text-slate-600">
+              {/* <div className="flex items-center gap-1 px-3 py-1.5 border border-gray-200 rounded-lg text-sm bg-gray-50 text-slate-600">
                 <span className="text-gray-400">Status</span>
                 <span className="font-medium text-slate-800">Active</span>
                 <button className="ml-1 text-gray-400 hover:text-gray-600"><X size={14} /></button>
-              </div>
+              </div> */}
               
-              <div className="flex items-center gap-1 px-3 py-1.5 border border-gray-200 rounded-lg text-sm bg-gray-50 text-slate-600">
+              {/* <div className="flex items-center gap-1 px-3 py-1.5 border border-gray-200 rounded-lg text-sm bg-gray-50 text-slate-600">
                 <span className="text-gray-400">Sort</span>
                 <span className="font-medium text-slate-800">Latest</span>
                 <button className="ml-1 text-gray-400 hover:text-gray-600"><X size={14} /></button>
-              </div>
+              </div> */}
 
-              <button className="flex items-center gap-2 px-3 py-1.5 border border-gray-200 rounded-lg text-sm text-blue-600 hover:bg-blue-50 font-medium">
+              {/* <button className="flex items-center gap-2 px-3 py-1.5 border border-gray-200 rounded-lg text-sm text-blue-600 hover:bg-blue-50 font-medium">
                 <Filter size={16} />
                 <span>Filters</span>
-              </button>
+              </button> */}
             </div>
           </div>
         </div>
@@ -249,9 +249,6 @@ export default function OutletsPage() {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-gray-50/50 border-b border-gray-100">
-                <th className="p-4 w-12">
-                  <input type="checkbox" className="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
-                </th>
                 <th className="p-4 text-sm font-semibold text-gray-500">
                   <div className="flex items-center gap-1 cursor-pointer hover:text-gray-700">
                     Outlets <ChevronDown size={14} />
@@ -272,9 +269,6 @@ export default function OutletsPage() {
                 </tr>
               ) : outlets.map((outlet) => (
                 <tr key={outlet.id} className="hover:bg-gray-50 group transition-colors">
-                  <td className="p-4">
-                    <input type="checkbox" className="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
-                  </td>
                   <td className="p-4">
                     <span className="font-medium text-slate-800">{outlet.name}</span>
                   </td>

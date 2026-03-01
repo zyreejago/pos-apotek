@@ -281,9 +281,6 @@ export default function Dashboard() {
             <table className="w-full">
                 <thead>
                     <tr className="border-b border-gray-100 text-left">
-                        <th className="py-3 px-4 w-10">
-                            <input type="checkbox" className="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
-                        </th>
                         <th className="py-3 px-4 text-xs font-medium text-gray-400 uppercase tracking-wider">
                             Outlets <ChevronDown size={12} className="inline ml-1" />
                         </th>
@@ -295,9 +292,6 @@ export default function Dashboard() {
                 <tbody className="divide-y divide-gray-50">
                     {paginatedCashiers.map((item, index) => (
                         <tr key={index} className="hover:bg-gray-50">
-                            <td className="py-4 px-4">
-                                <input type="checkbox" className="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
-                            </td>
                             <td className="py-4 px-4">
                                 <div>
                                     <p className="text-sm font-semibold text-gray-900">{item.outlet_name || 'Unassigned'}</p>

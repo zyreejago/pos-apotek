@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Eye, EyeOff } from 'lucide-react';
+import { goeyToast } from "@/components/ui/goey-toaster";
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -40,7 +41,9 @@ export default function LoginPage() {
         window.dispatchEvent(new Event('auth:changed'));
         router.push('/dashboard');
       } else {
-        setError(data.message || 'Login failed');
+        const message = data.message || 'Login failed';
+        setError(message);
+        goeyToast.error('Login Gagal');
       }
     } catch {
       setError('Something went wrong. Please try again.');
@@ -64,7 +67,7 @@ export default function LoginPage() {
         </div>
 
         {/* Social Login Buttons */}
-        <div className="flex gap-4 mb-8">
+        {/* <div className="flex gap-4 mb-8">
           <button type="button" className="flex-1 flex items-center justify-center gap-2 py-2.5 px-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium text-gray-700">
             <svg className="w-5 h-5" viewBox="0 0 24 24">
               <path
@@ -92,17 +95,17 @@ export default function LoginPage() {
             </svg>
             Use Apple
           </button>
-        </div>
+        </div> */}
 
         {/* Divider */}
-        <div className="relative mb-8">
+        {/* <div className="relative mb-8">
           <div className="absolute inset-0 flex items-center">
             <div className="w-full border-t border-gray-200"></div>
           </div>
           <div className="relative flex justify-center text-sm">
             <span className="px-4 bg-white text-gray-400 text-xs font-medium uppercase tracking-wider">OR</span>
           </div>
-        </div>
+        </div> */}
         
         <form onSubmit={handleLogin} className="space-y-6">
           {error && (
@@ -147,18 +150,6 @@ export default function LoginPage() {
                 {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
               </button>
             </div>
-          </div>
-
-          <div className="flex items-center">
-            <input
-              id="remember-me"
-              name="remember-me"
-              type="checkbox"
-              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-            />
-            <label htmlFor="remember-me" className="ml-2 block text-sm font-medium text-gray-700">
-              Remember me
-            </label>
           </div>
 
           <button

@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import { Search, Filter, Edit, Trash2, X } from 'lucide-react';
 import { goeyToast } from "@/components/ui/goey-toaster";
 import ConfirmModal from '@/components/ConfirmModal';
@@ -30,6 +31,7 @@ interface SupplierFormData {
 }
 
 export default function SuppliersPage() {
+  const router = useRouter();
   // Permission Check
   const { checkActionPermission } = useRequirePermission('Suppliers');
 
@@ -67,10 +69,27 @@ export default function SuppliersPage() {
     address: ''
   });
 
+  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+  const authHeaders = useMemo<Record<string, string>>(() => {
+    if (!token) return {} as Record<string, string>;
+    return { Authorization: `Bearer ${token}` };
+  }, [token]);
+
   const fetchSuppliers = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`http://localhost:5000/api/suppliers?page=${currentPage}&limit=${itemsPerPage}&search=${searchQuery}`);
+      const res = await fetch(`http://localhost:5000/api/suppliers?page=${currentPage}&limit=${itemsPerPage}&search=${searchQuery}`, {
+        headers: authHeaders
+      });
+
+      if (res.status === 401) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        document.cookie = "token=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+        router.push('/login');
+        return;
+      }
+
       const data = await res.json();
       setSuppliers(data.data || []);
       setPagination(data.pagination || { total: 0, page: 1, limit: 10, totalPages: 1 });
@@ -79,7 +98,7 @@ export default function SuppliersPage() {
     } finally {
       setLoading(false);
     }
-  }, [currentPage, itemsPerPage, searchQuery]);
+  }, [currentPage, itemsPerPage, searchQuery, authHeaders, router]);
 
   useEffect(() => {
     fetchSuppliers();
@@ -167,7 +186,10 @@ export default function SuppliersPage() {
       
       const res = await fetch(url, {
         method,
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          ...authHeaders
+        },
         body: JSON.stringify(formData)
       });
 
@@ -201,7 +223,8 @@ export default function SuppliersPage() {
 
     try {
       const res = await fetch(`http://localhost:5000/api/suppliers/${supplier.id}`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        headers: authHeaders
       });
 
       if (res.ok) {
@@ -256,10 +279,10 @@ export default function SuppliersPage() {
                     onChange={(e) => setSearchQuery(e.target.value)}
                     />
                 </div>
-                <button className="px-4 py-2 bg-blue-50 text-blue-600 rounded-lg text-sm font-medium hover:bg-blue-100 flex items-center gap-2">
+                {/* <button className="px-4 py-2 bg-blue-50 text-blue-600 rounded-lg text-sm font-medium hover:bg-blue-100 flex items-center gap-2">
                     <Filter size={16} />
                     Filters
-                </button>
+                </button> */}
                 {checkActionPermission('create') && (
                 <button 
                     onClick={openAddModal}
@@ -276,9 +299,6 @@ export default function SuppliersPage() {
           <table className="w-full">
             <thead className="bg-gray-50 text-gray-500 font-medium text-sm">
               <tr>
-                <th className="px-6 py-4 text-left w-10">
-                  <input type="checkbox" className="rounded border-gray-300" />
-                </th>
                 <th className="px-6 py-4 text-left">Name</th>
                 <th className="px-6 py-4 text-left">Phone</th>
                 <th className="px-6 py-4 text-right">Actions</th>
@@ -300,9 +320,6 @@ export default function SuppliersPage() {
               ) : (
                 suppliers.map((supplier) => (
                   <tr key={supplier.id} className="hover:bg-gray-50 transition-colors group">
-                    <td className="px-6 py-4">
-                      <input type="checkbox" className="rounded border-gray-300" />
-                    </td>
                     <td className="px-6 py-4">
                       <div className="font-medium text-gray-900">{supplier.name}</div>
                     </td>
