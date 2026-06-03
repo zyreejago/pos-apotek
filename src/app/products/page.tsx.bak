@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { Search, Filter, Plus, Edit, Trash2, FileText, Info } from 'lucide-react';
+import { Search, Filter, Plus, Edit, Trash2, PackageOpen, Info } from 'lucide-react';
 import { goeyToast } from "@/components/ui/goey-toaster";
 import ConfirmModal from '@/components/ConfirmModal';
 import PageHeader from '@/components/PageHeader';
@@ -25,23 +25,20 @@ interface Product {
   purchase_date: string | null;
   dp_amount?: number;
   due_date?: string | null;
-  invoice_number?: string | null;
 }
 
-interface Faktur {
+interface Batch {
   id: number;
   product_id: number;
-  invoice_number: string;
   supplier_id: number | null;
   supplier_name: string | null;
+  batch_number: string | null;
+  stock_type: 'beli_normal' | 'consignment';
   purchase_date: string | null;
-  quantity: number;
+  initial_quantity: number;
+  remaining_quantity: number;
   cost_price: number;
-  total_amount: number;
-  stock_type: 'belum_bayar' | 'konsinyasi' | 'dp' | 'lunas';
-  dp_amount: number | null;
-  due_date: string | null;
-  notes: string | null;
+  expired_date: string | null;
   created_at: string;
 }
 
@@ -74,16 +71,14 @@ interface ProductItem extends ProductFormData {
 }
 
 
-interface FakturFormData {
-  invoice_number: string;
+interface BatchFormData {
   supplier_id: string;
+  batch_number: string;
+  stock_type: 'beli_normal' | 'consignment';
   purchase_date: string;
-  quantity: string;
+  initial_quantity: string;
   cost_price: string;
-  stock_type: 'belum_bayar' | 'konsinyasi' | 'dp' | 'lunas';
-  dp_amount: string;
-  due_date: string;
-  notes: string;
+  expired_date: string;
 }
 
 export default function ProductsPage() {
@@ -116,19 +111,18 @@ export default function ProductsPage() {
 
   // OffCanvas States
   const [isProductOffCanvasOpen, setIsProductOffCanvasOpen] = useState(false);
-  const [isFakturOffCanvasOpen, setIsFakturOffCanvasOpen] = useState(false);
+  const [isBatchesOffCanvasOpen, setIsBatchesOffCanvasOpen] = useState(false);
   const [productOffCanvasMode, setProductOffCanvasMode] = useState<'add' | 'edit'>('add');
-  const [fakturModalMode, setFakturModalMode] = useState<'add' | 'edit'>('add');
+  const [batchModalMode, setBatchModalMode] = useState<'add' | 'edit'>('add');
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  const [selectedFaktur, setSelectedFaktur] = useState<Faktur | null>(null);
-  const [fakturs, setFakturs] = useState<Faktur[]>([]);
-  const [showFakturForm, setShowFakturForm] = useState(false);
+  const [selectedBatch, setSelectedBatch] = useState<Batch | null>(null);
+  const [batches, setBatches] = useState<Batch[]>([]);
 
   // Confirm Modal State
   const [confirmModal, setConfirmModal] = useState({
     isOpen: false,
     title: '',
-    message: '' as string | React.ReactNode,
+    message: '',
     onConfirm: () => {},
     onClose: () => {},
     confirmText: 'Confirm',
@@ -137,16 +131,14 @@ export default function ProductsPage() {
   });
 
   // Form States
-  const [fakturFormData, setFakturFormData] = useState<FakturFormData>({
-    invoice_number: '',
+  const [batchFormData, setBatchFormData] = useState<BatchFormData>({
     supplier_id: '',
-    purchase_date: new Date().toISOString().split('T')[0],
-    quantity: '',
+    batch_number: '',
+    stock_type: 'beli_normal',
+    purchase_date: '',
+    initial_quantity: '',
     cost_price: '',
-    stock_type: 'belum_bayar',
-    dp_amount: '',
-    due_date: '',
-    notes: ''
+    expired_date: ''
   });
 
   // Form State
@@ -174,69 +166,93 @@ export default function ProductsPage() {
     return { Authorization: `Bearer ${token}` };
   }, [token]);
 
-  const fetchProducts = useCallback(async () => {
+  const fetchProducts = useCallback(() => {
     setLoading(true);
     try {
-      let url = `http://localhost:5000/api/products?page=${currentPage}&limit=${itemsPerPage}`;
+      // Mock data untuk 20 produk dengan kode lokasi
+      const mockProducts: Product[] = [
+        { id: 1, name: "Paracetamol 500mg", cost_price: 2500, selling_price: 5000, stock: 100, unit: "tablet", expired_date: "2026-12-31", location_code: "A-01-01", supplier_id: 1, supplier_name: "PT Sumber Makmur", stock_type: "lunas", purchase_date: "2025-06-01", invoice_number: "INV-001" },
+        { id: 2, name: "Amoxicillin 250mg", cost_price: 3000, selling_price: 6000, stock: 80, unit: "tablet", expired_date: "2027-01-15", location_code: "A-01-02", supplier_id: 2, supplier_name: "PT Buana Saraswati", stock_type: "belum_bayar", purchase_date: "2025-06-05", invoice_number: "INV-002" },
+        { id: 3, name: "Ibuprofen 400mg", cost_price: 2800, selling_price: 5500, stock: 120, unit: "tablet", expired_date: "2026-11-20", location_code: "A-01-03", supplier_id: 1, supplier_name: "PT Sumber Makmur", stock_type: "konsinyasi", purchase_date: "2025-06-10", invoice_number: "INV-003" },
+        { id: 4, name: "Omeprazole 20mg", cost_price: 5000, selling_price: 10000, stock: 50, unit: "kapsul", expired_date: "2027-03-10", location_code: "A-02-01", supplier_id: 3, supplier_name: "PT Budhi Kurniawan Sejati", stock_type: "dp", purchase_date: "2025-06-08", dp_amount: 2500, due_date: "2025-07-08", invoice_number: "INV-004" },
+        { id: 5, name: "Cetirizine 10mg", cost_price: 3500, selling_price: 7000, stock: 90, unit: "tablet", expired_date: "2026-09-30", location_code: "A-02-02", supplier_id: 2, supplier_name: "PT Buana Saraswati", stock_type: "lunas", purchase_date: "2025-06-12", invoice_number: "INV-005" },
+        { id: 6, name: "Loratadine 10mg", cost_price: 4000, selling_price: 8000, stock: 60, unit: "tablet", expired_date: "2027-02-28", location_code: "A-02-03", supplier_id: 1, supplier_name: "PT Sumber Makmur", stock_type: "konsinyasi", purchase_date: "2025-06-15", invoice_number: "INV-006" },
+        { id: 7, name: "Dexamethasone 0.5mg", cost_price: 2000, selling_price: 4000, stock: 150, unit: "tablet", expired_date: "2026-10-15", location_code: "B-01-01", supplier_id: 3, supplier_name: "PT Budhi Kurniawan Sejati", stock_type: "belum_bayar", purchase_date: "2025-06-02", invoice_number: "INV-007" },
+        { id: 8, name: "Metformin 500mg", cost_price: 1800, selling_price: 3500, stock: 200, unit: "tablet", expired_date: "2027-04-20", location_code: "B-01-02", supplier_id: 2, supplier_name: "PT Buana Saraswati", stock_type: "lunas", purchase_date: "2025-06-03", invoice_number: "INV-008" },
+        { id: 9, name: "Simvastatin 20mg", cost_price: 4500, selling_price: 9000, stock: 40, unit: "tablet", expired_date: "2026-12-01", location_code: "B-01-03", supplier_id: 1, supplier_name: "PT Sumber Makmur", stock_type: "dp", purchase_date: "2025-06-07", dp_amount: 2250, due_date: "2025-07-07", invoice_number: "INV-009" },
+        { id: 10, name: "Amlodipine 5mg", cost_price: 3200, selling_price: 6500, stock: 70, unit: "tablet", expired_date: "2027-01-30", location_code: "B-02-01", supplier_id: 3, supplier_name: "PT Budhi Kurniawan Sejati", stock_type: "konsinyasi", purchase_date: "2025-06-09", invoice_number: "INV-010" },
+        { id: 11, name: "Losartan 50mg", cost_price: 3800, selling_price: 7500, stock: 85, unit: "tablet", expired_date: "2026-08-10", location_code: "B-02-02", supplier_id: 2, supplier_name: "PT Buana Saraswati", stock_type: "belum_bayar", purchase_date: "2025-06-11", invoice_number: "INV-011" },
+        { id: 12, name: "Vitamin C 500mg", cost_price: 1500, selling_price: 3000, stock: 300, unit: "tablet", expired_date: "2027-06-01", location_code: "C-01-01", supplier_id: 1, supplier_name: "PT Sumber Makmur", stock_type: "lunas", purchase_date: "2025-06-04", invoice_number: "INV-012" },
+        { id: 13, name: "Vitamin B Complex", cost_price: 2200, selling_price: 4500, stock: 180, unit: "tablet", expired_date: "2027-05-15", location_code: "C-01-02", supplier_id: 3, supplier_name: "PT Budhi Kurniawan Sejati", stock_type: "dp", purchase_date: "2025-06-06", dp_amount: 1100, due_date: "2025-07-06", invoice_number: "INV-013" },
+        { id: 14, name: "Magnesium Oxide 400mg", cost_price: 2000, selling_price: 4000, stock: 110, unit: "tablet", expired_date: "2026-11-30", location_code: "C-01-03", supplier_id: 2, supplier_name: "PT Buana Saraswati", stock_type: "konsinyasi", purchase_date: "2025-06-13", invoice_number: "INV-014" },
+        { id: 15, name: "Zinc Sulfate 20mg", cost_price: 1700, selling_price: 3400, stock: 95, unit: "tablet", expired_date: "2027-02-14", location_code: "C-02-01", supplier_id: 1, supplier_name: "PT Sumber Makmur", stock_type: "lunas", purchase_date: "2025-06-14", invoice_number: "INV-015" },
+        { id: 16, name: "Betadine Solution", cost_price: 8000, selling_price: 16000, stock: 50, unit: "botol", expired_date: "2028-01-01", location_code: "G-01-01", supplier_id: 2, supplier_name: "PT Buana Saraswati", stock_type: "belum_bayar", purchase_date: "2025-06-01", invoice_number: "INV-016" },
+        { id: 17, name: "Alcohol 70%", cost_price: 5000, selling_price: 10000, stock: 60, unit: "botol", expired_date: "2027-12-31", location_code: "G-01-02", supplier_id: 3, supplier_name: "PT Budhi Kurniawan Sejati", stock_type: "lunas", purchase_date: "2025-06-05", invoice_number: "INV-017" },
+        { id: 18, name: "Hydrocortisone Cream", cost_price: 6000, selling_price: 12000, stock: 35, unit: "tube", expired_date: "2027-03-01", location_code: "CH-01", supplier_id: 1, supplier_name: "PT Sumber Makmur", stock_type: "konsinyasi", purchase_date: "2025-06-08", invoice_number: "INV-018" },
+        { id: 19, name: "Salbutamol Inhaler", cost_price: 15000, selling_price: 30000, stock: 20, unit: "pcs", expired_date: "2026-10-01", location_code: "CH-02", supplier_id: 2, supplier_name: "PT Buana Saraswati", stock_type: "dp", purchase_date: "2025-06-10", dp_amount: 7500, due_date: "2025-07-10", invoice_number: "INV-019" },
+        { id: 20, name: "Neosporin Ointment", cost_price: 4500, selling_price: 9000, stock: 45, unit: "tube", expired_date: "2027-04-15", location_code: "B-02-T", supplier_id: 3, supplier_name: "PT Budhi Kurniawan Sejati", stock_type: "belum_bayar", purchase_date: "2025-06-03", invoice_number: "INV-020" }
+      ];
+      
+      // Initialize allProducts if empty
+      if (allProducts.length === 0) {
+        setAllProducts(mockProducts);
+      }
+      
+      // Filter berdasarkan search query
+      let filteredProducts = allProducts.length > 0 ? allProducts : mockProducts;
       if (debouncedSearchQuery) {
-        url += `&search=${encodeURIComponent(debouncedSearchQuery)}`;
+        const searchLower = debouncedSearchQuery.toLowerCase();
+        filteredProducts = filteredProducts.filter(p => 
+          p.name.toLowerCase().includes(searchLower) || 
+          p.location_code.toLowerCase().includes(searchLower) || 
+          (p.supplier_name && p.supplier_name.toLowerCase().includes(searchLower))
+        );
       }
-      const res = await fetch(url, { headers: authHeaders });
-      if (!res.ok) throw new Error('Failed to fetch products');
-      const json = await res.json();
       
-      setProducts(json.data || []);
-      setPagination({
-        total: json.pagination?.total || 0,
-        page: json.pagination?.page || 1,
-        limit: json.pagination?.limit || 10,
-        totalPages: json.pagination?.totalPages || 1
-      });
+      // Pagination
+      const startIndex = (currentPage - 1) * itemsPerPage;
+      const paginatedProducts = filteredProducts.slice(startIndex, startIndex + itemsPerPage);
+      const totalPages = Math.ceil(filteredProducts.length / itemsPerPage);
       
-      // Fetch all products for local reference if needed (optional, but let's keep allProducts updated)
-      const allRes = await fetch(`http://localhost:5000/api/products?limit=1000`, { headers: authHeaders });
-      if (allRes.ok) {
-        const allJson = await allRes.json();
-        setAllProducts(allJson.data || []);
-      }
+      setProducts(paginatedProducts);
+      setPagination({ total: filteredProducts.length, page: currentPage, limit: itemsPerPage, totalPages });
     } catch (error) {
       console.error('Error fetching products:', error);
     } finally {
       setLoading(false);
     }
-  }, [currentPage, itemsPerPage, debouncedSearchQuery, authHeaders]);
+  }, [currentPage, itemsPerPage, debouncedSearchQuery, allProducts]);
 
   const fetchSuppliers = useCallback(async () => {
     try {
-      const res = await fetch(`http://localhost:5000/api/suppliers?limit=1000`, { headers: authHeaders });
-      if (res.ok) {
-        const json = await res.json();
-        setSuppliers(json.data || []);
-      }
+      // Mock suppliers
+      const mockSuppliers = [
+        { id: 1, name: "PT Sumber Makmur" },
+        { id: 2, name: "PT Buana Saraswati" },
+        { id: 3, name: "PT Budhi Kurniawan Sejati" },
+        { id: 4, name: "PT Jaya Bersama" },
+        { id: 5, name: "PT Sejahtera Abadi" },
+        { id: 6, name: "PT Prima Mandiri" },
+        { id: 7, name: "PT Global Medika" },
+        { id: 8, name: "PT Nusantara Farma" },
+        { id: 9, name: "PT Indah Jaya" },
+        { id: 10, name: "PT Cipta Sehat" }
+      ];
+      setSuppliers(mockSuppliers);
     } catch (error) {
       console.error('Error fetching suppliers:', error);
     }
-  }, [authHeaders]);
+  }, []);
 
-  const fetchFakturs = useCallback(async (productId: number) => {
+  const fetchBatches = useCallback(async (productId: number) => {
     try {
       const res = await fetch(`http://localhost:5000/api/inventory/batches/${productId}`, {
         headers: authHeaders
       });
-      if (res.ok) {
-        const json = await res.json();
-        // Backend returns `batch_number`, frontend expects `invoice_number` due to refactor
-        const mappedFakturs = (json.data || []).map((batch: any) => ({
-          ...batch,
-          invoice_number: batch.batch_number,
-          quantity: batch.initial_quantity,
-          total_amount: batch.cost_price * batch.initial_quantity,
-          product_id: productId
-        }));
-        setFakturs(mappedFakturs);
-      }
+      const data = await res.json();
+      setBatches(data.data || []);
     } catch (error) {
-      console.error('Error fetching fakturs:', error);
+      console.error('Error fetching batches:', error);
     }
   }, [authHeaders]);
 
@@ -245,79 +261,64 @@ export default function ProductsPage() {
     fetchSuppliers();
   }, [fetchProducts, fetchSuppliers]);
 
-  // Faktur Handlers
-  const handleOpenFakturOffCanvas = (product: Product) => {
+  // Batches Handlers
+  const handleOpenBatchesOffCanvas = (product: Product) => {
     setSelectedProduct(product);
-    fetchFakturs(product.id);
-    setIsFakturOffCanvasOpen(true);
-    setShowFakturForm(false);
+    fetchBatches(product.id);
+    setIsBatchesOffCanvasOpen(true);
   };
 
-  const handleOpenAddFakturModal = () => {
-    setFakturModalMode('add');
-    setShowFakturForm(true);
-    setFakturFormData({
-      invoice_number: '',
-      supplier_id: selectedProduct?.supplier_id?.toString() || '',
+  const handleOpenAddBatchModal = () => {
+    setBatchModalMode('add');
+    setBatchFormData({
+      supplier_id: '',
+      batch_number: '',
+      stock_type: 'beli_normal',
       purchase_date: new Date().toISOString().split('T')[0],
-      quantity: '',
+      initial_quantity: '',
       cost_price: selectedProduct?.cost_price.toString() || '',
-      stock_type: selectedProduct?.stock_type || 'belum_bayar',
-      dp_amount: '',
-      due_date: '',
-      notes: ''
+      expired_date: ''
     });
   };
 
-  const handleOpenEditFakturModal = (faktur: Faktur) => {
-    setFakturModalMode('edit');
-    setSelectedFaktur(faktur);
-    setShowFakturForm(true);
-
-    const formatDateForInput = (dateStr: string | null) => {
-      if (!dateStr) return '';
-      return dateStr.substring(0, 10);
-    };
-
-    setFakturFormData({
-      invoice_number: faktur.invoice_number || '',
-      supplier_id: faktur.supplier_id?.toString() || '',
-      purchase_date: formatDateForInput(faktur.purchase_date),
-      quantity: faktur.quantity.toString(),
-      cost_price: faktur.cost_price.toString(),
-      stock_type: faktur.stock_type,
-      dp_amount: faktur.dp_amount?.toString() || '',
-      due_date: formatDateForInput(faktur.due_date),
-      notes: faktur.notes || ''
+  const handleOpenEditBatchModal = (batch: Batch) => {
+    setBatchModalMode('edit');
+    setSelectedBatch(batch);
+    setBatchFormData({
+      supplier_id: batch.supplier_id?.toString() || '',
+      batch_number: batch.batch_number || '',
+      stock_type: batch.stock_type,
+      purchase_date: batch.purchase_date || '',
+      initial_quantity: batch.initial_quantity.toString(),
+      cost_price: batch.cost_price.toString(),
+      expired_date: batch.expired_date || ''
     });
   };
 
-  const handleFakturInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+  const handleBatchInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setFakturFormData(prev => ({ ...prev, [name]: value }));
+    setBatchFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleSaveFaktur = async () => {
+  const handleSaveBatch = async () => {
     if (!selectedProduct) return;
 
     try {
-      const url = fakturModalMode === 'add'
+      const url = batchModalMode === 'add'
         ? 'http://localhost:5000/api/inventory/batches'
-        : `http://localhost:5000/api/inventory/batches/${selectedFaktur?.id}`;
-      const method = fakturModalMode === 'add' ? 'POST' : 'PUT';
+        : `http://localhost:5000/api/inventory/batches/${selectedBatch?.id}`;
+      const method = batchModalMode === 'add' ? 'POST' : 'PUT';
 
       const payload = {
         product_id: selectedProduct.id,
-        supplier_id: fakturFormData.supplier_id ? Number(fakturFormData.supplier_id) : null,
-        batch_number: fakturFormData.invoice_number || null,
-        stock_type: fakturFormData.stock_type,
-        purchase_date: fakturFormData.purchase_date || null,
-        initial_quantity: Number(fakturFormData.quantity) || 0,
-        remaining_quantity: Number(fakturFormData.quantity) || 0,
-        cost_price: Number(fakturFormData.cost_price) || 0,
-        expired_date: null,
-        dp_amount: fakturFormData.stock_type === 'dp' && fakturFormData.dp_amount ? Number(fakturFormData.dp_amount) : null,
-        due_date: fakturFormData.stock_type === 'dp' && fakturFormData.due_date ? fakturFormData.due_date : null
+        supplier_id: batchFormData.supplier_id ? Number(batchFormData.supplier_id) : null,
+        batch_number: batchFormData.batch_number || null,
+        stock_type: batchFormData.stock_type,
+        purchase_date: batchFormData.purchase_date || null,
+        initial_quantity: Number(batchFormData.initial_quantity),
+        remaining_quantity: batchModalMode === 'edit' ? Number(batchFormData.initial_quantity) : Number(batchFormData.initial_quantity),
+        cost_price: Number(batchFormData.cost_price),
+        expired_date: batchFormData.expired_date || null
       };
 
       const res = await fetch(url, {
@@ -330,63 +331,42 @@ export default function ProductsPage() {
       });
 
       if (res.ok) {
-        goeyToast.success(`Faktur ${fakturModalMode === 'add' ? 'ditambahkan' : 'diperbarui'}!`);
-        fetchFakturs(selectedProduct.id);
-        fetchProducts(); // refresh product stock
-        setFakturFormData({
-          invoice_number: '',
+        goeyToast.success(`Batch ${batchModalMode === 'add' ? 'ditambahkan' : 'diperbarui'}!`);
+        fetchBatches(selectedProduct.id);
+        fetchProducts();
+        setBatchFormData({
           supplier_id: '',
-          purchase_date: new Date().toISOString().split('T')[0],
-          quantity: '',
+          batch_number: '',
+          stock_type: 'beli_normal',
+          purchase_date: '',
+          initial_quantity: '',
           cost_price: '',
-          stock_type: 'belum_bayar',
-          dp_amount: '',
-          due_date: '',
-          notes: ''
+          expired_date: ''
         });
-        setSelectedFaktur(null);
-        setFakturModalMode('add');
-        setShowFakturForm(false);
-      } else {
-        goeyToast.error('Gagal menyimpan faktur');
+        setSelectedBatch(null);
       }
     } catch (error) {
-      console.error('Error saving faktur:', error);
-      goeyToast.error('Gagal menyimpan faktur');
+      console.error('Error saving batch:', error);
     }
   };
 
-  const handleDeleteFaktur = async (faktur: Faktur) => {
-    setConfirmModal({
-      isOpen: true,
-      title: 'Hapus Faktur',
-      message: `Anda yakin ingin menghapus faktur ${faktur.invoice_number}?`,
-      variant: 'danger',
-      onConfirm: async () => {
-        try {
-          const res = await fetch(`http://localhost:5000/api/inventory/batches/${faktur.id}`, {
-            method: 'DELETE',
-            headers: authHeaders
-          });
-          if (res.ok) {
-            goeyToast.success('Faktur berhasil dihapus!');
-            if (selectedProduct) {
-              fetchFakturs(selectedProduct.id);
-              fetchProducts(); // refresh product stock
-            }
-          } else {
-            goeyToast.error('Gagal menghapus faktur');
-          }
-        } catch (error) {
-          console.error('Error deleting faktur:', error);
-          goeyToast.error('Gagal menghapus faktur');
-        }
-        setConfirmModal(prev => ({ ...prev, isOpen: false }));
-      },
-      onClose: () => setConfirmModal(prev => ({ ...prev, isOpen: false })),
-      confirmText: 'Hapus',
-      cancelText: 'Batal'
-    });
+  const handleDeleteBatch = async (batch: Batch) => {
+    if (!confirm('Anda yakin ingin menghapus batch ini?')) return;
+
+    try {
+      const res = await fetch(`http://localhost:5000/api/inventory/batches/${batch.id}`, {
+        method: 'DELETE',
+        headers: authHeaders
+      });
+
+      if (res.ok && selectedProduct) {
+        goeyToast.success('Batch dihapus!');
+        fetchBatches(selectedProduct.id);
+        fetchProducts();
+      }
+    } catch (error) {
+      console.error('Error deleting batch:', error);
+    }
   };
 
   const checkPermission = (action: 'create' | 'edit' | 'delete') => {
@@ -486,7 +466,7 @@ export default function ProductsPage() {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
     // Permission check
@@ -512,117 +492,90 @@ export default function ProductsPage() {
     };
 
     if (productOffCanvasMode === 'edit' && selectedProduct) {
-      try {
-        const payload = {
-          name: formData.name,
-          cost_price: Number(formData.cost_price),
-          selling_price: Number(formData.selling_price) || 0,
-          stock: Number(formData.stock) || 0,
-          unit: formData.unit || 'pcs',
-          expired_date: formData.expired_date || null,
-          location_code: formData.location_code || null
-        };
-        const res = await fetch(`http://localhost:5000/api/products/${selectedProduct.id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json', ...authHeaders },
-          body: JSON.stringify(payload)
-        });
-        if (!res.ok) throw new Error('Failed to update product');
-        
-        handleCloseProductOffCanvas();
-        fetchProducts();
-        goeyToast.success('Produk berhasil diperbarui');
-      } catch (error) {
-        console.error('Error updating product:', error);
-        goeyToast.error('Gagal memperbarui produk');
-      }
+      // Edit single product
+      const updatedProduct: Product = {
+        ...selectedProduct,
+        name: formData.name,
+        cost_price: Number(formData.cost_price),
+        selling_price: Number(formData.selling_price),
+        stock: Number(formData.stock),
+        unit: formData.unit,
+        expired_date: formData.expired_date || null,
+        location_code: formData.location_code,
+        supplier_id: formData.supplier_id ? Number(formData.supplier_id) : null,
+        supplier_name: getSupplierName(formData.supplier_id),
+        stock_type: formData.stock_type,
+        purchase_date: formData.purchase_date || null,
+        dp_amount: formData.dp_amount ? Number(formData.dp_amount) : null,
+        due_date: formData.due_date || null,
+        invoice_number: formData.invoice_number || null
+      };
+      
+      setAllProducts(prev => 
+        prev.map(p => p.id === selectedProduct.id ? updatedProduct : p)
+      );
+      
+      handleCloseProductOffCanvas();
+      goeyToast.success('Produk berhasil diperbarui', {
+        description: `Produk "${formData.name}" telah berhasil diperbarui.`
+      });
     } else {
       // Add mode
-      try {
-        const saveProductAndBatch = async (item: any) => {
-          // Check if product with same name exists in database
-          const existingProduct = allProducts.find(
-            p => p.name.trim().toLowerCase() === item.name.trim().toLowerCase()
-          );
-
-          let productId = null;
-          if (existingProduct) {
-            productId = existingProduct.id;
-            // Update existing product details
-            const payload = {
-              name: existingProduct.name,
-              cost_price: Number(item.cost_price) || existingProduct.cost_price,
-              selling_price: Number(item.selling_price) || existingProduct.selling_price || 0,
-              stock: item.supplier_id ? Number(existingProduct.stock) : Number(existingProduct.stock) + Number(item.stock),
-              unit: item.unit || existingProduct.unit || 'pcs',
-              expired_date: item.expired_date || existingProduct.expired_date || null,
-              location_code: item.location_code || existingProduct.location_code || null
-            };
-            await fetch(`http://localhost:5000/api/products/${productId}`, {
-              method: 'PUT',
-              headers: { 'Content-Type': 'application/json', ...authHeaders },
-              body: JSON.stringify(payload)
-            });
-          } else {
-            // Create new product
-            const payload = {
-              name: item.name,
-              cost_price: Number(item.cost_price),
-              selling_price: Number(item.selling_price) || 0,
-              stock: item.supplier_id ? 0 : Number(item.stock) || 0,
-              unit: item.unit || 'pcs',
-              expired_date: item.expired_date || null,
-              location_code: item.location_code || null
-            };
-            const res = await fetch(`http://localhost:5000/api/products`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json', ...authHeaders },
-              body: JSON.stringify(payload)
-            });
-            const json = await res.json();
-            productId = json.id;
-          }
-
-          // Create batch/faktur if supplier info is present
-          if (productId && item.supplier_id) {
-            const batchPayload = {
-              product_id: productId,
-              supplier_id: Number(item.supplier_id),
-              batch_number: item.invoice_number || null,
-              stock_type: item.stock_type || 'belum_bayar',
-              purchase_date: item.purchase_date || null,
-              initial_quantity: Number(item.stock) || 0,
-              cost_price: Number(item.cost_price) || 0,
-              expired_date: item.expired_date || null
-            };
-            await fetch(`http://localhost:5000/api/inventory/batches`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json', ...authHeaders },
-              body: JSON.stringify(batchPayload)
-            });
-          }
-        };
-
-        if (isMultipleProducts) {
-          if (multipleProducts.length === 0) {
-            goeyToast.error('Daftar produk kosong', { description: 'Silakan tambahkan setidaknya satu produk.' });
-            return;
-          }
-          for (const item of multipleProducts) {
-            await saveProductAndBatch(item);
-          }
-        } else {
-          // Single product add
-          await saveProductAndBatch(formData);
+      const newProducts: Product[] = [];
+      if (isMultipleProducts) {
+        if (multipleProducts.length === 0) {
+          goeyToast.error('Daftar produk kosong', { description: 'Silakan tambahkan setidaknya satu produk.' });
+          return;
         }
-        
-        handleCloseProductOffCanvas();
-        fetchProducts();
-        goeyToast.success('Produk berhasil disimpan');
-      } catch (error) {
-        console.error('Error adding product:', error);
-        goeyToast.error('Gagal menambahkan produk');
+        const maxId = allProducts.reduce((max, p) => p.id > max ? p.id : max, 0);
+        multipleProducts.forEach((item, index) => {
+          newProducts.push({
+            id: maxId + index + 1,
+            name: item.name,
+            cost_price: Number(item.cost_price),
+            selling_price: Number(item.selling_price),
+            stock: Number(item.stock),
+            unit: item.unit,
+            expired_date: item.expired_date || null,
+            location_code: item.location_code,
+            supplier_id: item.supplier_id ? Number(item.supplier_id) : null,
+            supplier_name: getSupplierName(item.supplier_id),
+            stock_type: item.stock_type,
+            purchase_date: item.purchase_date || null,
+            dp_amount: item.dp_amount ? Number(item.dp_amount) : null,
+            due_date: item.due_date || null,
+            invoice_number: formData.invoice_number || null
+          });
+        });
+      } else {
+        // Single product add
+        const maxId = allProducts.reduce((max, p) => p.id > max ? p.id : max, 0);
+        newProducts.push({
+          id: maxId + 1,
+          name: formData.name,
+          cost_price: Number(formData.cost_price),
+          selling_price: Number(formData.selling_price),
+          stock: Number(formData.stock),
+          unit: formData.unit,
+          expired_date: formData.expired_date || null,
+          location_code: formData.location_code,
+          supplier_id: formData.supplier_id ? Number(formData.supplier_id) : null,
+          supplier_name: getSupplierName(formData.supplier_id),
+          stock_type: formData.stock_type,
+          purchase_date: formData.purchase_date || null,
+          dp_amount: formData.dp_amount ? Number(formData.dp_amount) : null,
+          due_date: formData.due_date || null,
+          invoice_number: formData.invoice_number || null
+        });
       }
+      
+      // Add new products
+      setAllProducts(prev => [...prev, ...newProducts]);
+      
+      handleCloseProductOffCanvas();
+      goeyToast.success(`Produk berhasil ditambahkan`, {
+        description: `${newProducts.length} produk telah berhasil ditambahkan ke katalog.`
+      });
     }
   };
 
@@ -632,9 +585,6 @@ export default function ProductsPage() {
       title: 'Delete Product',
       message: `Are you sure you want to delete ${product.name}? This action cannot be undone.`,
       variant: 'danger',
-      onClose: () => setConfirmModal(prev => ({ ...prev, isOpen: false })),
-      confirmText: 'Delete',
-      cancelText: 'Cancel',
       onConfirm: async () => {
         setConfirmModal(prev => ({ ...prev, isOpen: false }));
         await handleConfirmDelete(product);
@@ -652,13 +602,8 @@ export default function ProductsPage() {
     }
 
     try {
-      const res = await fetch(`http://localhost:5000/api/products/${product.id}`, {
-        method: 'DELETE',
-        headers: authHeaders
-      });
-      if (!res.ok) throw new Error('Failed to delete product');
-      
-      fetchProducts();
+      // Delete from local state
+      setAllProducts(prev => prev.filter(p => p.id !== product.id));
       goeyToast.success('Produk Berhasil Dihapus', {
         description: `Produk "${product.name}" telah berhasil dihapus dari katalog.`
       });
@@ -782,11 +727,11 @@ export default function ProductsPage() {
                       <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                         {checkPermission('edit') && (
                         <button 
-                          onClick={() => handleOpenFakturOffCanvas(product)}
+                          onClick={() => handleOpenBatchesOffCanvas(product)}
                           className="p-1 text-green-600 hover:bg-green-50 rounded"
-                          title="Faktur"
+                          title="Batches"
                         >
-                          <FileText size={16} />
+                          <PackageOpen size={16} />
                         </button>
                         )}
                         {checkPermission('edit') && (
@@ -892,19 +837,17 @@ export default function ProductsPage() {
             )}
 
             {/* Invoice Number */}
-            {productOffCanvasMode === 'add' && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Nomor Faktur</label>
-                <input
-                  type="text"
-                  name="invoice_number"
-                  value={formData.invoice_number ?? ''}
-                  onChange={handleInputChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                  placeholder="FKT-001"
-                />
-              </div>
-            )}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Nomor Faktur</label>
+              <input
+                type="text"
+                name="invoice_number"
+                value={formData.invoice_number ?? ''}
+                onChange={handleInputChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                placeholder="FKT-001"
+              />
+            </div>
 
             {/* Render form based on single/multiple */}
             {productOffCanvasMode === 'edit' || !isMultipleProducts ? (
@@ -1237,32 +1180,13 @@ export default function ProductsPage() {
                     type="button"
                     onClick={() => {
                       if (!formData.name || !formData.cost_price || !formData.stock) return;
-                      
-                      // Check if product with same name already exists in multipleProducts list
-                      const existingIndex = multipleProducts.findIndex(
-                        p => p.name.trim().toLowerCase() === formData.name.trim().toLowerCase()
-                      );
-
-                      if (existingIndex > -1) {
-                        const updatedList = [...multipleProducts];
-                        const existingItem = updatedList[existingIndex];
-                        updatedList[existingIndex] = {
-                          ...existingItem,
-                          stock: (Number(existingItem.stock) + Number(formData.stock)).toString(),
-                          cost_price: formData.cost_price, // Update with the latest cost price
-                          selling_price: formData.selling_price || existingItem.selling_price // Update with latest selling price
-                        };
-                        setMultipleProducts(updatedList);
-                      } else {
-                        setMultipleProducts([
-                          ...multipleProducts,
-                          {
-                            ...formData,
-                            id: Date.now().toString()
-                          }
-                        ]);
-                      }
-
+                      setMultipleProducts([
+                        ...multipleProducts,
+                        {
+                          ...formData,
+                          id: Date.now().toString()
+                        }
+                      ]);
                       // Reset form for next product
                       setFormData({
                         ...formData,
@@ -1339,12 +1263,12 @@ export default function ProductsPage() {
         </form>
       </OffCanvas>
 
-      {/* Faktur OffCanvas */}
-      {isFakturOffCanvasOpen && selectedProduct && (
+      {/* Batches OffCanvas */}
+      {isBatchesOffCanvasOpen && selectedProduct && (
         <OffCanvas
-          isOpen={isFakturOffCanvasOpen}
-          onClose={() => setIsFakturOffCanvasOpen(false)}
-          title={`Faktur - ${selectedProduct.name}`}
+          isOpen={isBatchesOffCanvasOpen}
+          onClose={() => setIsBatchesOffCanvasOpen(false)}
+          title={`Batches for ${selectedProduct.name}`}
           width="800px"
         >
           <div className="mb-4">
@@ -1352,86 +1276,69 @@ export default function ProductsPage() {
           </div>
 
           <div className="mb-4 flex justify-between items-center">
-            <h3 className="font-semibold text-gray-700">Daftar Faktur</h3>
+            <h3 className="font-semibold text-gray-700">Batch List</h3>
             <button
-              onClick={handleOpenAddFakturModal}
+              onClick={handleOpenAddBatchModal}
               className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium transition-colors"
             >
-              <Plus size={16} /> Tambah Faktur
+              <Plus size={16} /> Add Batch
             </button>
           </div>
 
-          {fakturs.length === 0 ? (
+          {batches.length === 0 ? (
             <div className="text-center py-10 text-gray-500">
-              Belum ada faktur. Tambahkan faktur pertama!
+              No batches found. Add your first batch!
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm text-left">
                 <thead className="bg-gray-50 text-gray-500 font-medium">
                   <tr>
-                    <th className="px-4 py-3">No. Faktur</th>
+                    <th className="px-4 py-3">Batch Number</th>
                     <th className="px-4 py-3">Supplier</th>
-                    <th className="px-4 py-3">Tipe Stok</th>
-                    <th className="px-4 py-3">Tgl Pembelian</th>
-                    <th className="px-4 py-3">Baru Bayar</th>
-                    <th className="px-4 py-3">Jatuh Tempo</th>
-                    <th className="px-4 py-3">Jumlah</th>
-                    <th className="px-4 py-3">Harga Beli</th>
-                    <th className="px-4 py-3">Total</th>
-                    <th className="px-4 py-3 text-right">Aksi</th>
+                    <th className="px-4 py-3">Stock Type</th>
+                    <th className="px-4 py-3">Purchase Date</th>
+                    <th className="px-4 py-3">Expired Date</th>
+                    <th className="px-4 py-3">Initial Qty</th>
+                    <th className="px-4 py-3">Remaining Qty</th>
+                    <th className="px-4 py-3">Cost Price</th>
+                    <th className="px-4 py-3 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {fakturs.map((faktur) => (
-                    <tr key={faktur.id} className="border-b border-gray-100 hover:bg-gray-50">
-                      <td className="px-4 py-3 font-medium">{faktur.invoice_number}</td>
-                      <td className="px-4 py-3">{faktur.supplier_name || '-'}</td>
+                  {batches.map((batch) => (
+                    <tr key={batch.id} className="border-b border-gray-100 hover:bg-gray-50">
+                      <td className="px-4 py-3">{batch.batch_number || '-'}</td>
+                      <td className="px-4 py-3">{batch.supplier_name || '-'}</td>
                       <td className="px-4 py-3">
                         <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                          faktur.stock_type === 'lunas'
-                            ? 'bg-green-100 text-green-700'
-                            : faktur.stock_type === 'belum_bayar'
-                            ? 'bg-yellow-100 text-yellow-700'
-                            : faktur.stock_type === 'konsinyasi'
-                            ? 'bg-purple-100 text-purple-700'
-                            : faktur.stock_type === 'dp'
-                            ? 'bg-blue-100 text-blue-700'
-                            : 'bg-gray-100 text-gray-700'
+                          batch.stock_type === 'beli_normal' 
+                            ? 'bg-blue-100 text-blue-700' 
+                            : 'bg-purple-100 text-purple-700'
                         }`}>
-                          {faktur.stock_type === 'lunas' ? 'Lunas' :
-                           faktur.stock_type === 'belum_bayar' ? 'Belum Bayar' :
-                           faktur.stock_type === 'konsinyasi' ? 'Konsinyasi' :
-                           faktur.stock_type === 'dp' ? 'DP' : '-'}
+                          {batch.stock_type === 'beli_normal' ? 'Normal' : 'Consignment'}
                         </span>
                       </td>
-                      <td className="px-4 py-3">{faktur.purchase_date ? new Date(faktur.purchase_date).toLocaleDateString('id-ID') : '-'}</td>
+                      <td className="px-4 py-3">{batch.purchase_date ? new Date(batch.purchase_date).toLocaleDateString('id-ID') : '-'}</td>
                       <td className="px-4 py-3">
-                        {faktur.stock_type === 'dp' && faktur.dp_amount 
-                          ? formatCurrency(faktur.dp_amount) 
-                          : '-'}
+                        {batch.expired_date ? new Date(batch.expired_date).toLocaleDateString('id-ID') : '-'}
                       </td>
-                      <td className="px-4 py-3">
-                        {faktur.stock_type === 'dp' && faktur.due_date 
-                          ? new Date(faktur.due_date).toLocaleDateString('id-ID') 
-                          : '-'}
-                      </td>
-                      <td className="px-4 py-3">{faktur.quantity}</td>
-                      <td className="px-4 py-3">{formatCurrency(faktur.cost_price)}</td>
-                      <td className="px-4 py-3 font-medium">{formatCurrency(faktur.total_amount)}</td>
+                      <td className="px-4 py-3">{batch.initial_quantity}</td>
+                      <td className="px-4 py-3 font-medium">{batch.remaining_quantity}</td>
+                      <td className="px-4 py-3">{formatCurrency(batch.cost_price)}</td>
                       <td className="px-4 py-3 text-right">
                         <div className="flex justify-end gap-2">
                           <button
-                            onClick={() => handleOpenEditFakturModal(faktur)}
+                            onClick={() => handleOpenEditBatchModal(batch)}
                             className="p-1 text-blue-600 hover:bg-blue-50 rounded"
                             title="Edit"
                           >
                             <Edit size={14} />
                           </button>
                           <button
-                            onClick={() => handleDeleteFaktur(faktur)}
+                            onClick={() => handleDeleteBatch(batch)}
                             className="p-1 text-red-600 hover:bg-red-50 rounded"
-                            title="Hapus"
+                            title="Delete"
                           >
                             <Trash2 size={14} />
                           </button>
@@ -1444,143 +1351,119 @@ export default function ProductsPage() {
             </div>
           )}
 
-          {/* Faktur Form */}
-          {showFakturForm && (
+          {/* Batch Form */}
+          {(batchModalMode === 'add' || selectedBatch) && (
             <div className="mt-6 border-t border-gray-100 pt-6">
               <h3 className="font-semibold text-gray-700 mb-4">
-                {fakturModalMode === 'add' ? 'Tambah Faktur Baru' : 'Edit Faktur'}
+                {batchModalMode === 'add' ? 'Add New Batch' : 'Edit Batch'}
               </h3>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">No. Faktur</label>
-                  <input
-                    type="text"
-                    name="invoice_number"
-                    value={fakturFormData.invoice_number}
-                    onChange={handleFakturInputChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                    placeholder="FKT-001"
-                  />
-                </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Supplier</label>
                   <select
                     name="supplier_id"
-                    value={fakturFormData.supplier_id}
-                    onChange={handleFakturInputChange}
+                    value={batchFormData.supplier_id}
+                    onChange={handleBatchInputChange}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                   >
-                    <option value="">Pilih Supplier</option>
+                    <option value="">Select Supplier</option>
                     {suppliers.map((s) => (
                       <option key={s.id} value={s.id}>{s.name}</option>
                     ))}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Tipe Stok</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Batch Number</label>
+                  <input
+                    type="text"
+                    name="batch_number"
+                    value={batchFormData.batch_number}
+                    onChange={handleBatchInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    placeholder="Optional"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Stock Type</label>
                   <select
                     name="stock_type"
-                    value={fakturFormData.stock_type}
-                    onChange={handleFakturInputChange}
+                    value={batchFormData.stock_type}
+                    onChange={handleBatchInputChange}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                   >
-                    <option value="belum_bayar">Belum Bayar</option>
-                    <option value="konsinyasi">Konsinyasi</option>
-                    <option value="dp">DP</option>
-                    <option value="lunas">Lunas</option>
+                    <option value="beli_normal">Normal Purchase</option>
+                    <option value="consignment">Consignment</option>
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Tgl Pembelian</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Purchase Date</label>
                   <input
                     type="date"
                     name="purchase_date"
-                    value={fakturFormData.purchase_date}
-                    onChange={handleFakturInputChange}
+                    value={batchFormData.purchase_date}
+                    onChange={handleBatchInputChange}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Jumlah</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Initial Quantity</label>
                   <input
                     type="number"
-                    name="quantity"
-                    value={fakturFormData.quantity}
-                    onChange={handleFakturInputChange}
+                    name="initial_quantity"
+                    value={batchFormData.initial_quantity}
+                    onChange={handleBatchInputChange}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                     placeholder="0"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Harga Beli</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Cost Price</label>
                   <input
                     type="number"
                     name="cost_price"
-                    value={fakturFormData.cost_price}
-                    onChange={handleFakturInputChange}
+                    value={batchFormData.cost_price}
+                    onChange={handleBatchInputChange}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                     placeholder="0"
                   />
                 </div>
-                {fakturFormData.stock_type === 'dp' && (
-                  <>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Jumlah DP (IDR)</label>
-                      <input
-                        type="number"
-                        name="dp_amount"
-                        min="0"
-                        value={fakturFormData.dp_amount}
-                        onChange={handleFakturInputChange}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                        placeholder="0"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Jatuh Tempo</label>
-                      <input
-                        type="date"
-                        name="due_date"
-                        value={fakturFormData.due_date}
-                        onChange={handleFakturInputChange}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                      />
-                    </div>
-                  </>
-                )}
-                <div className="col-span-2 md:col-span-3">
-                  
+                <div className="col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Expired Date</label>
+                  <input
+                    type="date"
+                    name="expired_date"
+                    value={batchFormData.expired_date}
+                    onChange={handleBatchInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  />
                 </div>
               </div>
               <div className="flex justify-end gap-3 mt-6">
                 <button
                   type="button"
                   onClick={() => {
-                    setFakturFormData({
-                      invoice_number: '',
+                    setBatchFormData({
                       supplier_id: '',
-                      purchase_date: new Date().toISOString().split('T')[0],
-                      quantity: '',
+                      batch_number: '',
+                      stock_type: 'beli_normal',
+                      purchase_date: '',
+                      initial_quantity: '',
                       cost_price: '',
-                      stock_type: 'belum_bayar',
-                      dp_amount: '',
-                      due_date: '',
-                      notes: ''
+                      expired_date: ''
                     });
-                    setSelectedFaktur(null);
-                    setFakturModalMode('add');
-                    setShowFakturForm(false);
+                    setSelectedBatch(null);
+                    setBatchModalMode('add');
                   }}
                   className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium transition-colors"
                 >
-                  Batal
+                  Cancel
                 </button>
                 <button
                   type="button"
-                  onClick={handleSaveFaktur}
+                  onClick={handleSaveBatch}
                   className="px-4 py-2 text-white bg-blue-600 hover:bg-blue-700 rounded-lg text-sm font-medium transition-colors"
                 >
-                  {fakturModalMode === 'add' ? 'Tambah Faktur' : 'Simpan Faktur'}
+                  {batchModalMode === 'add' ? 'Add Batch' : 'Save Batch'}
                 </button>
               </div>
             </div>

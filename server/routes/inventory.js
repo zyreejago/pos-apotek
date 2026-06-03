@@ -21,18 +21,23 @@ function registerInventoryRoutes(app, pool, authenticate, checkPermission, uploa
   // Create a new batch
   app.post('/api/inventory/batches', authenticate, checkPermission('Management Product', 'create'), async (req, res) => {
     try {
-      const { product_id, supplier_id, batch_number, stock_type, purchase_date, initial_quantity, cost_price, expired_date } = req.body;
-      const [result] = await pool.query(`
-        INSERT INTO batches (product_id, supplier_id, batch_number, stock_type, purchase_date, initial_quantity, remaining_quantity, cost_price, expired_date)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `, [product_id, supplier_id, batch_number, stock_type, purchase_date, initial_quantity, initial_quantity, cost_price, expired_date]);
+      const { product_id, supplier_id, batch_number, stock_type, purchase_date, initial_quantity, cost_price, expired_date, dp_amount, due_date } = req.body;
       
-      // Update product's total stock (sum of all batches' remaining quantities)
+      const formattedPurchaseDate = purchase_date ? purchase_date.substring(0, 10) : null;
+      const formattedExpiredDate = expired_date ? expired_date.substring(0, 10) : null;
+      const formattedDueDate = due_date ? due_date.substring(0, 10) : null;
+
+      const [result] = await pool.query(`
+        INSERT INTO batches (product_id, supplier_id, batch_number, stock_type, purchase_date, initial_quantity, remaining_quantity, cost_price, expired_date, dp_amount, due_date)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `, [product_id, supplier_id, batch_number, stock_type, formattedPurchaseDate, initial_quantity, initial_quantity, cost_price, formattedExpiredDate, dp_amount ? Number(dp_amount) : null, formattedDueDate]);
+      
+      // Update product's total stock by adding the new batch's remaining quantity
       await pool.query(`
         UPDATE products 
-        SET stock = (SELECT COALESCE(SUM(remaining_quantity), 0) FROM batches WHERE product_id = ?)
+        SET stock = stock + ?
         WHERE id = ?
-      `, [product_id, product_id]);
+      `, [initial_quantity, product_id]);
 
       res.json({ success: true, data: { id: result.insertId, ...req.body } });
     } catch (err) {
@@ -45,22 +50,32 @@ function registerInventoryRoutes(app, pool, authenticate, checkPermission, uploa
   app.put('/api/inventory/batches/:id', authenticate, checkPermission('Management Product', 'edit'), async (req, res) => {
     try {
       const { id } = req.params;
-      const { supplier_id, batch_number, stock_type, purchase_date, initial_quantity, remaining_quantity, cost_price, expired_date } = req.body;
+      const { supplier_id, batch_number, stock_type, purchase_date, initial_quantity, remaining_quantity, cost_price, expired_date, dp_amount, due_date } = req.body;
+      
+      // Get the old remaining_quantity first to calculate the difference
+      const [oldBatch] = await pool.query('SELECT remaining_quantity, product_id FROM batches WHERE id = ?', [id]);
+      if (oldBatch.length === 0) {
+        return res.status(404).json({ success: false, message: 'Batch not found' });
+      }
+      const oldQty = oldBatch[0].remaining_quantity;
+      const product_id = oldBatch[0].product_id;
+
+      const formattedPurchaseDate = purchase_date ? purchase_date.substring(0, 10) : null;
+      const formattedExpiredDate = expired_date ? expired_date.substring(0, 10) : null;
+      const formattedDueDate = due_date ? due_date.substring(0, 10) : null;
+
       await pool.query(`
         UPDATE batches 
-        SET supplier_id = ?, batch_number = ?, stock_type = ?, purchase_date = ?, initial_quantity = ?, remaining_quantity = ?, cost_price = ?, expired_date = ?
+        SET supplier_id = ?, batch_number = ?, stock_type = ?, purchase_date = ?, initial_quantity = ?, remaining_quantity = ?, cost_price = ?, expired_date = ?, dp_amount = ?, due_date = ?
         WHERE id = ?
-      `, [supplier_id, batch_number, stock_type, purchase_date, initial_quantity, remaining_quantity, cost_price, expired_date, id]);
-
-      const [batch] = await pool.query('SELECT product_id FROM batches WHERE id = ?', [id]);
-      if (batch.length > 0) {
-        const product_id = batch[0].product_id;
-        await pool.query(`
-          UPDATE products 
-          SET stock = (SELECT COALESCE(SUM(remaining_quantity), 0) FROM batches WHERE product_id = ?)
-          WHERE id = ?
-        `, [product_id, product_id]);
-      }
+      `, [supplier_id, batch_number, stock_type, formattedPurchaseDate, initial_quantity, remaining_quantity, cost_price, formattedExpiredDate, dp_amount ? Number(dp_amount) : null, formattedDueDate, id]);
+      
+      const diff = remaining_quantity - oldQty;
+      await pool.query(`
+        UPDATE products 
+        SET stock = GREATEST(stock + ?, 0)
+        WHERE id = ?
+      `, [diff, product_id]);
 
       res.json({ success: true });
     } catch (err) {
@@ -73,15 +88,18 @@ function registerInventoryRoutes(app, pool, authenticate, checkPermission, uploa
   app.delete('/api/inventory/batches/:id', authenticate, checkPermission('Management Product', 'delete'), async (req, res) => {
     try {
       const { id } = req.params;
-      const [batch] = await pool.query('SELECT product_id FROM batches WHERE id = ?', [id]);
-      await pool.query('DELETE FROM batches WHERE id = ?', [id]);
+      const [batch] = await pool.query('SELECT product_id, remaining_quantity FROM batches WHERE id = ?', [id]);
       if (batch.length > 0) {
         const product_id = batch[0].product_id;
+        const qty = batch[0].remaining_quantity;
+        await pool.query('DELETE FROM batches WHERE id = ?', [id]);
         await pool.query(`
           UPDATE products 
-          SET stock = (SELECT COALESCE(SUM(remaining_quantity), 0) FROM batches WHERE product_id = ?)
+          SET stock = GREATEST(stock - ?, 0)
           WHERE id = ?
-        `, [product_id, product_id]);
+        `, [qty, product_id]);
+      } else {
+        await pool.query('DELETE FROM batches WHERE id = ?', [id]);
       }
       res.json({ success: true });
     } catch (err) {

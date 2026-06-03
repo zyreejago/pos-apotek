@@ -35,18 +35,31 @@ module.exports = function registerProductRoutes(app, pool, authenticate, checkPe
     try {
       const connection = await pool.getConnection();
 
-      let query = 'SELECT * FROM products';
+      // Base query: JOIN with the latest batch per product to get supplier_name and stock_type
+      let query = `
+        SELECT p.*, 
+               lb.supplier_id, 
+               s.name AS supplier_name, 
+               lb.stock_type
+        FROM products p
+        LEFT JOIN (
+          SELECT b1.* FROM batches b1
+          INNER JOIN (
+            SELECT product_id, MAX(id) AS max_id FROM batches GROUP BY product_id
+          ) b2 ON b1.id = b2.max_id
+        ) lb ON p.id = lb.product_id
+        LEFT JOIN suppliers s ON lb.supplier_id = s.id
+      `;
       let countQuery = 'SELECT COUNT(*) as total FROM products';
       let params = [];
 
       if (search) {
-        const searchCondition = ' WHERE name LIKE ?';
-        query += searchCondition;
-        countQuery += searchCondition;
+        query += ' WHERE p.name LIKE ?';
+        countQuery += ' WHERE name LIKE ?';
         params.push(`%${search}%`);
       }
 
-      query += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
+      query += ' ORDER BY p.created_at DESC LIMIT ? OFFSET ?';
       params.push(limit, offset);
 
       const [products] = await connection.query(query, params);
@@ -80,7 +93,7 @@ module.exports = function registerProductRoutes(app, pool, authenticate, checkPe
     authenticate,
     checkPermission('Management Product', 'create'),
     async (req, res) => {
-    const { name, cost_price, selling_price, stock, category, unit, expired_date } =
+    const { name, cost_price, selling_price, stock, category, unit, expired_date, location_code } =
       req.body;
 
     if (!name || !cost_price) {
@@ -92,7 +105,7 @@ module.exports = function registerProductRoutes(app, pool, authenticate, checkPe
     try {
       const connection = await pool.getConnection();
       const [result] = await connection.query(
-        'INSERT INTO products (name, cost_price, selling_price, stock, category, unit, expired_date) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        'INSERT INTO products (name, cost_price, selling_price, stock, category, unit, expired_date, location_code) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
         [
           name,
           cost_price,
@@ -101,6 +114,7 @@ module.exports = function registerProductRoutes(app, pool, authenticate, checkPe
           category || 'General',
           unit || 'pcs',
           expired_date || null,
+          location_code || null,
         ]
       );
       connection.release();
@@ -114,6 +128,7 @@ module.exports = function registerProductRoutes(app, pool, authenticate, checkPe
         category,
         unit,
         expired_date,
+        location_code,
       });
     } catch (error) {
       console.error('Error adding product:', error);
@@ -128,14 +143,14 @@ module.exports = function registerProductRoutes(app, pool, authenticate, checkPe
     checkPermission('Management Product', 'edit'),
     async (req, res) => {
     const { id } = req.params;
-    const { name, cost_price, selling_price, stock, category, unit, expired_date } =
+    const { name, cost_price, selling_price, stock, category, unit, expired_date, location_code } =
       req.body;
 
     try {
       const connection = await pool.getConnection();
       await connection.query(
-        'UPDATE products SET name = ?, cost_price = ?, selling_price = ?, stock = ?, category = ?, unit = ?, expired_date = ? WHERE id = ?',
-        [name, cost_price, selling_price, stock, category, unit, expired_date, id]
+        'UPDATE products SET name = ?, cost_price = ?, selling_price = ?, stock = ?, category = ?, unit = ?, expired_date = ?, location_code = ? WHERE id = ?',
+        [name, cost_price, selling_price, stock, category, unit, expired_date, location_code || null, id]
       );
       connection.release();
 

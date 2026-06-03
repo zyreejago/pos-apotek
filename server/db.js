@@ -75,6 +75,7 @@ const initDB = async () => {
         unit VARCHAR(50),
         expired_date DATE,
         category VARCHAR(100),
+        location_code VARCHAR(100) NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
@@ -112,6 +113,18 @@ const initDB = async () => {
     } catch (e) {}
     try {
       await connection.query(`ALTER TABLE products ADD COLUMN expired_date DATE`);
+    } catch (e) {}
+    try {
+      await connection.query(`ALTER TABLE products ADD COLUMN location_code VARCHAR(100) NULL`);
+    } catch (e) {}
+    try {
+      await connection.query(`ALTER TABLE batches MODIFY COLUMN stock_type VARCHAR(50) DEFAULT 'belum_bayar'`);
+    } catch (e) {}
+    try {
+      await connection.query(`ALTER TABLE batches ADD COLUMN dp_amount DECIMAL(10, 2) NULL`);
+    } catch (e) {}
+    try {
+      await connection.query(`ALTER TABLE batches ADD COLUMN due_date DATE NULL`);
     } catch (e) {}
 
     await connection.query(`
@@ -244,12 +257,14 @@ const initDB = async () => {
         product_id INT NOT NULL,
         supplier_id INT NULL,
         batch_number VARCHAR(100) NULL,
-        stock_type ENUM('beli_normal', 'consignment') DEFAULT 'beli_normal',
+        stock_type VARCHAR(50) DEFAULT 'belum_bayar',
         purchase_date DATE NULL,
         initial_quantity INT NOT NULL DEFAULT 0,
         remaining_quantity INT NOT NULL DEFAULT 0,
         cost_price DECIMAL(10, 2) NOT NULL DEFAULT 0,
         expired_date DATE NULL,
+        dp_amount DECIMAL(10, 2) NULL,
+        due_date DATE NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
         FOREIGN KEY (supplier_id) REFERENCES suppliers(id) ON DELETE SET NULL
