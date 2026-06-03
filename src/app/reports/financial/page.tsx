@@ -1,55 +1,53 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Header from '@/components/Header';
-import { goeyToast } from "@/components/ui/goey-toaster";
+import { goeyToast } from '@/components/ui/goey-toaster';
 import { Download, Calendar, Loader2 } from 'lucide-react';
 import jsPDF from 'jspdf';
-type ReportItem = { label: string; amount: number };
-type ReportSection = { total: number; details: ReportItem[] };
-type ProfitLossReport = {
-  period: { month: string | number; year: string | number };
-  revenue: ReportSection;
-  cogs: ReportSection;
-  gross_profit: number;
-  expenses: { total: number; details: ReportItem[] };
-  net_profit: number;
-};
+import autoTable from 'jspdf-autotable';
 
-export default function Page() {
-  const reportRef = useRef<HTMLDivElement>(null);
-  
+interface Account {
+  code: string;
+  name: string;
+  type: string;
+  normal_balance: string;
+  total_debit: number;
+  total_credit: number;
+}
+
+export default function ProfitLossAccountingPage() {
   const [loading, setLoading] = useState(false);
-  const [data, setData] = useState<ProfitLossReport | null>(null);
-  
+  const [accounts, setAccounts] = useState<Account[]>([]);
+
   const currentDate = new Date();
   const [month, setMonth] = useState(currentDate.getMonth() + 1);
   const [year, setYear] = useState(currentDate.getFullYear());
 
-  const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
-  const user = typeof window !== "undefined" ? JSON.parse(localStorage.getItem("user") || '{}') : {};
-  const username = user.username || user.name || "Admin";
+  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+  const user = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('user') || '{}') : {};
+  const username = user.username || user.name || 'Admin';
 
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`http://localhost:5000/api/financial/profit-loss?month=${month}&year=${year}`, {
+      const res = await fetch(`http://localhost:5000/api/financial/profit-loss-accounting?month=${month}&year=${year}`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {}
       });
       
       if (res.ok) {
-        const result: ProfitLossReport = await res.json();
-        setData(result);
+        const data = await res.json();
+        setAccounts(data.accounts || []);
       } else {
         const err = await res.json();
-        goeyToast.error(err.message || "Gagal mengambil laporan keuangan", {
-          description: "Terjadi kesalahan saat mengambil data laporan keuangan."
+        goeyToast.error(err.message || 'Gagal mengambil laporan laba rugi', {
+          description: 'Terjadi kesalahan saat mengambil data laporan.'
         });
       }
     } catch (error) {
-      console.error("Error fetching report:", error);
-      goeyToast.error("Gagal terhubung ke server", {
-        description: "Periksa koneksi internet Anda dan coba lagi."
+      console.error('Error fetching profit loss accounting:', error);
+      goeyToast.error('Gagal terhubung ke server', {
+        description: 'Periksa koneksi internet Anda dan coba lagi.'
       });
     } finally {
       setLoading(false);
@@ -60,156 +58,127 @@ export default function Page() {
     fetchData();
   }, [fetchData]);
 
-  const handleDownloadPDF = async () => {
-    try {
-      goeyToast.info("Sedang membuat PDF...", {
-        description: "Mohon tunggu sebentar, laporan sedang diproses."
-      });
-      
-      const doc = new jsPDF();
-
-      // 1. Header (Kop)
-      doc.setFontSize(18);
-      doc.setFont("helvetica", "bold");
-      doc.text("APOTEK SUMBER WARAS", 105, 20, { align: "center" });
-      
-      doc.setFontSize(10);
-      doc.setFont("helvetica", "normal");
-      doc.text("Jl. Kesehatan No. 123, Kota Sehat", 105, 26, { align: "center" });
-      doc.text("Telp: (021) 12345678 | Email: info@sumberwaras.com", 105, 30, { align: "center" });
-      
-      doc.setLineWidth(0.5);
-      doc.line(20, 35, 190, 35);
-
-      // 2. Report Info
-      doc.setFontSize(14);
-      doc.setFont("helvetica", "bold");
-      doc.text("LAPORAN LABA - RUGI", 105, 45, { align: "center" });
-      
-      doc.setFontSize(10);
-      doc.setFont("helvetica", "normal");
-      doc.text(`Periode: ${getMonthName(month)} ${year}`, 105, 52, { align: "center" });
-      doc.text(`Tanggal Rilis: ${new Date().toLocaleString('id-ID', { dateStyle: 'full', timeStyle: 'short' })}`, 105, 58, { align: "center" });
-
-      let currentY = 70;
-
-      // Helper for sections
-      const addSection = (title: string, items: ReportItem[], total: number) => {
-        // Section Title
-        doc.setFontSize(11);
-        doc.setFont("helvetica", "bold");
-        doc.setTextColor(59, 130, 246); // Blue
-        doc.text(title.toUpperCase(), 14, currentY);
-        currentY += 8;
-
-        // Items
-        doc.setFontSize(10);
-        doc.setFont("helvetica", "normal");
-        doc.setTextColor(0, 0, 0); // Black
-        
-        items.forEach((item, idx) => {
-          doc.text(`${idx + 1}. ${item.label}`, 14, currentY);
-          doc.text(formatCurrency(item.amount), 196, currentY, { align: 'right' });
-          currentY += 6;
-        });
-
-        // Total Line
-        doc.setLineWidth(0.1);
-        doc.line(14, currentY, 196, currentY);
-        currentY += 6;
-        
-        doc.setFont("helvetica", "bold");
-        doc.text(title, 14, currentY);
-        doc.text(formatCurrency(total), 196, currentY, { align: 'right' });
-        currentY += 12; // Space before next section
-      };
-
-      // 3. Content Sections
-      if (data) {
-        addSection("Pendapatan Penjualan", data.revenue.details, data.revenue.total);
-        addSection("Harga Pokok Penjualan", data.cogs.details, data.cogs.total);
-
-        // Gross Profit
-        doc.setLineWidth(0.5);
-        doc.line(14, currentY - 6, 196, currentY - 6);
-        doc.setFontSize(11);
-        doc.setFont("helvetica", "bold");
-        doc.setTextColor(59, 130, 246);
-        doc.text("LABA KOTOR", 14, currentY);
-        doc.setTextColor(0, 0, 0);
-        doc.text(formatCurrency(data.gross_profit), 196, currentY, { align: 'right' });
-        currentY += 12;
-
-        addSection("Beban & Penyesuaian Lainnya", data.expenses.details, 0); // Expenses total handled in logic if needed
-
-        // Net Profit
-        currentY += 5;
-        doc.setFillColor(240, 240, 240);
-        doc.rect(14, currentY - 8, 182, 12, 'F');
-        doc.setFontSize(12);
-        doc.setFont("helvetica", "bold");
-        doc.text("LABA BERSIH / (RUGI)", 18, currentY);
-        doc.text(formatCurrency(data.net_profit), 192, currentY, { align: 'right' });
-        currentY += 20;
-      }
-
-      // 4. Footer (Signature)
-      // Check page break
-      if (currentY > 250) {
-        doc.addPage();
-        currentY = 40;
-      }
-
-      const signatureY = currentY;
-      
-      doc.setFontSize(10);
-      doc.setFont("helvetica", "normal");
-      doc.text(`Kota Sehat, ${new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}`, 140, signatureY);
-      doc.text("Dibuat oleh,", 140, signatureY + 6);
-      
-      doc.setFont("helvetica", "bold");
-      doc.text(username, 140, signatureY + 30);
-      doc.setLineWidth(0.2);
-      // doc.line(140, signatureY + 31, 190, signatureY + 31); // Underline name
-      
-      doc.setFont("helvetica", "normal");
-      doc.text("Staff Admin", 140, signatureY + 36);
-
-      doc.save(`Laporan_Laba_Rugi_${month}_${year}.pdf`);
-      goeyToast.success("PDF berhasil diunduh", {
-        description: `Laporan Laba Rugi periode ${getMonthName(month)} ${year} telah berhasil disimpan sebagai Laporan_Laba_Rugi_${month}_${year}.pdf`
-      });
-    } catch (error) {
-      console.error("Error generating PDF:", error);
-      goeyToast.error("Gagal membuat PDF", {
-        description: "Terjadi kesalahan saat membuat file PDF. Silakan coba lagi."
-      });
-    }
-  };
-
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('id-ID', {
       style: 'currency',
       currency: 'IDR',
       minimumFractionDigits: 0,
       maximumFractionDigits: 0
-    }).format(amount);
+    }).format(amount || 0);
   };
 
   const getMonthName = (m: number) => {
     const months = [
-      "Januari", "Februari", "Maret", "April", "Mei", "Juni",
-      "Juli", "Agustus", "September", "Oktober", "November", "Desember"
+      'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+      'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
     ];
-    return months[m - 1] || "";
+    return months[m - 1] || '';
+  };
+
+  // Filter accounts for profit and loss
+  const revenueAccounts = accounts.filter(a => a.type === 'pendapatan');
+  const expenseAccounts = accounts.filter(a => a.type === 'beban');
+
+  // Calculate totals
+  const totalRevenue = revenueAccounts.reduce((sum, a) => sum + (a.total_credit - a.total_debit), 0);
+  const totalExpenses = expenseAccounts.reduce((sum, a) => sum + (a.total_debit - a.total_credit), 0);
+  const netProfit = totalRevenue - totalExpenses;
+
+  const handleDownloadPDF = async () => {
+    try {
+      goeyToast.info('Sedang membuat PDF...', {
+        description: 'Mohon tunggu sebentar, laporan sedang diproses.'
+      });
+      
+      const doc = new jsPDF();
+
+      // Header
+      doc.setFontSize(18);
+      doc.setFont('helvetica', 'bold');
+      doc.text('APOTEK SUMBER WARAS', 105, 20, { align: 'center' });
+      
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.text('Jl. Kesehatan No. 123, Karangasem', 105, 26, { align: 'center' });
+      doc.text('Telp: (021) 12345678 | Email: info@sumberwaras.com', 105, 30, { align: 'center' });
+      
+      doc.setLineWidth(0.5);
+      doc.line(20, 35, 190, 35);
+
+      // Report Info
+      doc.setFontSize(14);
+      doc.setFont('helvetica', 'bold');
+      doc.text('LAPORAN LABA RUGI', 105, 45, { align: 'center' });
+      
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Periode: ${getMonthName(month)} ${year}`, 105, 52, { align: 'center' });
+      doc.text(`Tanggal Rilis: ${new Date().toLocaleString('id-ID', { dateStyle: 'full', timeStyle: 'short' })}`, 105, 58, { align: 'center' });
+
+      // Table Content
+      const tableColumn = ['No', 'Keterangan', 'Debit', 'Kredit'];
+      const tableRows: (string | number)[][] = [];
+
+      // Revenue accounts
+      tableRows.push(['', 'PENDAPATAN', '', '']);
+      revenueAccounts.forEach((a, index) => {
+        tableRows.push([index + 1, a.name, formatCurrency(a.total_debit), formatCurrency(a.total_credit)]);
+      });
+      tableRows.push(['', 'Total Pendapatan', '', formatCurrency(totalRevenue)]);
+
+      // Expense accounts
+      tableRows.push(['', 'BEBAN', '', '']);
+      expenseAccounts.forEach((a, index) => {
+        tableRows.push([revenueAccounts.length + index + 1, a.name, formatCurrency(a.total_debit), formatCurrency(a.total_credit)]);
+      });
+      tableRows.push(['', 'Total Beban', formatCurrency(totalExpenses), '']);
+
+      // Net Profit
+      tableRows.push(['', 'LABA BERSIH', netProfit < 0 ? formatCurrency(Math.abs(netProfit)) : '', netProfit >= 0 ? formatCurrency(netProfit) : '']);
+
+      autoTable(doc, {
+        head: [tableColumn],
+        body: tableRows,
+        startY: 70,
+        theme: 'grid',
+        styles: { fontSize: 8, cellPadding: 2 },
+        headStyles: { fillColor: [59, 130, 246] },
+        columnStyles: {
+          2: { halign: 'right' },
+          3: { halign: 'right' }
+        }
+      });
+
+      // Footer
+      const finalY = (doc as any).lastAutoTable.finalY + 20;
+      doc.setFontSize(10);
+      doc.text(`Karangasem, ${new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}`, 140, finalY);
+      doc.text('Dibuat oleh,', 140, finalY + 6);
+      
+      doc.setFont('helvetica', 'bold');
+      doc.text(username, 140, finalY + 30);
+      
+      doc.setFont('helvetica', 'normal');
+      doc.text('Staff Admin', 140, finalY + 36);
+
+      doc.save(`Laporan_Laba_Rugi_${getMonthName(month)}_${year}.pdf`);
+      goeyToast.success('PDF berhasil diunduh', {
+        description: `Laporan Laba Rugi periode ${getMonthName(month)} ${year} telah berhasil disimpan.`
+      });
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      goeyToast.error('Gagal membuat PDF', {
+        description: 'Terjadi kesalahan saat membuat file PDF. Silakan coba lagi.'
+      });
+    }
   };
 
   return (
     <div className="bg-gray-50 min-h-screen relative">
       <Header
-        title="Laporan Laba - Rugi"
+        title="Laporan Laba Rugi"
         subtitle="Laporan Keuangan"
-        breadcrumbs={[{ label: 'Sales Report' }, { label: 'Laporan Keuangan' }]}
+        breadcrumbs={[{ label: 'Sales Report' }, { label: 'Laporan Laba Rugi' }]}
         rightContent={
           <div className="flex items-center gap-3">
              <div className="flex items-center bg-white border border-gray-200 rounded-lg px-3 py-1.5 shadow-sm">
@@ -219,7 +188,7 @@ export default function Page() {
                  onChange={(e) => setMonth(parseInt(e.target.value))}
                  className="text-sm border-none focus:ring-0 text-gray-700 bg-transparent cursor-pointer outline-none"
                >
-                 {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
+                 {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
                    <option key={m} value={m}>{getMonthName(m)}</option>
                  ))}
                </select>
@@ -229,7 +198,7 @@ export default function Page() {
                  onChange={(e) => setYear(parseInt(e.target.value))}
                  className="text-sm border-none focus:ring-0 text-gray-700 bg-transparent cursor-pointer outline-none"
                >
-                 {Array.from({ length: 5 }, (_, i) => currentDate.getFullYear() - i).map(y => (
+                 {Array.from({ length: 5 }, (_, i) => currentDate.getFullYear() - i).map((y) => (
                    <option key={y} value={y}>{y}</option>
                  ))}
                </select>
@@ -246,96 +215,74 @@ export default function Page() {
       />
       
       <div className="p-8 pt-0 flex justify-center">
-        {loading && !data ? (
+        {loading ? (
           <div className="flex flex-col items-center justify-center py-20">
             <Loader2 className="animate-spin text-blue-500 mb-2" size={32} />
-            <p className="text-gray-500 text-sm">Memuat laporan keuangan...</p>
+            <p className="text-gray-500 text-sm">Memuat laporan laba rugi...</p>
           </div>
         ) : (
-          <div ref={reportRef} className="bg-white w-full max-w-4xl p-10 rounded-xl shadow-sm border border-gray-100 min-h-[800px]">
-            {/* Report Header */}
-            <div className="text-center mb-10 border-b border-gray-100 pb-6">
-              <h2 className="text-xl font-bold text-gray-900 mb-2">Laporan Laba - Rugi</h2>
-              <div className="text-gray-500 text-sm">
-                <p>Periode: Bulan {getMonthName(month)}, Tahun {year}</p>
-                <p className="mt-1">Terakhir Update: {new Date().toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' })}</p>
-              </div>
+          <div className="bg-white w-full max-w-4xl rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+            <div className="p-6 border-b border-gray-100 text-center">
+              <h2 className="text-xl font-bold text-gray-900">Laporan Laba Rugi</h2>
+              <p className="text-gray-500 text-sm mt-2">Periode: {getMonthName(month)} {year}</p>
             </div>
+            
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead>
+                  <tr className="bg-gray-50 text-gray-500 font-medium border-b border-gray-100">
+                    <th className="px-6 py-4">No</th>
+                    <th className="px-6 py-4">Keterangan</th>
+                    <th className="px-6 py-4 text-right">Debit</th>
+                    <th className="px-6 py-4 text-right">Kredit</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {/* Revenue Section */}
+                  <tr className="bg-blue-50">
+                    <td colSpan={4} className="px-6 py-4 font-bold text-blue-700">PENDAPATAN</td>
+                  </tr>
+                  {revenueAccounts.map((a, index) => (
+                    <tr key={a.code} className="hover:bg-gray-50 transition-colors">
+                      <td className="px-6 py-3 text-gray-600">{index + 1}</td>
+                      <td className="px-6 py-3 text-gray-600">{a.name}</td>
+                      <td className="px-6 py-3 text-right text-gray-600">{formatCurrency(a.total_debit)}</td>
+                      <td className="px-6 py-3 text-right text-gray-600">{formatCurrency(a.total_credit)}</td>
+                    </tr>
+                  ))}
+                  <tr className="font-bold bg-gray-50">
+                    <td colSpan={2} className="px-6 py-4 text-gray-900">Total Pendapatan</td>
+                    <td className="px-6 py-4 text-right text-gray-900"></td>
+                    <td className="px-6 py-4 text-right text-gray-900">{formatCurrency(totalRevenue)}</td>
+                  </tr>
 
-            {/* Content */}
-            {data && (
-              <div className="space-y-10">
-                
-                {/* Revenue Section */}
-                <div>
-                  <h3 className="text-blue-500 font-semibold mb-4 text-sm uppercase tracking-wide">Pendapatan Penjualan</h3>
-                  <div className="space-y-3 text-sm">
-                    {data.revenue.details.map((item, idx) => (
-                      <div key={idx} className="flex justify-between items-center text-gray-600">
-                        <span>{idx + 1}. {item.label}</span>
-                        <span>{formatCurrency(item.amount)}</span>
-                      </div>
-                    ))}
-                    <div className="flex justify-between items-center font-bold text-gray-900 pt-3 border-t border-gray-100 mt-2">
-                      <span>Pendapatan Penjualan</span>
-                      <span>{formatCurrency(data.revenue.total)}</span>
-                    </div>
-                  </div>
-                </div>
+                  {/* Expense Section */}
+                  <tr className="bg-orange-50">
+                    <td colSpan={4} className="px-6 py-4 font-bold text-orange-700">BEBAN</td>
+                  </tr>
+                  {expenseAccounts.map((a, index) => (
+                    <tr key={a.code} className="hover:bg-gray-50 transition-colors">
+                      <td className="px-6 py-3 text-gray-600">{revenueAccounts.length + index + 1}</td>
+                      <td className="px-6 py-3 text-gray-600">{a.name}</td>
+                      <td className="px-6 py-3 text-right text-gray-600">{formatCurrency(a.total_debit)}</td>
+                      <td className="px-6 py-3 text-right text-gray-600">{formatCurrency(a.total_credit)}</td>
+                    </tr>
+                  ))}
+                  <tr className="font-bold bg-gray-50">
+                    <td colSpan={2} className="px-6 py-4 text-gray-900">Total Beban</td>
+                    <td className="px-6 py-4 text-right text-gray-900">{formatCurrency(totalExpenses)}</td>
+                    <td className="px-6 py-4 text-right text-gray-900"></td>
+                  </tr>
 
-                {/* COGS Section */}
-                <div>
-                  <h3 className="text-blue-500 font-semibold mb-4 text-sm uppercase tracking-wide">Harga Pokok Penjualan</h3>
-                  <div className="space-y-3 text-sm">
-                    {data.cogs.details.map((item, idx) => (
-                      <div key={idx} className="flex justify-between items-center text-gray-600">
-                        <span>{idx + 1}. {item.label}</span>
-                        <span>{formatCurrency(item.amount)}</span>
-                      </div>
-                    ))}
-                    <div className="flex justify-between items-center font-bold text-gray-900 pt-3 border-t border-gray-100 mt-2">
-                      <span>Harga Pokok Penjualan</span>
-                      <span>{formatCurrency(data.cogs.total)}</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Gross Profit Section */}
-                <div className="py-4 border-t-2 border-gray-100">
-                  <h3 className="text-blue-500 font-semibold mb-4 text-sm uppercase tracking-wide">Laba Kotor</h3>
-                  <div className="flex justify-between items-center font-bold text-gray-900 text-sm">
-                    <span>Laba Kotor</span>
-                    <span>{formatCurrency(data.gross_profit)}</span>
-                  </div>
-                </div>
-
-                {/* Expenses / Other Section (Laba Daki) */}
-                <div>
-                  <h3 className="text-blue-500 font-semibold mb-4 text-sm uppercase tracking-wide">Beban & Penyesuaian Lainnya</h3>
-                  <div className="space-y-3 text-sm">
-                    {data.expenses.details.map((item, idx) => (
-                      <div key={idx} className="flex justify-between items-center text-gray-600">
-                        <span>{idx + 1}. {item.label}</span>
-                        <span>{formatCurrency(item.amount)}</span>
-                      </div>
-                    ))}
-                    {/* The image shows a summary line here too, let's add total expenses if needed, but the structure flows to Net Profit */}
-                  </div>
-                </div>
-
-                {/* Net Profit Section */}
-                <div className="py-6 border-t-2 border-gray-200 mt-8">
-                   {/* In image: "Harga Pokok Penjualan" label is used for bottom line? Probably "Laba Bersih". */}
-                   {/* The image bottom text says "Harga Pokok Penjualan Rp. -67". This looks like a copy-paste error in the design mock or a very specific term. 
-                       Usually the bottom line is Net Profit / Laba Bersih. I will use "Laba Bersih / (Rugi)" for clarity. */}
-                  <div className="flex justify-between items-center font-bold text-gray-900 text-base">
-                    <span>Laba Bersih / (Rugi)</span>
-                    <span>{formatCurrency(data.net_profit)}</span>
-                  </div>
-                </div>
-
-              </div>
-            )}
+                  {/* Net Profit */}
+                  <tr className="font-bold bg-gray-100">
+                    <td colSpan={2} className="px-6 py-4 text-gray-900 text-lg">LABA BERSIH</td>
+                    <td className="px-6 py-4 text-right text-gray-900 text-lg">{netProfit < 0 ? formatCurrency(Math.abs(netProfit)) : ''}</td>
+                    <td className="px-6 py-4 text-right text-gray-900 text-lg">{netProfit >= 0 ? formatCurrency(netProfit) : ''}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
       </div>

@@ -1,4 +1,27 @@
 module.exports = function registerProductRoutes(app, pool, authenticate, checkPermission) {
+  // Helper function to create journal entry
+  const createJournalEntry = async (connection, transactionId, date, description, items) => {
+    // Create journal entry header
+    const [journalResult] = await connection.query(
+      'INSERT INTO journal_entries (transaction_id, date, description) VALUES (?, ?, ?)',
+      [transactionId, date, description]
+    );
+    const journalId = journalResult.insertId;
+
+    // Insert journal items
+    for (const item of items) {
+      const [accResult] = await connection.query('SELECT id FROM accounts WHERE code = ?', [item.accountCode]);
+      if (accResult.length > 0) {
+        await connection.query(
+          'INSERT INTO journal_items (journal_entry_id, account_id, debit, credit) VALUES (?, ?, ?, ?)',
+          [journalId, accResult[0].id, item.debit || 0, item.credit || 0]
+        );
+      }
+    }
+
+    return journalId;
+  };
+
   app.get(
     '/api/products',
     authenticate,
@@ -250,6 +273,7 @@ module.exports = function registerProductRoutes(app, pool, authenticate, checkPe
     const connection = await pool.getConnection();
     try {
       await connection.beginTransaction();
+      const today = new Date().toISOString().split('T')[0];
 
       for (const item of items) {
         const { id, system_stock, actual_stock } = item;
@@ -260,6 +284,37 @@ module.exports = function registerProductRoutes(app, pool, authenticate, checkPe
             actual_stock,
             id,
           ]);
+
+          // Get product cost price
+          const [productResult] = await connection.query('SELECT cost_price FROM products WHERE id = ?', [id]);
+          const costPrice = productResult[0]?.cost_price || 0;
+          const differenceValue = difference * costPrice;
+
+          // Create journal entry
+          const journalItems = [];
+          if (difference > 0) {
+            // Stock increased: Debit Persediaan, Credit Pendapatan Selisih Stok
+            journalItems.push(
+              { accountCode: '110', debit: differenceValue },
+              { accountCode: '410', credit: differenceValue }
+            );
+          } else {
+            // Stock decreased: Debit Beban Selisih Stok, Credit Persediaan
+            const absValue = Math.abs(differenceValue);
+            journalItems.push(
+              { accountCode: '540', debit: absValue },
+              { accountCode: '110', credit: absValue }
+            );
+          }
+
+          // Get product name for description
+          const [productNameResult] = await connection.query('SELECT name FROM products WHERE id = ?', [id]);
+          const productName = productNameResult[0]?.name || `Produk #${id}`;
+
+          await createJournalEntry(connection, null, today, 
+            `Penyesuaian stok opname: ${productName} (${difference > 0 ? '+' : ''}${difference} pcs)`,
+            journalItems
+          );
 
           await connection.query(
             'INSERT INTO inventory_history (product_id, type, quantity_change, previous_stock, new_stock, note) VALUES (?, ?, ?, ?, ?, ?)',

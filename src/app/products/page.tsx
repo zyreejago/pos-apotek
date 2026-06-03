@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { Search, Filter, Plus, Edit, Trash2, X } from 'lucide-react';
+import { Search, Filter, Plus, Edit, Trash2, X, PackageOpen } from 'lucide-react';
 import { goeyToast } from "@/components/ui/goey-toaster";
 import ConfirmModal from '@/components/ConfirmModal';
 import Header from '@/components/Header';
@@ -17,6 +17,21 @@ interface Product {
   unit: string;
   expired_date: string | null;
   category: string;
+}
+
+interface Batch {
+  id: number;
+  product_id: number;
+  supplier_id: number | null;
+  supplier_name: string | null;
+  batch_number: string | null;
+  stock_type: 'beli_normal' | 'consignment';
+  purchase_date: string | null;
+  initial_quantity: number;
+  remaining_quantity: number;
+  cost_price: number;
+  expired_date: string | null;
+  created_at: string;
 }
 
 interface Pagination {
@@ -36,12 +51,23 @@ interface ProductFormData {
   category: string;
 }
 
+interface BatchFormData {
+  supplier_id: string;
+  batch_number: string;
+  stock_type: 'beli_normal' | 'consignment';
+  purchase_date: string;
+  initial_quantity: string;
+  cost_price: string;
+  expired_date: string;
+}
+
 export default function ProductsPage() {
   const router = useRouter();
   // Permission Check
   const { checkActionPermission } = useRequirePermission('Management Product');
 
   const [products, setProducts] = useState<Product[]>([]);
+  const [suppliers, setSuppliers] = useState<{ id: number; name: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
@@ -56,8 +82,12 @@ export default function ProductsPage() {
 
   // Modal States
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isBatchesModalOpen, setIsBatchesModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<'add' | 'edit'>('add');
+  const [batchModalMode, setBatchModalMode] = useState<'add' | 'edit'>('add');
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [selectedBatch, setSelectedBatch] = useState<Batch | null>(null);
+  const [batches, setBatches] = useState<Batch[]>([]);
 
   // Confirm Modal State
   const [confirmModal, setConfirmModal] = useState({
@@ -66,6 +96,17 @@ export default function ProductsPage() {
     message: '',
     onConfirm: () => {},
     variant: 'danger' as 'danger' | 'warning' | 'info'
+  });
+
+  // Form States
+  const [batchFormData, setBatchFormData] = useState<BatchFormData>({
+    supplier_id: '',
+    batch_number: '',
+    stock_type: 'beli_normal',
+    purchase_date: '',
+    initial_quantity: '',
+    cost_price: '',
+    expired_date: ''
   });
 
   // Form State
@@ -119,9 +160,142 @@ export default function ProductsPage() {
     }
   }, [authHeaders, currentPage, itemsPerPage, debouncedSearchQuery, router]);
 
+  const fetchSuppliers = useCallback(async () => {
+    try {
+      const res = await fetch('http://localhost:5000/api/suppliers', {
+        headers: authHeaders
+      });
+      const data = await res.json();
+      setSuppliers(data.data || []);
+    } catch (error) {
+      console.error('Error fetching suppliers:', error);
+    }
+  }, [authHeaders]);
+
+  const fetchBatches = useCallback(async (productId: number) => {
+    try {
+      const res = await fetch(`http://localhost:5000/api/inventory/batches/${productId}`, {
+        headers: authHeaders
+      });
+      const data = await res.json();
+      setBatches(data.data || []);
+    } catch (error) {
+      console.error('Error fetching batches:', error);
+    }
+  }, [authHeaders]);
+
   useEffect(() => {
     fetchProducts();
-  }, [fetchProducts]);
+    fetchSuppliers();
+  }, [fetchProducts, fetchSuppliers]);
+
+  // Batches Handlers
+  const handleOpenBatchesModal = (product: Product) => {
+    setSelectedProduct(product);
+    fetchBatches(product.id);
+    setIsBatchesModalOpen(true);
+  };
+
+  const handleOpenAddBatchModal = () => {
+    setBatchModalMode('add');
+    setBatchFormData({
+      supplier_id: '',
+      batch_number: '',
+      stock_type: 'beli_normal',
+      purchase_date: new Date().toISOString().split('T')[0],
+      initial_quantity: '',
+      cost_price: selectedProduct?.cost_price.toString() || '',
+      expired_date: ''
+    });
+  };
+
+  const handleOpenEditBatchModal = (batch: Batch) => {
+    setBatchModalMode('edit');
+    setSelectedBatch(batch);
+    setBatchFormData({
+      supplier_id: batch.supplier_id?.toString() || '',
+      batch_number: batch.batch_number || '',
+      stock_type: batch.stock_type,
+      purchase_date: batch.purchase_date || '',
+      initial_quantity: batch.initial_quantity.toString(),
+      cost_price: batch.cost_price.toString(),
+      expired_date: batch.expired_date || ''
+    });
+  };
+
+  const handleBatchInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    setBatchFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleSaveBatch = async () => {
+    if (!selectedProduct) return;
+
+    try {
+      const url = batchModalMode === 'add'
+        ? 'http://localhost:5000/api/inventory/batches'
+        : `http://localhost:5000/api/inventory/batches/${selectedBatch?.id}`;
+      const method = batchModalMode === 'add' ? 'POST' : 'PUT';
+
+      const payload = {
+        product_id: selectedProduct.id,
+        supplier_id: batchFormData.supplier_id ? Number(batchFormData.supplier_id) : null,
+        batch_number: batchFormData.batch_number || null,
+        stock_type: batchFormData.stock_type,
+        purchase_date: batchFormData.purchase_date || null,
+        initial_quantity: Number(batchFormData.initial_quantity),
+        remaining_quantity: batchModalMode === 'edit' ? Number(batchFormData.initial_quantity) : Number(batchFormData.initial_quantity),
+        cost_price: Number(batchFormData.cost_price),
+        expired_date: batchFormData.expired_date || null
+      };
+
+      const res = await fetch(url, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+          ...authHeaders
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (res.ok) {
+        goeyToast.success(`Batch ${batchModalMode === 'add' ? 'ditambahkan' : 'diperbarui'}!`);
+        fetchBatches(selectedProduct.id);
+        fetchProducts();
+        setBatchFormData({
+          supplier_id: '',
+          batch_number: '',
+          stock_type: 'beli_normal',
+          purchase_date: '',
+          initial_quantity: '',
+          cost_price: '',
+          expired_date: ''
+        });
+        setSelectedBatch(null);
+      }
+    } catch (error) {
+      console.error('Error saving batch:', error);
+    }
+  };
+
+  const handleDeleteBatch = async (batch: Batch) => {
+    if (!confirm('Anda yakin ingin menghapus batch ini?')) return;
+
+    try {
+      const res = await fetch(`http://localhost:5000/api/inventory/batches/${batch.id}`, {
+        method: 'DELETE',
+        headers: authHeaders
+      });
+
+      if (res.ok && selectedProduct) {
+        goeyToast.success('Batch dihapus!');
+        fetchBatches(selectedProduct.id);
+        fetchProducts();
+      }
+    } catch (error) {
+      console.error('Error deleting batch:', error);
+    }
+  };
 
   const checkPermission = (action: 'create' | 'edit' | 'delete') => {
     return checkActionPermission(action);
@@ -417,6 +591,15 @@ export default function ProductsPage() {
                       <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                         {checkPermission('edit') && (
                         <button 
+                          onClick={() => handleOpenBatchesModal(product)}
+                          className="p-1 text-green-600 hover:bg-green-50 rounded"
+                          title="Batches"
+                        >
+                          <PackageOpen size={16} />
+                        </button>
+                        )}
+                        {checkPermission('edit') && (
+                        <button 
                           onClick={() => handleOpenEditModal(product)}
                           className="p-1 text-blue-600 hover:bg-blue-50 rounded"
                           title="Edit"
@@ -614,6 +797,219 @@ export default function ProductsPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Batches Modal */}
+      {isBatchesModalOpen && selectedProduct && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-lg w-full max-w-5xl mx-4 max-h-[90vh] overflow-hidden flex flex-col">
+            <div className="flex justify-between items-center p-6 border-b border-gray-100">
+              <div>
+                <h2 className="text-xl font-bold text-gray-800">Batches for {selectedProduct.name}</h2>
+                <p className="text-sm text-gray-500">Total stock: {selectedProduct.stock} {selectedProduct.unit}</p>
+              </div>
+              <button onClick={() => setIsBatchesModalOpen(false)} className="text-gray-400 hover:text-gray-600">
+                <X size={24} />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-auto p-6">
+              <div className="mb-4 flex justify-between items-center">
+                <h3 className="font-semibold text-gray-700">Batch List</h3>
+                <button
+                  onClick={handleOpenAddBatchModal}
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium transition-colors"
+                >
+                  <Plus size={16} /> Add Batch
+                </button>
+              </div>
+
+              {batches.length === 0 ? (
+                <div className="text-center py-10 text-gray-500">
+                  No batches found. Add your first batch!
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm text-left">
+                    <thead className="bg-gray-50 text-gray-500 font-medium">
+                      <tr>
+                        <th className="px-4 py-3">Batch Number</th>
+                        <th className="px-4 py-3">Supplier</th>
+                        <th className="px-4 py-3">Stock Type</th>
+                        <th className="px-4 py-3">Purchase Date</th>
+                        <th className="px-4 py-3">Expired Date</th>
+                        <th className="px-4 py-3">Initial Qty</th>
+                        <th className="px-4 py-3">Remaining Qty</th>
+                        <th className="px-4 py-3">Cost Price</th>
+                        <th className="px-4 py-3 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {batches.map((batch) => (
+                        <tr key={batch.id} className="border-b border-gray-100 hover:bg-gray-50">
+                          <td className="px-4 py-3">{batch.batch_number || '-'}</td>
+                          <td className="px-4 py-3">{batch.supplier_name || '-'}</td>
+                          <td className="px-4 py-3">
+                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                              batch.stock_type === 'beli_normal' 
+                                ? 'bg-blue-100 text-blue-700' 
+                                : 'bg-purple-100 text-purple-700'
+                            }`}>
+                              {batch.stock_type === 'beli_normal' ? 'Normal' : 'Consignment'}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">{batch.purchase_date ? new Date(batch.purchase_date).toLocaleDateString('id-ID') : '-'}</td>
+                          <td className="px-4 py-3">
+                            {batch.expired_date ? new Date(batch.expired_date).toLocaleDateString('id-ID') : '-'}
+                          </td>
+                          <td className="px-4 py-3">{batch.initial_quantity}</td>
+                          <td className="px-4 py-3 font-medium">{batch.remaining_quantity}</td>
+                          <td className="px-4 py-3">{formatCurrency(batch.cost_price)}</td>
+                          <td className="px-4 py-3 text-right">
+                            <div className="flex justify-end gap-2">
+                              <button
+                                onClick={() => handleOpenEditBatchModal(batch)}
+                                className="p-1 text-blue-600 hover:bg-blue-50 rounded"
+                                title="Edit"
+                              >
+                                <Edit size={14} />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteBatch(batch)}
+                                className="p-1 text-red-600 hover:bg-red-50 rounded"
+                                title="Delete"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {/* Batch Form */}
+              {(batchModalMode === 'add' || selectedBatch) && (
+                <div className="mt-6 border-t border-gray-100 pt-6">
+                  <h3 className="font-semibold text-gray-700 mb-4">
+                    {batchModalMode === 'add' ? 'Add New Batch' : 'Edit Batch'}
+                  </h3>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Supplier</label>
+                      <select
+                        name="supplier_id"
+                        value={batchFormData.supplier_id}
+                        onChange={handleBatchInputChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                      >
+                        <option value="">Select Supplier</option>
+                        {suppliers.map((s) => (
+                          <option key={s.id} value={s.id}>{s.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Batch Number</label>
+                      <input
+                        type="text"
+                        name="batch_number"
+                        value={batchFormData.batch_number}
+                        onChange={handleBatchInputChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                        placeholder="Optional"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Stock Type</label>
+                      <select
+                        name="stock_type"
+                        value={batchFormData.stock_type}
+                        onChange={handleBatchInputChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                      >
+                        <option value="beli_normal">Normal Purchase</option>
+                        <option value="consignment">Consignment</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Purchase Date</label>
+                      <input
+                        type="date"
+                        name="purchase_date"
+                        value={batchFormData.purchase_date}
+                        onChange={handleBatchInputChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Initial Quantity</label>
+                      <input
+                        type="number"
+                        name="initial_quantity"
+                        value={batchFormData.initial_quantity}
+                        onChange={handleBatchInputChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                        placeholder="0"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Cost Price</label>
+                      <input
+                        type="number"
+                        name="cost_price"
+                        value={batchFormData.cost_price}
+                        onChange={handleBatchInputChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                        placeholder="0"
+                      />
+                    </div>
+                    <div className="col-span-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Expired Date</label>
+                      <input
+                        type="date"
+                        name="expired_date"
+                        value={batchFormData.expired_date}
+                        onChange={handleBatchInputChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex justify-end gap-3 mt-6">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setBatchFormData({
+                          supplier_id: '',
+                          batch_number: '',
+                          stock_type: 'beli_normal',
+                          purchase_date: '',
+                          initial_quantity: '',
+                          cost_price: '',
+                          expired_date: ''
+                        });
+                        setSelectedBatch(null);
+                        setBatchModalMode('add');
+                      }}
+                      className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleSaveBatch}
+                      className="px-4 py-2 text-white bg-blue-600 hover:bg-blue-700 rounded-lg text-sm font-medium transition-colors"
+                    >
+                      {batchModalMode === 'add' ? 'Add Batch' : 'Save Batch'}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}

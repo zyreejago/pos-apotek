@@ -141,6 +141,9 @@ export default function POSTransactionsPage() {
     setProcessing(true);
     try {
       const token = localStorage.getItem('token');
+      const userStr = localStorage.getItem('user');
+      const currentUser = userStr ? JSON.parse(userStr) : null;
+      
       const payload = {
         items: cart.map(item => ({
           id: item.id,
@@ -192,6 +195,17 @@ export default function POSTransactionsPage() {
                     goeyToast.success('Transaksi Berhasil', {
                       description: `Pembayaran senilai ${formatCurrency(total)} berhasil diproses. ${cart.length} item telah tercatat dalam sistem penjualan.`
                     });
+                    
+                    printReceiptFunction({
+                      id: data.id,
+                      items: cart,
+                      subtotal,
+                      ppn,
+                      discount,
+                      total,
+                      cashierName: currentUser?.username || 'Admin'
+                    });
+                    
                     setCart([]);
                     // Refresh products
                     const prodRes = await fetch('http://localhost:5000/api/products?limit=100', {
@@ -236,6 +250,17 @@ export default function POSTransactionsPage() {
           goeyToast.success('Transaksi Berhasil', {
             description: `Pembayaran senilai ${formatCurrency(total)} berhasil diproses. ${cart.length} item telah tercatat dalam sistem penjualan.`
           });
+          
+          printReceiptFunction({
+            id: data.id,
+            items: cart,
+            subtotal,
+            ppn,
+            discount,
+            total,
+            cashierName: currentUser?.username || 'Admin'
+          });
+          
           setCart([]); // Clear cart
           // Refresh products to update stock
           const prodRes = await fetch('http://localhost:5000/api/products?limit=100', {
@@ -257,6 +282,135 @@ export default function POSTransactionsPage() {
     } finally {
       setProcessing(false);
     }
+  };
+
+  // Print Receipt Function
+  const printReceiptFunction = (receiptData: any) => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+
+    const receiptHTML = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Nota Pembelian</title>
+        <style>
+          body {
+            font-family: monospace;
+            max-width: 300px;
+            margin: 0 auto;
+            padding: 20px;
+          }
+          .header {
+            text-align: center;
+            border-bottom: 1px dashed #000;
+            padding-bottom: 10px;
+            margin-bottom: 10px;
+          }
+          .title {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 5px;
+          }
+          .info {
+            font-size: 12px;
+            margin: 2px 0;
+          }
+          .items {
+            margin: 10px 0;
+            border-bottom: 1px dashed #000;
+          }
+          .item {
+            display: flex;
+            justify-content: space-between;
+            margin: 5px 0;
+          }
+          .summary {
+            margin-top: 10px;
+            border-top: 1px dashed #000;
+            padding-top: 10px;
+          }
+          .summary-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 3px 0;
+          }
+          .total {
+            font-weight: bold;
+            font-size: 14px;
+            margin-top: 5px;
+            border-top: 1px solid #000;
+            padding-top: 5px;
+          }
+          .footer {
+            margin-top: 20px;
+            text-align: center;
+            font-size: 12px;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <div class="title">APOTEK SUMBER WARAS</div>
+          <div class="info">Jl. Kesehatan No. 123, Karangasem</div>
+          <div class="info">Telp: (021) 12345678</div>
+        </div>
+        
+        <div class="info">ID Transaksi: ${receiptData.id}</div>
+        <div class="info">Tanggal: ${new Date().toLocaleString('id-ID')}</div>
+        <div class="info">Kasir: ${receiptData.cashierName}</div>
+        
+        <div class="items">
+          ${receiptData.items.map((item: any) => `
+            <div class="item">
+              <span>${item.name} x${item.quantity}</span>
+              <span>${formatCurrency(item.selling_price * item.quantity)}</span>
+            </div>
+          `).join('')}
+        </div>
+        
+        <div class="summary">
+          <div class="summary-row">
+            <span>Subtotal</span>
+            <span>${formatCurrency(receiptData.subtotal)}</span>
+          </div>
+          ${receiptData.ppn > 0 ? `
+            <div class="summary-row">
+              <span>PPN</span>
+              <span>${formatCurrency(receiptData.ppn)}</span>
+            </div>
+          ` : ''}
+          ${receiptData.discount > 0 ? `
+            <div class="summary-row">
+              <span>Diskon</span>
+              <span>-${formatCurrency(receiptData.discount)}</span>
+            </div>
+          ` : ''}
+          <div class="summary-row total">
+            <span>Total</span>
+            <span>${formatCurrency(receiptData.total)}</span>
+          </div>
+        </div>
+        
+        <div class="footer">
+          <p>Terima kasih atas kunjungan Anda!</p>
+          <p>Semoga cepat sembuh</p>
+        </div>
+        
+        <script>
+          window.onload = function() {
+            window.print();
+            setTimeout(function() {
+              window.close();
+            }, 500);
+          };
+        </script>
+      </body>
+      </html>
+    `;
+
+    printWindow.document.write(receiptHTML);
+    printWindow.document.close();
   };
 
   return (
@@ -389,31 +543,31 @@ export default function POSTransactionsPage() {
             </div>
 
             <div className="mb-4">
-                <label className="text-sm font-medium text-gray-700 mb-2 block">Metode Pembayaran</label>
-                <div className="grid grid-cols-2 gap-2">
-                    <button
-                        onClick={() => setPaymentMethod('cash')}
-                        className={`p-3 rounded-xl border-2 transition-all ${
-                            paymentMethod === 'cash' 
-                                ? 'border-blue-600 bg-blue-50 text-blue-700' 
-                                : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
-                        }`}
-                    >
-                        <div className="font-semibold text-sm">Cash</div>
-                        <div className="text-xs opacity-75">Tunai</div>
-                    </button>
-                    <button
-                        onClick={() => setPaymentMethod('midtrans')}
-                        className={`p-3 rounded-xl border-2 transition-all ${
-                            paymentMethod === 'midtrans' 
-                                ? 'border-green-600 bg-green-50 text-green-700' 
-                                : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
-                        }`}
-                    >
-                        <div className="font-semibold text-sm">Midtrans</div>
-                        <div className="text-xs opacity-75">Transfer/QRIS</div>
-                    </button>
-                </div>
+              <label className="text-sm font-medium text-gray-700 mb-2 block">Metode Pembayaran</label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => setPaymentMethod('cash')}
+                  className={`p-3 rounded-xl border-2 transition-all ${
+                    paymentMethod === 'cash' 
+                      ? 'border-blue-600 bg-blue-50 text-blue-700' 
+                      : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+                  }`}
+                >
+                  <div className="font-semibold text-sm">Cash</div>
+                  <div className="text-xs opacity-75">Tunai</div>
+                </button>
+                <button
+                  onClick={() => setPaymentMethod('midtrans')}
+                  className={`p-3 rounded-xl border-2 transition-all ${
+                    paymentMethod === 'midtrans' 
+                      ? 'border-green-600 bg-green-50 text-green-700' 
+                      : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+                  }`}
+                >
+                  <div className="font-semibold text-sm">Midtrans</div>
+                  <div className="text-xs opacity-75">Transfer/QRIS</div>
+                </button>
+              </div>
             </div>
 
             <button 

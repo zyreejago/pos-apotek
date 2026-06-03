@@ -34,6 +34,7 @@ interface Transaction {
   transaction_date: string;
   total_amount: number;
   items: TransactionItem[];
+  cashier_name?: string;
 }
 
 interface ChartData {
@@ -148,19 +149,21 @@ export default function TransactionReportPage() {
       doc.text(`Tanggal Rilis: ${new Date().toLocaleString('id-ID', { dateStyle: 'full', timeStyle: 'short' })}`, 105, 58, { align: "center" });
 
       // 3. Table Content
-      const tableColumn = ["No", "Waktu", "Total", "Detail Item"];
-      const tableRows: (string | number)[][] = [];
+        const tableColumn = ["No", "ID Transaksi", "Waktu", "Kasir", "Total", "Detail Item"];
+        const tableRows: (string | number)[][] = [];
 
-      data.transactions.forEach((t, index) => {
-        const transactionData = [
-          index + 1,
-          formatDate(t.transaction_date),
-          formatCurrency(t.total_amount),
-          // Format items as a simple list string
-          t.items.map((i) => `${i.product_name} (${i.quantity}x)`).join(', ')
-        ];
-        tableRows.push(transactionData);
-      });
+        data.transactions.forEach((t, index) => {
+          const transactionData = [
+            index + 1,
+            t.id,
+            formatDate(t.transaction_date),
+            t.cashier_name || '-',
+            formatCurrency(t.total_amount),
+            // Format items as a simple list string
+            t.items.map((i) => `${i.product_name} (${i.quantity}x)`).join(', ')
+          ];
+          tableRows.push(transactionData);
+        });
 
       autoTable(doc, {
         head: [tableColumn],
@@ -348,7 +351,9 @@ export default function TransactionReportPage() {
                 <table className="w-full text-left text-sm">
                     <thead>
                         <tr className="bg-gray-50 text-gray-500 font-medium border-b border-gray-100">
+                            <th className="px-6 py-4">ID Transaksi</th>
                             <th className="px-6 py-4">Waktu</th>
+                            <th className="px-6 py-4">Kasir</th>
                             <th className="px-6 py-4">Detail Item</th>
                             <th className="px-6 py-4 text-right">Total</th>
                         </tr>
@@ -356,16 +361,18 @@ export default function TransactionReportPage() {
                     <tbody className="divide-y divide-gray-50">
                         {loading ? (
                             <tr>
-                                <td colSpan={3} className="px-6 py-8 text-center text-gray-500">Loading data...</td>
+                                <td colSpan={5} className="px-6 py-8 text-center text-gray-500">Loading data...</td>
                             </tr>
                         ) : data.transactions.length === 0 ? (
                             <tr>
-                                <td colSpan={3} className="px-6 py-8 text-center text-gray-500">Tidak ada transaksi pada periode ini</td>
+                                <td colSpan={5} className="px-6 py-8 text-center text-gray-500">Tidak ada transaksi pada periode ini</td>
                             </tr>
                         ) : (
                             data.transactions.map((t) => (
                                 <tr key={t.id} className="hover:bg-gray-50 transition-colors">
+                                    <td className="px-6 py-4 text-gray-600 align-top whitespace-nowrap font-medium">{t.id}</td>
                                     <td className="px-6 py-4 text-gray-600 align-top whitespace-nowrap">{formatDate(t.transaction_date)}</td>
+                                    <td className="px-6 py-4 text-gray-600 align-top">{t.cashier_name || '-'}</td>
                                     <td className="px-6 py-4 text-gray-600 align-top">
                                       <ul className="list-disc list-inside space-y-1">
                                         {t.items.map((item, idx: number) => (

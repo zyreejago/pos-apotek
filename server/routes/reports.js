@@ -70,7 +70,7 @@ module.exports = function registerReportRoutes(app, pool, authenticate, checkPer
         expenses: {
           total: otherExpenses,
           details: [
-            { label: 'Biaya Operasional (Demo)', amount: otherExpenses },
+            { label: 'Beban Operasional (Demo)', amount: otherExpenses },
           ],
         },
         net_profit:
@@ -80,6 +80,200 @@ module.exports = function registerReportRoutes(app, pool, authenticate, checkPer
       });
     } catch (error) {
       console.error('Error generating financial report:', error);
+      res.status(500).json({ message: 'Server error' });
+    }
+    }
+  );
+
+  // New: Profit Loss with Debit/Credit format
+  app.get(
+    '/api/financial/profit-loss-accounting',
+    authenticate,
+    checkPermission('Sales Report', 'show'),
+    async (req, res) => {
+    const { month, year } = req.query;
+    if (!month || !year) {
+      return res.status(400).json({ message: 'Month and year are required' });
+    }
+
+    try {
+      const connection = await pool.getConnection();
+      const startDate = `${year}-${String(month).padStart(2, '0')}-01`;
+      const endDate = new Date(parseInt(year), parseInt(month), 0).toISOString().split('T')[0];
+
+      // Get journal entries for the period, grouped by account
+      const [journalData] = await connection.query(
+        `
+        SELECT a.code, a.name, a.type, a.normal_balance, 
+               COALESCE(SUM(ji.debit), 0) as total_debit, COALESCE(SUM(ji.credit), 0) as total_credit
+        FROM accounts a
+        LEFT JOIN journal_items ji ON a.id = ji.account_id
+        LEFT JOIN journal_entries je ON ji.journal_entry_id = je.id
+        WHERE (je.date BETWEEN ? AND ? OR je.date IS NULL)
+        GROUP BY a.id
+        ORDER BY a.code
+      `, [startDate, endDate]);
+
+      connection.release();
+
+      res.json({
+        period: { month, year, startDate, endDate },
+        accounts: journalData
+      });
+    } catch (error) {
+      console.error('Error generating accounting profit loss:', error);
+      res.status(500).json({ message: 'Server error' });
+    }
+    }
+  );
+
+  // New: Balance Sheet with Debit/Credit format
+  app.get(
+    '/api/reports/balance-accounting',
+    authenticate,
+    checkPermission('Sales Report', 'show'),
+    async (req, res) => {
+    const { month, year } = req.query;
+    const endDate = new Date(parseInt(year), parseInt(month), 0).toISOString().split('T')[0];
+    const startDate = `${year}-01-01`;
+
+    try {
+      const connection = await pool.getConnection();
+      
+      // Get all accounts with cumulative balances
+      let [accounts] = await connection.query(
+        `
+        SELECT a.*, 
+               COALESCE(SUM(ji.debit), 0) as total_debit, 
+               COALESCE(SUM(ji.credit), 0) as total_credit
+        FROM accounts a
+        LEFT JOIN journal_items ji ON a.id = ji.account_id
+        LEFT JOIN journal_entries je ON ji.journal_entry_id = je.id
+        WHERE je.date <= ? OR je.date IS NULL
+        GROUP BY a.id
+        ORDER BY a.code
+      `, [endDate]);
+
+      // Calculate net profit for the current year (from Jan to selected month)
+      const [profitLossAccounts] = await connection.query(
+        `
+        SELECT a.*, 
+               COALESCE(SUM(ji.debit), 0) as total_debit, 
+               COALESCE(SUM(ji.credit), 0) as total_credit
+        FROM accounts a
+        LEFT JOIN journal_items ji ON a.id = ji.account_id
+        LEFT JOIN journal_entries je ON ji.journal_entry_id = je.id
+        WHERE (je.date BETWEEN ? AND ?) AND a.type IN ('pendapatan', 'beban')
+        GROUP BY a.id
+        ORDER BY a.code
+      `, [startDate, endDate]);
+
+      // Calculate net profit
+      let totalRevenue = 0;
+      let totalExpenses = 0;
+      
+      profitLossAccounts.forEach(acc => {
+        const balance = acc.normal_balance === 'debit' 
+        ? acc.total_debit - acc.total_credit 
+        : acc.total_credit - acc.total_debit;
+        if (acc.type === 'pendapatan') {
+          totalRevenue += balance;
+        } else if (acc.type === 'beban') {
+          totalExpenses += balance;
+        }
+      });
+
+      const netProfit = totalRevenue - totalExpenses;
+
+      // Find Laba Tahun Berjalan account
+      const profitAcc = accounts.find(a => a.code === '311');
+      if (profitAcc) {
+        // Add net profit to Laba Tahun Berjalan
+        if (profitAcc.normal_balance === 'debit') {
+          if (netProfit >= 0) {
+            profitAcc.total_credit += netProfit;
+          } else {
+            profitAcc.total_debit += Math.abs(netProfit);
+          }
+        } else {
+          if (netProfit >= 0) {
+            profitAcc.total_credit += netProfit;
+          } else {
+            profitAcc.total_debit += Math.abs(netProfit);
+          }
+        }
+      } else {
+        // If account doesn't exist, add it
+        accounts.push({
+          id: 999,
+          code: '311',
+          name: 'Laba Tahun Berjalan',
+          type: 'modal',
+          normal_balance: 'kredit',
+          total_debit: netProfit < 0 ? Math.abs(netProfit) : 0,
+          total_credit: netProfit >= 0 ? netProfit : 0
+        });
+      }
+
+      connection.release();
+
+      res.json({
+        period: { month, year, endDate },
+        accounts
+      });
+    } catch (error) {
+      console.error('Error generating balance sheet accounting:', error);
+      res.status(500).json({ message: 'Server error' });
+    }
+    }
+  );
+
+  // New: General Ledger (Buku Besar)
+  app.get(
+    '/api/accounting/general-ledger',
+    authenticate,
+    checkPermission('Sales Report', 'show'),
+    async (req, res) => {
+    const { month, year, accountId } = req.query;
+    const startDate = `${year}-${String(month).padStart(2, '0')}-01`;
+    const endDate = new Date(parseInt(year), parseInt(month), 0).toISOString().split('T')[0];
+
+    try {
+      const connection = await pool.getConnection();
+
+      let query = `
+        SELECT 
+          je.id, je.date, je.description,
+          a.code, a.name, a.type, a.normal_balance,
+          ji.debit, ji.credit
+        FROM journal_entries je
+        JOIN journal_items ji ON je.id = ji.journal_entry_id
+        JOIN accounts a ON ji.account_id = a.id
+        WHERE je.date BETWEEN ? AND ?
+      `;
+      const params = [startDate, endDate];
+
+      if (accountId) {
+        query += ' AND a.id = ?';
+        params.push(parseInt(accountId));
+      }
+
+      query += ' ORDER BY je.date, je.id, a.code';
+
+      const [ledgerData] = await connection.query(query, params);
+
+      // Get all accounts for dropdown
+      const [accounts] = await connection.query('SELECT * FROM accounts ORDER BY code');
+
+      connection.release();
+
+      res.json({
+        period: { month, year, startDate, endDate },
+        ledger: ledgerData,
+        accounts
+      });
+    } catch (error) {
+      console.error('Error generating general ledger:', error);
       res.status(500).json({ message: 'Server error' });
     }
     }
@@ -103,8 +297,9 @@ module.exports = function registerReportRoutes(app, pool, authenticate, checkPer
 
       const [transactions] = await connection.query(
         `
-      SELECT t.id, t.transaction_date, t.total_amount
+      SELECT t.id, t.transaction_date, t.total_amount, u.username as cashier_name
       FROM transactions t
+      LEFT JOIN users u ON t.user_id = u.id
       WHERE DATE(t.transaction_date) BETWEEN ? AND ?
       ORDER BY t.transaction_date DESC
     `,
@@ -232,4 +427,4 @@ module.exports = function registerReportRoutes(app, pool, authenticate, checkPer
     }
     }
   );
-}
+};

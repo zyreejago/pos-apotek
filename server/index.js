@@ -4,6 +4,7 @@ const dotenv = require('dotenv');
 const path = require('path');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const multer = require('multer');
 const registerUserRoutes = require('./routes/users');
 const registerProductRoutes = require('./routes/products');
 const registerSettingsRoutes = require('./routes/settings');
@@ -14,6 +15,7 @@ const registerPasswordResetRoutes = require('./routes/password-reset');
 const registerProfileRoutes = require('./routes/profile');
 const registerStockForecastRoutes = require('./routes/stock-forecast');
 const registerStockForecastOpenRouterRoutes = require('./routes/stock-forecast-openrouter');
+const registerInventoryRoutes = require('./routes/inventory');
 
 const envPath = path.join(__dirname, '..', '.env');
 console.log('Loading .env from:', envPath);
@@ -27,6 +29,34 @@ const JWT_SECRET = process.env.JWT_SECRET || 'your_super_secret_key';
 
 app.use(cors());
 app.use(express.json());
+
+// Setup multer for file uploads
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, path.join(__dirname, 'uploads'));
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, uniqueSuffix + path.extname(file.originalname));
+  }
+});
+
+const upload = multer({ 
+  storage: storage,
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = /jpeg|jpg|png|gif|webp/;
+    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+    const mimetype = allowedTypes.test(file.mimetype);
+    if (extname && mimetype) {
+      return cb(null, true);
+    } else {
+      cb(new Error('Hanya file gambar yang diizinkan'));
+    }
+  }
+});
+
+// Serve static files from uploads directory
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 app.get('/', (req, res) => {
   res.send('API is running...');
@@ -176,6 +206,7 @@ const RBAC_MODULES = [
   'Substitutions',
   'Suppliers',
   'Stock Opname',
+  'Resep Dokter',
   'System Settings'
 ];
 
@@ -331,6 +362,7 @@ registerSupplierRoutes(app, pool, authenticate, checkPermission);
 registerReportRoutes(app, pool, authenticate, checkPermission);
 registerStockForecastRoutes(app, pool, authenticate, checkPermission);
 registerStockForecastOpenRouterRoutes(app, pool, authenticate, checkPermission);
+registerInventoryRoutes(app, pool, authenticate, checkPermission, upload);
 
 async function startServer() {
   await initDB();

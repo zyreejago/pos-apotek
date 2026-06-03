@@ -243,6 +243,10 @@ export default function Sidebar() {
             {canShow('Suppliers') && (
                 <NavItem href="/suppliers" icon={<Users size={20} />} label="Suppliers" active={isActive('/suppliers')} isCollapsed={isCollapsed} />
             )}
+
+            {canShow('Resep Dokter') && (
+                <NavItem href="/prescriptions" icon={<FileText size={20} />} label="Resep Dokter" active={isActive('/prescriptions')} isCollapsed={isCollapsed} />
+            )}
             
             {canShow('Transactions') && (
                 <NavItem href="/transactions" icon={<ShoppingCart size={20} />} label="Transactions" active={isActive('/transactions')} isCollapsed={isCollapsed} />
@@ -285,6 +289,10 @@ export default function Sidebar() {
                         <Link href="/reports/transactions" className={`flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer ${isActive('/reports/transactions') ? 'bg-blue-50 text-blue-600' : 'text-slate-500 hover:text-slate-700 hover:bg-gray-50'}`}>
                             <div className={`w-1.5 h-1.5 rounded-full ${isActive('/reports/transactions') ? 'bg-blue-600' : 'bg-transparent border border-slate-400'}`}></div>
                             <span className="font-medium text-sm">Laporan Transaksi</span>
+                        </Link>
+                        <Link href="/reports/general-ledger" className={`flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer ${isActive('/reports/general-ledger') ? 'bg-blue-50 text-blue-600' : 'text-slate-500 hover:text-slate-700 hover:bg-gray-50'}`}>
+                            <div className={`w-1.5 h-1.5 rounded-full ${isActive('/reports/general-ledger') ? 'bg-blue-600' : 'bg-transparent border border-slate-400'}`}></div>
+                            <span className="font-medium text-sm">Buku Besar</span>
                         </Link>
                     </div>
                 )}

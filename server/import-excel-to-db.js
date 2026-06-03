@@ -16,6 +16,22 @@ function loadMonthlySalesFromXlsx(xlsxPath) {
   const salesByName = new Map();
   let allDates = [];
 
+  // Map sheet names to month numbers
+  const sheetToMonth = {
+    'jan': 1, 'januari': 1,
+    'feb': 2, 'februari': 2,
+    'mar': 3, 'maret': 3,
+    'apr': 4, 'april': 4,
+    'mei': 5,
+    'jun': 6, 'juni': 6,
+    'jul': 7, 'juli': 7,
+    'agu': 8, 'agustus': 8,
+    'sep': 9, 'september': 9,
+    'okt': 10, 'oktober': 10,
+    'nov': 11, 'november': 11,
+    'des': 12, 'desember': 12
+  };
+
   for (const sheetName of wb.SheetNames) {
     if (sheetName.toLowerCase() === 'supplier') continue;
     const ws = wb.Sheets[sheetName];
@@ -24,15 +40,35 @@ function loadMonthlySalesFromXlsx(xlsxPath) {
     const rows = xlsx.utils.sheet_to_json(ws, { header: 1, defval: '' });
     if (!Array.isArray(rows) || rows.length < 4) continue;
 
+    // Get target month for this sheet
+    const sheetLower = sheetName.toLowerCase().trim();
+    let targetMonth = null;
+    for (const [key, month] of Object.entries(sheetToMonth)) {
+      if (sheetLower.includes(key)) {
+        targetMonth = month;
+        break;
+      }
+    }
+
     const header = rows[2] || [];
     const hasNoColumn = header[0] && header[0].toString().toLowerCase().trim() === 'no';
     const nameColumnIndex = hasNoColumn ? 1 : 0;
     const dateCols = [];
     for (let c = 0; c < header.length; c += 1) {
       const v = header[c];
+      if (typeof v === 'string' && v.toLowerCase().includes('stock')) {
+        continue;
+      }
       if (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v.trim())) {
-        dateCols.push({ c, date: v.trim() });
-        allDates.push(v.trim());
+        const dateStr = v.trim();
+        const date = new Date(dateStr);
+        const year = date.getFullYear();
+        const month = date.getMonth() + 1; // getMonth() is 0-based
+        // Only keep dates that are in 2025 and match the sheet's month
+        if (year === 2025 && targetMonth !== null && month === targetMonth) {
+          dateCols.push({ c, date: dateStr });
+          allDates.push(dateStr);
+        }
       }
     }
 

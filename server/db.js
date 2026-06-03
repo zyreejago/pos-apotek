@@ -121,7 +121,43 @@ const initDB = async () => {
         transaction_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         payment_method VARCHAR(50) DEFAULT 'cash',
         midtrans_order_id VARCHAR(255) NULL,
-        payment_status VARCHAR(50) DEFAULT 'pending'
+        payment_status VARCHAR(50) DEFAULT 'pending',
+        user_id INT NULL,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+      )
+    `);
+
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS accounts (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        code VARCHAR(20) NOT NULL UNIQUE,
+        name VARCHAR(100) NOT NULL,
+        type ENUM('aktiva', 'pasiva', 'modal', 'pendapatan', 'beban') NOT NULL,
+        normal_balance ENUM('debit', 'kredit') NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS journal_entries (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        transaction_id INT NULL,
+        date DATE NOT NULL,
+        description TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (transaction_id) REFERENCES transactions(id) ON DELETE SET NULL
+      )
+    `);
+
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS journal_items (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        journal_entry_id INT NOT NULL,
+        account_id INT NOT NULL,
+        debit DECIMAL(15, 2) DEFAULT 0,
+        credit DECIMAL(15, 2) DEFAULT 0,
+        FOREIGN KEY (journal_entry_id) REFERENCES journal_entries(id) ON DELETE CASCADE,
+        FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE
       )
     `);
 
@@ -201,6 +237,97 @@ const initDB = async () => {
       )
     `);
 
+    // Batches table
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS batches (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        product_id INT NOT NULL,
+        supplier_id INT NULL,
+        batch_number VARCHAR(100) NULL,
+        stock_type ENUM('beli_normal', 'consignment') DEFAULT 'beli_normal',
+        purchase_date DATE NULL,
+        initial_quantity INT NOT NULL DEFAULT 0,
+        remaining_quantity INT NOT NULL DEFAULT 0,
+        cost_price DECIMAL(10, 2) NOT NULL DEFAULT 0,
+        expired_date DATE NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
+        FOREIGN KEY (supplier_id) REFERENCES suppliers(id) ON DELETE SET NULL
+      )
+    `);
+
+    // Prescriptions table
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS prescriptions (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        prescription_code VARCHAR(100) NULL,
+        image_url VARCHAR(255) NULL,
+        prescription_date DATE NULL,
+        entered_by INT NULL,
+        transaction_id INT NULL,
+        notes TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (entered_by) REFERENCES users(id) ON DELETE SET NULL,
+        FOREIGN KEY (transaction_id) REFERENCES transactions(id) ON DELETE SET NULL
+      )
+    `);
+
+    // Purchases table
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS purchases (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        supplier_id INT NOT NULL,
+        total_amount DECIMAL(10, 2) NOT NULL DEFAULT 0,
+        down_payment DECIMAL(10, 2) DEFAULT 0,
+        remaining_debt DECIMAL(10, 2) DEFAULT 0,
+        payment_status ENUM('dp', 'hutang', 'cicilan', 'lunas') DEFAULT 'hutang',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (supplier_id) REFERENCES suppliers(id) ON DELETE CASCADE
+      )
+    `);
+
+    // Purchase items table
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS purchase_items (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        purchase_id INT NOT NULL,
+        product_id INT NOT NULL,
+        batch_id INT NULL,
+        quantity INT NOT NULL,
+        cost_price DECIMAL(10, 2) NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (purchase_id) REFERENCES purchases(id) ON DELETE CASCADE,
+        FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
+        FOREIGN KEY (batch_id) REFERENCES batches(id) ON DELETE SET NULL
+      )
+    `);
+
+    // Purchase payments table
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS purchase_payments (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        purchase_id INT NOT NULL,
+        amount DECIMAL(10, 2) NOT NULL,
+        payment_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        payment_method VARCHAR(50) DEFAULT 'cash',
+        notes TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (purchase_id) REFERENCES purchases(id) ON DELETE CASCADE
+      )
+    `);
+
+    // Queues table
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS queues (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        transaction_id INT NOT NULL,
+        queue_number INT NOT NULL,
+        status ENUM('menunggu', 'diproses', 'siap', 'selesai') DEFAULT 'menunggu',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (transaction_id) REFERENCES transactions(id) ON DELETE CASCADE
+      )
+    `);
+
     await connection.query(`
       CREATE TABLE IF NOT EXISTS system_settings (
         setting_key VARCHAR(50) PRIMARY KEY,
@@ -240,6 +367,56 @@ const initDB = async () => {
     try {
       await connection.query(`ALTER TABLE users ADD COLUMN status VARCHAR(20) DEFAULT 'active'`);
     } catch (e) {}
+    try {
+      await connection.query(`ALTER TABLE transactions ADD COLUMN user_id INT NULL`);
+    } catch (e) {}
+    try {
+      await connection.query(`ALTER TABLE transactions ADD FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL`);
+    } catch (e) {}
+
+    // Seed Chart of Accounts
+    const [accountCount] = await connection.query('SELECT COUNT(*) as count FROM accounts');
+    if (accountCount[0].count === 0) {
+      const accounts = [
+        { code: '101', name: 'Kas', type: 'aktiva', normal_balance: 'debit' },
+        { code: '102', name: 'Bank', type: 'aktiva', normal_balance: 'debit' },
+        { code: '110', name: 'Persediaan Barang', type: 'aktiva', normal_balance: 'debit' },
+        { code: '120', name: 'Piutang Usaha', type: 'aktiva', normal_balance: 'debit' },
+        { code: '201', name: 'Hutang Usaha', type: 'pasiva', normal_balance: 'kredit' },
+        { code: '301', name: 'Modal Awal', type: 'modal', normal_balance: 'kredit' },
+        { code: '310', name: 'Laba Ditahan', type: 'modal', normal_balance: 'kredit' },
+        { code: '311', name: 'Laba Tahun Berjalan', type: 'modal', normal_balance: 'kredit' },
+        { code: '401', name: 'Penjualan', type: 'pendapatan', normal_balance: 'kredit' },
+        { code: '402', name: 'Diskon Penjualan', type: 'pendapatan', normal_balance: 'debit' },
+        { code: '410', name: 'Pendapatan Selisih Stok', type: 'pendapatan', normal_balance: 'kredit' },
+        { code: '501', name: 'Harga Pokok Penjualan', type: 'beban', normal_balance: 'debit' },
+        { code: '510', name: 'Beban Gaji', type: 'beban', normal_balance: 'debit' },
+        { code: '520', name: 'Beban Sewa', type: 'beban', normal_balance: 'debit' },
+        { code: '530', name: 'Beban Listrik', type: 'beban', normal_balance: 'debit' },
+        { code: '540', name: 'Beban Selisih Stok', type: 'beban', normal_balance: 'debit' },
+        { code: '590', name: 'Beban Lain-lain', type: 'beban', normal_balance: 'debit' },
+      ];
+      for (const acc of accounts) {
+        await connection.query('INSERT INTO accounts (code, name, type, normal_balance) VALUES (?, ?, ?, ?)',
+          [acc.code, acc.name, acc.type, acc.normal_balance]);
+      }
+      console.log('Chart of accounts seeded');
+    } else {
+      // Add missing accounts if they don't exist
+      const missingAccounts = [
+        { code: '311', name: 'Laba Tahun Berjalan', type: 'modal', normal_balance: 'kredit' },
+        { code: '410', name: 'Pendapatan Selisih Stok', type: 'pendapatan', normal_balance: 'kredit' },
+        { code: '540', name: 'Beban Selisih Stok', type: 'beban', normal_balance: 'debit' },
+      ];
+      for (const acc of missingAccounts) {
+        const [existing] = await connection.query('SELECT id FROM accounts WHERE code = ?', [acc.code]);
+        if (existing.length === 0) {
+          await connection.query('INSERT INTO accounts (code, name, type, normal_balance) VALUES (?, ?, ?, ?)',
+            [acc.code, acc.name, acc.type, acc.normal_balance]);
+          console.log(`Added missing account: ${acc.code} - ${acc.name}`);
+        }
+      }
+    }
 
     const [suppliers] = await connection.query('SELECT * FROM suppliers');
     if (suppliers.length === 0) {
