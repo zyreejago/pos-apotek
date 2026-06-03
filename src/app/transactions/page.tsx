@@ -24,6 +24,16 @@ interface CartItem extends Product {
   quantity: number;
 }
 
+interface ReceiptData {
+  id: number;
+  items: CartItem[];
+  subtotal: number;
+  ppn: number;
+  discount: number;
+  total: number;
+  cashierName: string;
+}
+
 export default function POSTransactionsPage() {
   const router = useRouter();
   // Permission Check
@@ -85,9 +95,21 @@ export default function POSTransactionsPage() {
 
   // Cart Logic
   const addToCart = (product: Product) => {
+    if (product.stock <= 0) {
+      goeyToast.error('Stok Habis', {
+        description: `Stok produk ${product.name} habis.`
+      });
+      return;
+    }
     setCart(prev => {
       const existing = prev.find(item => item.id === product.id);
       if (existing) {
+        if (existing.quantity >= product.stock) {
+          goeyToast.error('Stok Tidak Cukup', {
+            description: `Stok produk ${product.name} hanya tersisa ${product.stock} ${product.unit}.`
+          });
+          return prev;
+        }
         return prev.map(item => 
           item.id === product.id 
             ? { ...item, quantity: item.quantity + 1 } 
@@ -118,21 +140,7 @@ export default function POSTransactionsPage() {
     new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(val);
 
   const formatStock = (stock: number, multiplier: number, purchaseUnit: string, baseUnit: string) => {
-    const mult = multiplier || 1;
-    if (mult <= 1) {
-      return `${stock} ${baseUnit}`;
-    }
-    const pUnit = purchaseUnit || 'Box';
-    const bUnit = baseUnit || 'Tablet';
-    const boxes = Math.floor(stock / mult);
-    const remaining = stock % mult;
-    if (boxes > 0 && remaining > 0) {
-      return `${boxes} ${pUnit} ${remaining} ${bUnit}`;
-    } else if (boxes > 0) {
-      return `${boxes} ${pUnit}`;
-    } else {
-      return `${remaining} ${bUnit}`;
-    }
+    return `${stock} ${baseUnit || 'Tablet'}`;
   };
 
   // Calculations
@@ -201,9 +209,8 @@ export default function POSTransactionsPage() {
           const snapToken = urlParts[urlParts.length - 1];
           const orderId = data.order_id || `POS-${Date.now()}`; // Wait, we need backend to return order_id! Let's update backend first!
           
-          // @ts-ignore
-          window.snap.pay(snapToken, {
-            onSuccess: async (result: any) => {
+          (window as Window & { snap: { pay: (token: string, options: Record<string, unknown>) => void } }).snap.pay(snapToken, {
+            onSuccess: async () => {
               try {
                 const statusRes = await fetch(`http://localhost:5000/api/midtrans/status/${orderId}`, {
                   headers: { Authorization: `Bearer ${token}` }
@@ -250,12 +257,12 @@ export default function POSTransactionsPage() {
                 });
               }
             },
-            onPending: (result: any) => {
+            onPending: () => {
               goeyToast.info('Menunggu Pembayaran', {
                 description: 'Silakan selesaikan pembayaran Anda.'
               });
             },
-            onError: (result: any) => {
+            onError: () => {
               goeyToast.error('Pembayaran Gagal', {
                 description: 'Terjadi kesalahan saat memproses pembayaran.'
               });
@@ -305,7 +312,7 @@ export default function POSTransactionsPage() {
   };
 
   // Print Receipt Function
-  const printReceiptFunction = (receiptData: any) => {
+  const printReceiptFunction = (receiptData: ReceiptData) => {
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
 
@@ -381,9 +388,9 @@ export default function POSTransactionsPage() {
         <div class="info">Kasir: ${receiptData.cashierName}</div>
         
         <div class="items">
-          ${receiptData.items.map((item: any) => `
+          ${receiptData.items.map((item: CartItem) => `
             <div class="item">
-              <span>${item.name} x${item.quantity}</span>
+              <span>${item.name} x${item.quantity} ${item.unit}</span>
               <span>${formatCurrency(item.selling_price * item.quantity)}</span>
             </div>
           `).join('')}
@@ -518,7 +525,7 @@ export default function POSTransactionsPage() {
                             >
                                 <Minus size={14} />
                             </button>
-                            <span className="text-sm font-medium w-4 text-center">{item.quantity}</span>
+                            <span className="text-sm font-medium px-2 text-center whitespace-nowrap">{item.quantity} {item.unit}</span>
                             <button 
                                 onClick={(e) => { e.stopPropagation(); updateQuantity(item.id, 1); }}
                                 className="w-6 h-6 flex items-center justify-center hover:bg-white rounded text-gray-600 shadow-sm transition-all"

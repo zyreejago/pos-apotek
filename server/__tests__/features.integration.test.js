@@ -25,7 +25,7 @@ async function loadAppWithMockedDb() {
   });
 
   const mockConnection = {
-    query: jest.fn(),
+    query: jest.fn().mockResolvedValue([[], []]),
     beginTransaction: jest.fn().mockResolvedValue(undefined),
     commit: jest.fn().mockResolvedValue(undefined),
     rollback: jest.fn().mockResolvedValue(undefined),
@@ -33,7 +33,7 @@ async function loadAppWithMockedDb() {
   };
 
   const mockPool = {
-    query: jest.fn(),
+    query: jest.fn().mockResolvedValue([[], []]),
     getConnection: jest.fn().mockResolvedValue(mockConnection),
   };
 

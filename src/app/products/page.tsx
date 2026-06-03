@@ -86,6 +86,7 @@ interface ProductFormData {
   invoice_number?: string;
   purchase_unit?: string;
   unit_multiplier?: string;
+  purchase_unit_stock?: string;
 }
 
 // For multiple products
@@ -304,7 +305,7 @@ export default function ProductsPage() {
       invoice_number: faktur.invoice_number || '',
       supplier_id: faktur.supplier_id?.toString() || '',
       purchase_date: formatDateForInput(faktur.purchase_date),
-      quantity: faktur.quantity.toString(),
+      quantity: (faktur.quantity / (selectedProduct?.unit_multiplier || 1)).toString(),
       cost_price: faktur.cost_price.toString(),
       stock_type: faktur.stock_type,
       dp_amount: faktur.dp_amount?.toString() || '',
@@ -327,14 +328,19 @@ export default function ProductsPage() {
         : `http://localhost:5000/api/inventory/batches/${selectedFaktur?.id}`;
       const method = fakturModalMode === 'add' ? 'POST' : 'PUT';
 
+      // Convert from purchase unit (box) to base unit (tablet)
+      // e.g. 20 Box × 2 tablet/box = 40 tablet
+      const multiplier = selectedProduct.unit_multiplier || 1;
+      const qtyInBaseUnit = (Number(fakturFormData.quantity) || 0) * multiplier;
+
       const payload = {
         product_id: selectedProduct.id,
         supplier_id: fakturFormData.supplier_id ? Number(fakturFormData.supplier_id) : null,
         batch_number: fakturFormData.invoice_number || null,
         stock_type: fakturFormData.stock_type,
         purchase_date: fakturFormData.purchase_date || null,
-        initial_quantity: Number(fakturFormData.quantity) || 0,
-        remaining_quantity: Number(fakturFormData.quantity) || 0,
+        initial_quantity: qtyInBaseUnit,
+        remaining_quantity: qtyInBaseUnit,
         cost_price: Number(fakturFormData.cost_price) || 0,
         expired_date: null,
         dp_amount: fakturFormData.stock_type === 'dp' && fakturFormData.dp_amount ? Number(fakturFormData.dp_amount) : null,
@@ -424,21 +430,7 @@ export default function ProductsPage() {
   }, [searchQuery]);
 
   const formatStock = (stock: number, multiplier: number, purchaseUnit: string, baseUnit: string) => {
-    const mult = multiplier || 1;
-    if (mult <= 1) {
-      return `${stock} ${baseUnit}`;
-    }
-    const pUnit = purchaseUnit || 'Box';
-    const bUnit = baseUnit || 'Tablet';
-    const boxes = Math.floor(stock / mult);
-    const remaining = stock % mult;
-    if (boxes > 0 && remaining > 0) {
-      return `${boxes} ${pUnit} ${remaining} ${bUnit}`;
-    } else if (boxes > 0) {
-      return `${boxes} ${pUnit}`;
-    } else {
-      return `${remaining} ${bUnit}`;
-    }
+    return `${stock} ${baseUnit || 'Tablet'}`;
   };
 
   const formatCurrency = (value: number) => {
@@ -490,7 +482,8 @@ export default function ProductsPage() {
       purchase_date: new Date().toISOString().split('T')[0],
       invoice_number: '',
       purchase_unit: 'Box',
-      unit_multiplier: '1'
+      unit_multiplier: '1',
+      purchase_unit_stock: ''
     });
     setIsProductOffCanvasOpen(true);
   };
@@ -499,11 +492,13 @@ export default function ProductsPage() {
     setProductOffCanvasMode('edit');
     setIsMultipleProducts(false);
     setSelectedProduct(product);
+    const multiplier = product.unit_multiplier || 1;
+    const calculatedPurchaseStock = (product.stock / multiplier).toString();
     setFormData({
       name: product.name,
       cost_price: product.cost_price.toString(),
       selling_price: product.selling_price.toString(),
-      stock: (product.stock / (product.unit_multiplier || 1)).toString(),
+      stock: product.stock.toString(),
       unit: product.unit || 'Tablet',
       expired_date: product.expired_date ? new Date(product.expired_date).toISOString().split('T')[0] : '',
       location_code: product.location_code || '',
@@ -514,7 +509,8 @@ export default function ProductsPage() {
       due_date: product.due_date ? new Date(product.due_date).toISOString().split('T')[0] : '',
       invoice_number: product.invoice_number || '',
       purchase_unit: product.purchase_unit || 'Box',
-      unit_multiplier: (product.unit_multiplier || 1).toString()
+      unit_multiplier: multiplier.toString(),
+      purchase_unit_stock: calculatedPurchaseStock
     });
     setIsProductOffCanvasOpen(true);
   };
@@ -526,7 +522,23 @@ export default function ProductsPage() {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData(prev => {
+      const updated = { ...prev, [name]: value };
+      if (name === 'purchase_unit_stock') {
+        const pStock = Number(value) || 0;
+        const mult = Number(updated.unit_multiplier) || 1;
+        updated.stock = value === '' ? '' : Math.round(pStock * mult).toString();
+      } else if (name === 'unit_multiplier') {
+        const pStock = Number(updated.purchase_unit_stock) || 0;
+        const mult = Number(value) || 1;
+        updated.stock = updated.purchase_unit_stock === '' ? '' : Math.round(pStock * mult).toString();
+      } else if (name === 'stock') {
+        const bStock = Number(value) || 0;
+        const mult = Number(updated.unit_multiplier) || 1;
+        updated.purchase_unit_stock = value === '' ? '' : (bStock / mult).toString();
+      }
+      return updated;
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -553,7 +565,7 @@ export default function ProductsPage() {
           name: formData.name,
           cost_price: Number(formData.cost_price),
           selling_price: Number(formData.selling_price) || 0,
-          stock: Number(formData.stock) * multiplier,
+          stock: Number(formData.stock),
           unit: formData.unit || 'Tablet',
           expired_date: formData.expired_date || null,
           location_code: formData.location_code || null,
@@ -584,7 +596,7 @@ export default function ProductsPage() {
           );
 
           const multiplier = Number(item.unit_multiplier) || 1;
-          const calculatedStock = Number(item.stock) * multiplier;
+          const calculatedStock = Number(item.stock);
 
           let productId = null;
           if (existingProduct) {
@@ -1001,20 +1013,6 @@ export default function ProductsPage() {
                 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Stock (Dalam {formData.purchase_unit || 'Box'})</label>
-                    <input
-                      type="number"
-                      name="stock"
-                      required
-                      min="0"
-                      value={formData.stock}
-                      onChange={handleInputChange}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                      placeholder="0"
-                    />
-                  </div>
-                  
-                  <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Unit Pembelian</label>
                     <select
                       name="purchase_unit"
@@ -1029,9 +1027,7 @@ export default function ProductsPage() {
                       <option value="Pcs">Pcs</option>
                     </select>
                   </div>
-                </div>
 
-                <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Unit Dasar</label>
                     <select
@@ -1051,7 +1047,9 @@ export default function ProductsPage() {
                       <option value="Pcs">Pcs</option>
                     </select>
                   </div>
+                </div>
 
+                <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Isi per Unit Pembelian</label>
                     <input
@@ -1064,6 +1062,40 @@ export default function ProductsPage() {
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                       placeholder="1"
                     />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Stok (Dalam {formData.purchase_unit || 'Box'})</label>
+                    <input
+                      type="number"
+                      name="purchase_unit_stock"
+                      min="0"
+                      value={formData.purchase_unit_stock}
+                      onChange={handleInputChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                      placeholder="0"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Stok (Dalam {formData.unit || 'Tablet'}) <span className="text-xs text-gray-400 font-normal">(Unit Dasar)</span>
+                    </label>
+                    <input
+                      type="number"
+                      name="stock"
+                      required
+                      min="0"
+                      value={formData.stock}
+                      onChange={handleInputChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                      placeholder="0"
+                    />
+                  </div>
+                  <div>
+                    {/* Placeholder to balance the row */}
                   </div>
                 </div>
                 
@@ -1113,47 +1145,51 @@ export default function ProductsPage() {
                   </select>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Supplier</label>
-                    <select
-                      name="supplier_id"
-                      value={formData.supplier_id}
-                      onChange={handleInputChange}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                    >
-                      <option value="">Select Supplier</option>
-                      {suppliers.map((s) => (
-                        <option key={s.id} value={s.id}>{s.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Stock Type</label>
-                    <select
-                      name="stock_type"
-                      value={formData.stock_type}
-                      onChange={handleInputChange}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                    >
-                      <option value="belum_bayar">Belum Bayar</option>
-                      <option value="konsinyasi">Konsinyasi</option>
-                      <option value="dp">DP</option>
-                      <option value="lunas">Lunas</option>
-                    </select>
-                  </div>
-                </div>
+                {productOffCanvasMode === 'add' && (
+                  <React.Fragment>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Supplier</label>
+                        <select
+                          name="supplier_id"
+                          value={formData.supplier_id}
+                          onChange={handleInputChange}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                        >
+                          <option value="">Select Supplier</option>
+                          {suppliers.map((s) => (
+                            <option key={s.id} value={s.id}>{s.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Stock Type</label>
+                        <select
+                          name="stock_type"
+                          value={formData.stock_type}
+                          onChange={handleInputChange}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                        >
+                          <option value="belum_bayar">Belum Bayar</option>
+                          <option value="konsinyasi">Konsinyasi</option>
+                          <option value="dp">DP</option>
+                          <option value="lunas">Lunas</option>
+                        </select>
+                      </div>
+                    </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Purchase Date</label>
-                  <input
-                    type="date"
-                    name="purchase_date"
-                    value={formData.purchase_date}
-                    onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                  />
-                </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Purchase Date</label>
+                      <input
+                        type="date"
+                        name="purchase_date"
+                        value={formData.purchase_date}
+                        onChange={handleInputChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                      />
+                    </div>
+                  </React.Fragment>
+                )}
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Expired Date</label>
@@ -1166,8 +1202,8 @@ export default function ProductsPage() {
                   />
                 </div>
 
-                {/* DP Fields (only show if stock type is DP) */}
-                {formData.stock_type === 'dp' && (
+                {/* DP Fields (only show if stock type is DP and in ADD mode) */}
+                {productOffCanvasMode === 'add' && formData.stock_type === 'dp' && (
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">DP Amount (IDR)</label>
@@ -1263,16 +1299,6 @@ export default function ProductsPage() {
                       />
                     </div>
                     <div>
-                      <label className="block text-xs text-gray-600 mb-1">Stock ({formData.purchase_unit || 'Box'})</label>
-                      <input
-                        type="number"
-                        value={formData.stock}
-                        onChange={(e) => setFormData({ ...formData, stock: e.target.value })}
-                        className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm"
-                        placeholder="0"
-                      />
-                    </div>
-                    <div>
                       <label className="block text-xs text-gray-600 mb-1">Unit Pembelian</label>
                       <select
                         value={formData.purchase_unit}
@@ -1310,9 +1336,56 @@ export default function ProductsPage() {
                         type="number"
                         min="1"
                         value={formData.unit_multiplier}
-                        onChange={(e) => setFormData({ ...formData, unit_multiplier: e.target.value })}
+                        onChange={(e) => {
+                          const multVal = e.target.value;
+                          const mult = Number(multVal) || 1;
+                          const pStock = Number(formData.purchase_unit_stock) || 0;
+                          setFormData({
+                            ...formData,
+                            unit_multiplier: multVal,
+                            stock: formData.purchase_unit_stock === '' ? '' : Math.round(pStock * mult).toString()
+                          });
+                        }}
                         className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm"
                         placeholder="1"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-600 mb-1">Stock ({formData.purchase_unit || 'Box'})</label>
+                      <input
+                        type="number"
+                        value={formData.purchase_unit_stock || ''}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          const pStock = Number(val) || 0;
+                          const mult = Number(formData.unit_multiplier) || 1;
+                          setFormData({
+                            ...formData,
+                            purchase_unit_stock: val,
+                            stock: val === '' ? '' : Math.round(pStock * mult).toString()
+                          });
+                        }}
+                        className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm"
+                        placeholder="0"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-600 mb-1">Stock ({formData.unit || 'Tablet'}) <span className="text-[10px] text-gray-400 font-normal">(Unit Dasar)</span></label>
+                      <input
+                        type="number"
+                        value={formData.stock || ''}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          const bStock = Number(val) || 0;
+                          const mult = Number(formData.unit_multiplier) || 1;
+                          setFormData({
+                            ...formData,
+                            stock: val,
+                            purchase_unit_stock: val === '' ? '' : (bStock / mult).toString()
+                          });
+                        }}
+                        className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm"
+                        placeholder="0"
                       />
                     </div>
                     <div>
@@ -1405,7 +1478,8 @@ export default function ProductsPage() {
                         dp_amount: '',
                         due_date: '',
                         purchase_unit: 'Box',
-                        unit_multiplier: '1'
+                        unit_multiplier: '1',
+                        purchase_unit_stock: ''
                       });
                     }}
                     className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-md transition-colors"
@@ -1548,7 +1622,9 @@ export default function ProductsPage() {
                           ? new Date(faktur.due_date).toLocaleDateString('id-ID') 
                           : '-'}
                       </td>
-                      <td className="px-4 py-3">{faktur.quantity}</td>
+                      <td className="px-4 py-3">
+                        <span>{faktur.quantity} {selectedProduct?.unit || 'Tablet'}</span>
+                      </td>
                       <td className="px-4 py-3">{formatCurrency(faktur.cost_price)}</td>
                       <td className="px-4 py-3 font-medium">{formatCurrency(faktur.total_amount)}</td>
                       <td className="px-4 py-3 text-right">
@@ -1633,7 +1709,9 @@ export default function ProductsPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Jumlah</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Jumlah (dalam {selectedProduct?.purchase_unit || 'Box'})
+                  </label>
                   <input
                     type="number"
                     name="quantity"
@@ -1641,7 +1719,13 @@ export default function ProductsPage() {
                     onChange={handleFakturInputChange}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                     placeholder="0"
+                    min="0"
                   />
+                  {(selectedProduct?.unit_multiplier || 1) > 1 && fakturFormData.quantity && (
+                    <p className="text-xs text-blue-600 mt-1">
+                      = {Number(fakturFormData.quantity) * (selectedProduct?.unit_multiplier || 1)} {selectedProduct?.unit || 'Tablet'} (total satuan dasar)
+                    </p>
+                  )}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Harga Beli</label>

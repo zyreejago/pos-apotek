@@ -311,7 +311,7 @@ module.exports = function registerReportRoutes(app, pool, authenticate, checkPer
       if (transactionIds.length > 0) {
         const [itemRows] = await connection.query(
           `
-        SELECT ti.transaction_id, ti.quantity, ti.price, p.name as product_name
+        SELECT ti.transaction_id, ti.quantity, ti.price, p.name as product_name, p.unit as product_unit
         FROM transaction_items ti
         JOIN products p ON ti.product_id = p.id
         WHERE ti.transaction_id IN (?)

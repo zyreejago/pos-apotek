@@ -27,6 +27,7 @@ interface TransactionItem {
   product_name: string;
   quantity: number;
   price: number;
+  product_unit?: string;
 }
 
 interface Transaction {
@@ -160,7 +161,7 @@ export default function TransactionReportPage() {
             t.cashier_name || '-',
             formatCurrency(t.total_amount),
             // Format items as a simple list string
-            t.items.map((i) => `${i.product_name} (${i.quantity}x)`).join(', ')
+            t.items.map((i) => `${i.product_name} (${i.quantity} ${i.product_unit || ''})`).join(', ')
           ];
           tableRows.push(transactionData);
         });
@@ -378,7 +379,7 @@ export default function TransactionReportPage() {
                                         {t.items.map((item, idx: number) => (
                                           <li key={idx} className="text-sm">
                                             <span className="font-medium text-gray-800">{item.product_name}</span>
-                                            <span className="text-gray-500 ml-1">x {item.quantity}</span>
+                                            <span className="text-gray-500 ml-1">x {item.quantity} {item.product_unit}</span>
                                             <span className="text-gray-400 text-xs ml-2">(@ {formatCurrency(item.price)})</span>
                                           </li>
                                         ))}
