@@ -779,7 +779,7 @@ describe('users module', () => {
 
     fireEvent.click(editButtons[0]);
 
-    mockCheckPermission.mockImplementation((action: string) => {
+    mockCheckPermission.mockImplementation((action?: string) => {
       if (action === 'edit') return false;
       return true;
     });
@@ -801,7 +801,7 @@ describe('users module', () => {
 
     fireEvent.click(deleteButtons[0]);
 
-    mockCheckPermission.mockImplementation((action: string) => {
+    mockCheckPermission.mockImplementation((action?: string) => {
       if (action === 'delete') return false;
       return true;
     });
@@ -817,7 +817,7 @@ describe('users module', () => {
   });
 
   test('hides create button when create permission is false', async () => {
-    mockCheckPermission.mockImplementation((action: string) => action !== 'create');
+    mockCheckPermission.mockImplementation((action?: string) => action !== 'create');
 
     renderUsersPage();
 
@@ -826,7 +826,7 @@ describe('users module', () => {
   });
 
   test('hides edit button when edit permission is false', async () => {
-    mockCheckPermission.mockImplementation((action: string) => action !== 'edit');
+    mockCheckPermission.mockImplementation((action?: string) => action !== 'edit');
 
     renderUsersPage();
 
@@ -835,7 +835,7 @@ describe('users module', () => {
   });
 
   test('hides delete button when delete permission is false', async () => {
-    mockCheckPermission.mockImplementation((action: string) => action !== 'delete');
+    mockCheckPermission.mockImplementation((action?: string) => action !== 'delete');
 
     renderUsersPage();
 

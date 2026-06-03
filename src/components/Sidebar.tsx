@@ -218,7 +218,7 @@ export default function Sidebar() {
             <div>
                 <button 
                     onClick={() => {
-                        if (isCollapsed) setIsCollapsed(false);
+                        if (isCollapsed) toggleSidebar();
                         setIsSettingsOpen(!isSettingsOpen);
                     }}
                     className={`w-full flex items-center ${isCollapsed ? 'justify-center' : 'justify-between'} px-3 py-2.5 rounded-lg transition-colors group ${pathname.startsWith('/settings') ? 'bg-gray-50' : 'hover:bg-gray-50'}`}
@@ -279,7 +279,7 @@ export default function Sidebar() {
             <div>
                 <button 
                     onClick={() => {
-                        if (isCollapsed) setIsCollapsed(false);
+                        if (isCollapsed) toggleSidebar();
                         setIsReportOpen(!isReportOpen);
                     }}
                     className={`w-full flex items-center ${isCollapsed ? 'justify-center' : 'justify-between'} px-3 py-2.5 rounded-lg transition-colors group ${pathname.startsWith('/reports') ? 'bg-gray-50' : 'hover:bg-gray-50'}`}
@@ -329,7 +329,7 @@ export default function Sidebar() {
             <div>
                 <button 
                     onClick={() => {
-                        if (isCollapsed) setIsCollapsed(false);
+                        if (isCollapsed) toggleSidebar();
                         setIsSettingsOpen(!isSettingsOpen);
                     }}
                     className={`w-full flex items-center ${isCollapsed ? 'justify-center' : 'justify-between'} px-3 py-2.5 rounded-lg transition-colors group ${pathname.startsWith('/settings') ? 'bg-gray-50' : 'hover:bg-gray-50'}`}

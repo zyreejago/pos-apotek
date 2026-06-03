@@ -6,7 +6,7 @@ import { Trash2 } from "lucide-react";
 import { goeyToast } from "@/components/ui/goey-toaster";
 import ConfirmModal from "@/components/ConfirmModal";
 import OffCanvas from "@/components/OffCanvas";
-import Header from "@/components/Header";
+import PageHeader from "@/components/PageHeader";
 import { useRequirePermission } from "@/hooks/useRequirePermission";
 
 type Role = { id: number; name: string };
@@ -306,7 +306,7 @@ export default function Page() {
     <div className="flex items-center justify-center min-h-screen bg-gray-50">Loading...</div>
   ) : (
     <div className="bg-gray-50 min-h-screen relative">
-      <Header 
+      <PageHeader 
         title="Role Permissions"
         subtitle="Manage roles and permissions"
         breadcrumbs={[{ label: 'Settings' }, { label: 'Role Permissions' }]}

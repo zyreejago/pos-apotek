@@ -1,8 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { useRouter } from 'next/navigation';
-import { Search, Filter, Plus, Edit, Trash2, FileText, Info } from 'lucide-react';
+import { Search, Plus, Edit, Trash2, FileText, Info } from 'lucide-react';
 import { goeyToast } from "@/components/ui/goey-toaster";
 import ConfirmModal from '@/components/ConfirmModal';
 import PageHeader from '@/components/PageHeader';
@@ -42,6 +41,23 @@ interface Faktur {
   dp_amount: number | null;
   due_date: string | null;
   notes: string | null;
+  created_at: string;
+}
+
+interface DbBatch {
+  id: number;
+  product_id: number;
+  batch_number: string | null;
+  supplier_id: number | null;
+  supplier_name: string | null;
+  purchase_date: string | null;
+  initial_quantity: number;
+  remaining_quantity: number;
+  cost_price: number;
+  stock_type: 'belum_bayar' | 'konsinyasi' | 'dp' | 'lunas';
+  dp_amount: number | null;
+  due_date: string | null;
+  expired_date: string | null;
   created_at: string;
 }
 
@@ -87,7 +103,6 @@ interface FakturFormData {
 }
 
 export default function ProductsPage() {
-  const router = useRouter();
   const { setSearchInputRef } = useKeyboardShortcuts();
   const searchRef = useRef<HTMLInputElement>(null);
 
@@ -226,7 +241,7 @@ export default function ProductsPage() {
       if (res.ok) {
         const json = await res.json();
         // Backend returns `batch_number`, frontend expects `invoice_number` due to refactor
-        const mappedFakturs = (json.data || []).map((batch: any) => ({
+        const mappedFakturs = (json.data || []).map((batch: DbBatch) => ({
           ...batch,
           invoice_number: batch.batch_number,
           quantity: batch.initial_quantity,
@@ -503,14 +518,6 @@ export default function ProductsPage() {
         return;
     }
 
-    // Helper function to get supplier name
-    const getSupplierName = (supplierId: string | number | null) => {
-      if (!supplierId) return null;
-      const id = Number(supplierId);
-      const supplier = suppliers.find(s => s.id === id);
-      return supplier ? supplier.name : null;
-    };
-
     if (productOffCanvasMode === 'edit' && selectedProduct) {
       try {
         const payload = {
@@ -539,7 +546,7 @@ export default function ProductsPage() {
     } else {
       // Add mode
       try {
-        const saveProductAndBatch = async (item: any) => {
+        const saveProductAndBatch = async (item: ProductFormData) => {
           // Check if product with same name exists in database
           const existingProduct = allProducts.find(
             p => p.name.trim().toLowerCase() === item.name.trim().toLowerCase()
@@ -1214,7 +1221,7 @@ export default function ProductsPage() {
                       <label className="block text-xs text-gray-600 mb-1">Stock Type</label>
                       <select
                         value={formData.stock_type}
-                        onChange={(e) => setFormData({ ...formData, stock_type: e.target.value as any })}
+                        onChange={(e) => setFormData({ ...formData, stock_type: e.target.value as ProductFormData['stock_type'] })}
                         className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm"
                       >
                         <option value="belum_bayar">Belum Bayar</option>
