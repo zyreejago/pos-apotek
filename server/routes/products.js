@@ -168,7 +168,7 @@ module.exports = function registerProductRoutes(app, pool, authenticate, checkPe
   app.post(
     '/api/inventory/adjust',
     authenticate,
-    checkPermission('Management Stock', 'edit'),
+    checkPermission('Management Product', 'edit'),
     async (req, res) => {
       const { productId, type, quantity, note } = req.body;
 

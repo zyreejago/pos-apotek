@@ -279,10 +279,7 @@ export default function SuppliersPage() {
                     onChange={(e) => setSearchQuery(e.target.value)}
                     />
                 </div>
-                {/* <button className="px-4 py-2 bg-blue-50 text-blue-600 rounded-lg text-sm font-medium hover:bg-blue-100 flex items-center gap-2">
-                    <Filter size={16} />
-                    Filters
-                </button> */}
+                
                 {checkActionPermission('create') && (
                 <button 
                     onClick={openAddModal}

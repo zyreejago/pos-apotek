@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Search, ShoppingCart, Plus, Minus, X, Store, CreditCard } from 'lucide-react';
+import { Search, ShoppingCart, Plus, Minus, X, CreditCard } from 'lucide-react';
 
 import { goeyToast } from "@/components/ui/goey-toaster";
 import { useRequirePermission } from '@/hooks/useRequirePermission';
@@ -18,11 +18,6 @@ interface Product {
   category: string;
 }
 
-interface Outlet {
-  id: number;
-  name: string;
-}
-
 interface CartItem extends Product {
   quantity: number;
 }
@@ -33,13 +28,12 @@ export default function POSTransactionsPage() {
   const { checkActionPermission } = useRequirePermission('Transactions');
 
   const [products, setProducts] = useState<Product[]>([]);
-  const [outlets, setOutlets] = useState<Outlet[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedOutlet, setSelectedOutlet] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
   const [settings, setSettings] = useState({ ppn_rate: 0, discount_rate: 0 });
+  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'midtrans'>('cash');
 
   // Fetch Data
   useEffect(() => {
@@ -47,15 +41,14 @@ export default function POSTransactionsPage() {
       try {
         const token = localStorage.getItem('token');
         const authHeaders: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
-        const [prodRes, outletRes, settingsRes] = await Promise.all([
+        const [prodRes, settingsRes] = await Promise.all([
           fetch('http://localhost:5000/api/products?limit=100', { headers: authHeaders }), // Get enough products
-          fetch('http://localhost:5000/api/outlets', { headers: authHeaders }),
           fetch(`http://localhost:5000/api/settings?t=${Date.now()}`, {
             headers: authHeaders
           })
         ]);
 
-        if (prodRes.status === 401 || outletRes.status === 401 || settingsRes.status === 401) {
+        if (prodRes.status === 401 || settingsRes.status === 401) {
           localStorage.removeItem('token');
           localStorage.removeItem('user');
           document.cookie = "token=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT";
@@ -69,23 +62,6 @@ export default function POSTransactionsPage() {
         } else if (prodRes.status === 403) {
           goeyToast.error('Akses Ditolak', {
             description: 'Anda tidak memiliki izin untuk melihat daftar produk.'
-          });
-        }
-
-        if (outletRes.ok) {
-          const outletData = await outletRes.json();
-          if (Array.isArray(outletData)) {
-            setOutlets(outletData);
-            if (outletData.length > 0) {
-              setSelectedOutlet(outletData[0].id);
-            }
-          } else {
-            console.error('Outlets data is not an array:', outletData);
-            setOutlets([]);
-          }
-        } else if (outletRes.status === 403) {
-          goeyToast.error('Akses Ditolak', {
-            description: 'Anda tidak memiliki izin untuk melihat daftar outlet.'
           });
         }
 
@@ -161,13 +137,11 @@ export default function POSTransactionsPage() {
     }
 
     if (cart.length === 0) return goeyToast.error('Keranjang Kosong', { description: "Silakan pilih produk terlebih dahulu sebelum melanjutkan pembayaran." });
-    if (!selectedOutlet) return goeyToast.error('Outlet Belum Dipilih', { description: "Harap pilih lokasi outlet untuk transaksi ini." });
 
     setProcessing(true);
     try {
       const token = localStorage.getItem('token');
       const payload = {
-        outlet_id: selectedOutlet,
         items: cart.map(item => ({
           id: item.id,
           quantity: item.quantity,
@@ -176,7 +150,8 @@ export default function POSTransactionsPage() {
         total_amount: total,
         subtotal: subtotal,
         tax_amount: ppn,
-        discount_amount: discount
+        discount_amount: discount,
+        payment_method: paymentMethod
       };
 
       const res = await fetch('http://localhost:5000/api/transactions', {
@@ -193,20 +168,85 @@ export default function POSTransactionsPage() {
         return;
       }
 
+      const data = await res.json();
       if (res.ok) {
-        goeyToast.success('Transaksi Berhasil', {
-          description: `Pembayaran senilai ${formatCurrency(total)} berhasil diproses. ${cart.length} item telah tercatat dalam sistem penjualan.`
-        });
-        setCart([]); // Clear cart
-        // Refresh products to update stock
-        const prodRes = await fetch('http://localhost:5000/api/products?limit=100', {
-          headers: token ? { Authorization: `Bearer ${token}` } : {}
-        });
-        const prodData = await prodRes.json();
-        setProducts(prodData.data || []);
+        if (paymentMethod === 'midtrans' && data.redirect_url) {
+          // Use snap modal instead of redirect
+          // Extract order_id from data (we need to return order_id from backend too!)
+          // First, let's update backend to return order_id, but for now, extract from redirect_url:
+          const urlParts = data.redirect_url.split('/');
+          const snapToken = urlParts[urlParts.length - 1];
+          const orderId = data.order_id || `POS-${Date.now()}`; // Wait, we need backend to return order_id! Let's update backend first!
+          
+          // @ts-ignore
+          window.snap.pay(snapToken, {
+            onSuccess: async (result: any) => {
+              try {
+                const statusRes = await fetch(`http://localhost:5000/api/midtrans/status/${orderId}`, {
+                  headers: { Authorization: `Bearer ${token}` }
+                });
+                
+                if (statusRes.ok) {
+                  const statusData = await statusRes.json();
+                  if (statusData.payment_status === 'completed') {
+                    goeyToast.success('Transaksi Berhasil', {
+                      description: `Pembayaran senilai ${formatCurrency(total)} berhasil diproses. ${cart.length} item telah tercatat dalam sistem penjualan.`
+                    });
+                    setCart([]);
+                    // Refresh products
+                    const prodRes = await fetch('http://localhost:5000/api/products?limit=100', {
+                      headers: token ? { Authorization: `Bearer ${token}` } : {}
+                    });
+                    const prodData = await prodRes.json();
+                    setProducts(prodData.data || []);
+                  } else {
+                    goeyToast.warning('Pembayaran Belum Selesai', {
+                      description: `Status pembayaran: ${statusData.payment_status}`
+                    });
+                  }
+                } else {
+                  goeyToast.error('Gagal Memeriksa Status', {
+                    description: 'Terjadi kesalahan saat memeriksa status pembayaran.'
+                  });
+                }
+              } catch (error) {
+                console.error('Error checking payment status:', error);
+                goeyToast.error('Gagal Memeriksa Status', {
+                  description: 'Periksa koneksi internet Anda dan coba lagi.'
+                });
+              }
+            },
+            onPending: (result: any) => {
+              goeyToast.info('Menunggu Pembayaran', {
+                description: 'Silakan selesaikan pembayaran Anda.'
+              });
+            },
+            onError: (result: any) => {
+              goeyToast.error('Pembayaran Gagal', {
+                description: 'Terjadi kesalahan saat memproses pembayaran.'
+              });
+            },
+            onClose: () => {
+              goeyToast.info('Pembayaran Ditutup', {
+                description: 'Anda menutup halaman pembayaran.'
+              });
+            }
+          });
+        } else {
+          goeyToast.success('Transaksi Berhasil', {
+            description: `Pembayaran senilai ${formatCurrency(total)} berhasil diproses. ${cart.length} item telah tercatat dalam sistem penjualan.`
+          });
+          setCart([]); // Clear cart
+          // Refresh products to update stock
+          const prodRes = await fetch('http://localhost:5000/api/products?limit=100', {
+            headers: token ? { Authorization: `Bearer ${token}` } : {}
+          });
+          const prodData = await prodRes.json();
+          setProducts(prodData.data || []);
+        }
       } else {
         goeyToast.error('Transaksi gagal', {
-            description: "Terjadi kesalahan saat memproses transaksi."
+            description: data.message || "Terjadi kesalahan saat memproses transaksi."
         });
       }
     } catch (error) {
@@ -224,20 +264,6 @@ export default function POSTransactionsPage() {
       {/* Header */}
       <Header 
         breadcrumbs={[{ label: 'Transactions' }, { label: 'Point Of Sales' }]}
-        rightContent={
-            <div className="relative">
-                <Store size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                <select 
-                    className="pl-10 pr-4 py-2 rounded-lg bg-gray-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    value={selectedOutlet || ''}
-                    onChange={(e) => setSelectedOutlet(Number(e.target.value))}
-                >
-                    {outlets.map(o => (
-                        <option key={o.id} value={o.id}>{o.name}</option>
-                    ))}
-                </select>
-            </div>
-        }
       />
 
       <div className="flex flex-1 overflow-hidden">
@@ -359,6 +385,34 @@ export default function POSTransactionsPage() {
                 <div className="flex justify-between text-gray-900 font-bold text-lg pt-2 border-t border-gray-100">
                     <span>Total</span>
                     <span>{formatCurrency(total)}</span>
+                </div>
+            </div>
+
+            <div className="mb-4">
+                <label className="text-sm font-medium text-gray-700 mb-2 block">Metode Pembayaran</label>
+                <div className="grid grid-cols-2 gap-2">
+                    <button
+                        onClick={() => setPaymentMethod('cash')}
+                        className={`p-3 rounded-xl border-2 transition-all ${
+                            paymentMethod === 'cash' 
+                                ? 'border-blue-600 bg-blue-50 text-blue-700' 
+                                : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+                        }`}
+                    >
+                        <div className="font-semibold text-sm">Cash</div>
+                        <div className="text-xs opacity-75">Tunai</div>
+                    </button>
+                    <button
+                        onClick={() => setPaymentMethod('midtrans')}
+                        className={`p-3 rounded-xl border-2 transition-all ${
+                            paymentMethod === 'midtrans' 
+                                ? 'border-green-600 bg-green-50 text-green-700' 
+                                : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+                        }`}
+                    >
+                        <div className="font-semibold text-sm">Midtrans</div>
+                        <div className="text-xs opacity-75">Transfer/QRIS</div>
+                    </button>
                 </div>
             </div>
 

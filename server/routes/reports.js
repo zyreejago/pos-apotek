@@ -103,9 +103,8 @@ module.exports = function registerReportRoutes(app, pool, authenticate, checkPer
 
       const [transactions] = await connection.query(
         `
-      SELECT t.id, t.transaction_date, t.total_amount, o.name as outlet_name
+      SELECT t.id, t.transaction_date, t.total_amount
       FROM transactions t
-      LEFT JOIN outlets o ON t.outlet_id = o.id
       WHERE DATE(t.transaction_date) BETWEEN ? AND ?
       ORDER BY t.transaction_date DESC
     `,
@@ -188,6 +187,11 @@ module.exports = function registerReportRoutes(app, pool, authenticate, checkPer
 
       const totalLiabilities = payables + consignmentDebt;
 
+      const [revenueRows] = await connection.query(
+        'SELECT SUM(total_amount) as total_revenue FROM transactions'
+      );
+      const totalRevenue = Number(revenueRows[0].total_revenue || 0);
+
       const [cogsRows] = await connection.query(
         `
       SELECT SUM(ti.quantity * p.cost_price) as total_cogs
@@ -197,7 +201,7 @@ module.exports = function registerReportRoutes(app, pool, authenticate, checkPer
       );
       const totalCOGS = Number(cogsRows[0].total_cogs || 0);
 
-      const retainedEarnings = cash - totalCOGS;
+      const retainedEarnings = totalRevenue - totalCOGS;
 
       const initialEquity = totalAssets - totalLiabilities - retainedEarnings;
 

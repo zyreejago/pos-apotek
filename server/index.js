@@ -5,7 +5,6 @@ const path = require('path');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const registerUserRoutes = require('./routes/users');
-const registerOutletRoutes = require('./routes/outlets');
 const registerProductRoutes = require('./routes/products');
 const registerSettingsRoutes = require('./routes/settings');
 const registerTransactionRoutes = require('./routes/transactions');
@@ -13,6 +12,8 @@ const registerSupplierRoutes = require('./routes/suppliers');
 const registerReportRoutes = require('./routes/reports');
 const registerPasswordResetRoutes = require('./routes/password-reset');
 const registerProfileRoutes = require('./routes/profile');
+const registerStockForecastRoutes = require('./routes/stock-forecast');
+const registerStockForecastOpenRouterRoutes = require('./routes/stock-forecast-openrouter');
 
 const envPath = path.join(__dirname, '..', '.env');
 console.log('Loading .env from:', envPath);
@@ -27,12 +28,57 @@ const JWT_SECRET = process.env.JWT_SECRET || 'your_super_secret_key';
 app.use(cors());
 app.use(express.json());
 
-initDB()
-  .then(() => console.log('Database initialized successfully'))
-  .catch(err => console.error('Database initialization failed:', err));
-
 app.get('/', (req, res) => {
   res.send('API is running...');
+});
+
+// Register Endpoint
+app.post('/api/register', async (req, res) => {
+  const { username, email, password, confirmPassword } = req.body;
+
+  if (!username || !email || !password) {
+    return res.status(400).json({ message: 'Username, email, dan password harus diisi' });
+  }
+
+  if (password !== confirmPassword) {
+    return res.status(400).json({ message: 'Password dan konfirmasi password tidak cocok' });
+  }
+
+  if (password.length < 6) {
+    return res.status(400).json({ message: 'Password minimal 6 karakter' });
+  }
+
+  try {
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const [result] = await pool.query(
+      'INSERT INTO users (username, email, password, role, status) VALUES (?, ?, ?, ?, ?)',
+      [username, email, hashedPassword, 'user', 'active']
+    );
+
+    const token = jwt.sign(
+      { id: result.insertId, username, email, role: 'user' },
+      JWT_SECRET,
+      { expiresIn: '1d' }
+    );
+
+    res.status(201).json({
+      token,
+      user: {
+        id: result.insertId,
+        username,
+        email,
+        role: 'user',
+        outlet_id: null,
+        can_multi_outlet: false
+      }
+    });
+  } catch (error) {
+    if (error.code === 'ER_DUP_ENTRY') {
+      return res.status(409).json({ message: 'Username atau email sudah digunakan' });
+    }
+    console.error('Register error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
 });
 
 // Login Endpoint
@@ -62,7 +108,15 @@ app.post('/api/login', async (req, res) => {
       expiresIn: '1d'
     });
 
-    res.json({ token, user: { id: user.id, username: user.username, email: user.email, role: user.role } });
+    res.json({ 
+      token, 
+      user: { 
+        id: user.id, 
+        username: user.username, 
+        email: user.email, 
+        role: user.role
+      } 
+    });
   } catch (error) {
     console.error('Login error:', error);
     res.status(500).json({ message: 'Server error' });
@@ -115,8 +169,6 @@ const checkPermission = (moduleName, action) => {
 
 const RBAC_MODULES = [
   'Management Product',
-  'Management Stock',
-  'Outlets',
   'Transactions',
   'Management Pengguna',
   'Sales Report',
@@ -272,13 +324,30 @@ app.put('/api/rbac/permissions', authenticate, requireSuperadmin, async (req, re
 registerUserRoutes(app, pool, bcrypt, authenticate, checkPermission);
 registerPasswordResetRoutes(app, pool, bcrypt);
 registerProfileRoutes(app, pool, bcrypt, authenticate);
-registerOutletRoutes(app, pool, authenticate, checkPermission);
 registerProductRoutes(app, pool, authenticate, checkPermission);
 registerSettingsRoutes(app, pool, authenticate);
 registerTransactionRoutes(app, pool, authenticate, checkPermission);
 registerSupplierRoutes(app, pool, authenticate, checkPermission);
 registerReportRoutes(app, pool, authenticate, checkPermission);
+registerStockForecastRoutes(app, pool, authenticate, checkPermission);
+registerStockForecastOpenRouterRoutes(app, pool, authenticate, checkPermission);
 
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
-});
+async function startServer() {
+  await initDB();
+  if (typeof registerStockForecastRoutes.startWeeklyForecastScheduler === 'function') {
+    registerStockForecastRoutes.startWeeklyForecastScheduler(pool, {
+      xlsxPath: path.join(__dirname, '..', 'NEWWWW1.xlsx'),
+      leadTime: 7,
+      windowSize: 7,
+    });
+  }
+  return app.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}`);
+  });
+}
+
+if (require.main === module) {
+  startServer().catch(err => console.error('Startup failed:', err));
+}
+
+module.exports = { app, startServer, pool };

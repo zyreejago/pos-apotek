@@ -13,8 +13,6 @@ type PermItem = { module: string; create: boolean; edit: boolean; delete: boolea
 
 const MODULE_CONFIG: Record<string, string[]> = {
   'Management Product': ['create', 'edit', 'delete', 'show'],
-  'Management Stock': ['edit', 'show'],
-  'Outlets': ['create', 'edit', 'delete', 'show'],
   'Transactions': ['create', 'show'],
   'Management Pengguna': ['create', 'edit', 'delete', 'show'],
   'Sales Report': ['show'],

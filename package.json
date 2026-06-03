@@ -6,7 +6,19 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test:server": "npm --prefix server test",
+    "test:client": "jest --no-watchman",
+    "test": "npm run test:server && npm run test:client",
+    "test:client:coverage": "jest --no-watchman --coverage",
+    "test:server:coverage": "npm --prefix server run test:coverage",
+    "test:coverage": "npm run test:server:coverage && npm run test:client:coverage",
+    "test:server:coverage:module": "npm --prefix server run test:coverage:module",
+    "test:client:coverage:module": "jest --no-watchman --coverage --collectCoverageFrom=$MODULE",
+    "test:server:modules": "npm --prefix server run test:modules",
+    "test:server:modules:coverage": "npm --prefix server run test:modules:coverage",
+    "test:client:modules": "jest --no-watchman --testPathPatterns=\"__tests__/.*\\.module\\.test\\.(ts|tsx)$\"",
+    "test:client:modules:coverage": "jest --no-watchman --coverage --testPathPatterns=\"__tests__/.*\\.module\\.test\\.(ts|tsx)$\""
   },
   "dependencies": {
     "@google/genai": "^1.34.0",
@@ -24,12 +36,19 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.0",
+    "@types/jest": "^30.0.0",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "babel-plugin-react-compiler": "1.0.0",
     "eslint": "^9",
     "eslint-config-next": "16.1.1",
+    "glob": "^13.0.6",
+    "identity-obj-proxy": "^3.0.0",
+    "jest": "^30.4.2",
+    "jest-environment-jsdom": "^30.4.1",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

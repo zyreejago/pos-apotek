@@ -16,15 +16,7 @@ const initDB = async () => {
   try {
     const connection = await pool.getConnection();
     
-    await connection.query(`
-      CREATE TABLE IF NOT EXISTS outlets (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        name VARCHAR(255) NOT NULL,
-        location VARCHAR(255) NOT NULL,
-        status VARCHAR(50) DEFAULT 'Active',
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
+
 
     await connection.query(`
       CREATE TABLE IF NOT EXISTS users (
@@ -125,10 +117,11 @@ const initDB = async () => {
     await connection.query(`
       CREATE TABLE IF NOT EXISTS transactions (
         id INT AUTO_INCREMENT PRIMARY KEY,
-        outlet_id INT,
         total_amount DECIMAL(10, 2) NOT NULL,
         transaction_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (outlet_id) REFERENCES outlets(id) ON DELETE SET NULL
+        payment_method VARCHAR(50) DEFAULT 'cash',
+        midtrans_order_id VARCHAR(255) NULL,
+        payment_status VARCHAR(50) DEFAULT 'pending'
       )
     `);
 
@@ -141,6 +134,45 @@ const initDB = async () => {
         price DECIMAL(10, 2) NOT NULL,
         FOREIGN KEY (transaction_id) REFERENCES transactions(id) ON DELETE CASCADE,
         FOREIGN KEY (product_id) REFERENCES products(id)
+      )
+    `);
+
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS stock_forecasts (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        product_id INT NOT NULL,
+        source VARCHAR(50) NOT NULL DEFAULT 'db',
+        source_end_date DATE NULL,
+        lead_time INT NOT NULL,
+        window_size INT NOT NULL,
+        metode VARCHAR(20) NOT NULL,
+        alasan_fallback VARCHAR(100) NULL,
+        kebutuhan_7_hari INT NOT NULL,
+        perkiraan_penjualan_per_hari DECIMAL(12, 6) NOT NULL,
+        tambahan_stok INT NOT NULL,
+        satuan VARCHAR(50) NULL,
+        debug_prompt TEXT NULL,
+        debug_response TEXT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_stock_forecasts_product_created (product_id, created_at),
+        FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+      )
+    `);
+    
+    try {
+      await connection.query(`ALTER TABLE stock_forecasts ADD COLUMN debug_prompt TEXT NULL`);
+    } catch (e) {}
+    try {
+      await connection.query(`ALTER TABLE stock_forecasts ADD COLUMN debug_response TEXT NULL`);
+    } catch (e) {}
+
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS forecast_jobs (
+        job_key VARCHAR(50) PRIMARY KEY,
+        last_run_at TIMESTAMP NULL,
+        last_status VARCHAR(20) NULL,
+        last_error VARCHAR(255) NULL,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
       )
     `);
 
@@ -195,9 +227,14 @@ const initDB = async () => {
     try {
       await connection.query(`ALTER TABLE transactions ADD COLUMN subtotal DECIMAL(10, 2) DEFAULT 0`);
     } catch (e) {}
-
     try {
-      await connection.query(`ALTER TABLE users ADD COLUMN outlet_id INT DEFAULT NULL`);
+      await connection.query(`ALTER TABLE transactions ADD COLUMN payment_method VARCHAR(50) DEFAULT 'cash'`);
+    } catch (e) {}
+    try {
+      await connection.query(`ALTER TABLE transactions ADD COLUMN midtrans_order_id VARCHAR(255) NULL`);
+    } catch (e) {}
+    try {
+      await connection.query(`ALTER TABLE transactions ADD COLUMN payment_status VARCHAR(50) DEFAULT 'pending'`);
     } catch (e) {}
 
     try {
@@ -236,26 +273,26 @@ const initDB = async () => {
       await connection.query('DELETE FROM transactions');
       
       const newProducts = [
-        { name: 'Sanmol Tab', stock: 150, expired: '2027-05-01', cost: 2008, unit: 'STRIP' },
-        { name: 'Paracetamol Tab', stock: 200, expired: '2029-05-01', cost: 1859, unit: 'STRIP' },
-        { name: 'Imboost Force Kaplet', stock: 120, expired: '2028-02-01', cost: 6238, unit: 'KAPLET' },
-        { name: 'Vicee Orange', stock: 500, expired: '2027-03-01', cost: 646, unit: 'TABLET' },
-        { name: 'Amlodipine 5mg Tab', stock: 100, expired: '2027-01-06', cost: 2558, unit: 'STRIP' },
-        { name: 'Cetirizine 10 mg Tab', stock: 100, expired: '2027-04-01', cost: 2470, unit: 'STRIP' },
-        { name: 'Paramex Tab', stock: 75, expired: '2027-01-04', cost: 2344, unit: 'STRIP' },
-        { name: 'Enervon C', stock: 75, expired: '2027-03-30', cost: 4609, unit: 'STRIP' },
-        { name: 'Ambroxol Tab', stock: 100, expired: '2028-06-01', cost: 1207, unit: 'STRIP' },
-        { name: 'Metformin Tab', stock: 80, expired: '2027-04-01', cost: 2173, unit: 'STRIP' },
-        { name: 'Demacolin Tab', stock: 150, expired: '2028-11-01', cost: 5200, unit: 'STRIP' },
-        { name: 'Tera-F Tab', stock: 50, expired: '2028-03-01', cost: 4520, unit: 'STRIP' },
-        { name: 'Fasidol Tab', stock: 80, expired: '2029-06-01', cost: 2890, unit: 'STRIP' },
-        { name: 'Hufagripp Flu', stock: 12, expired: '2028-04-01', cost: 21770, unit: 'BOTOL' },
-        { name: 'Kool Fever Anak', stock: 56, expired: '2027-12-01', cost: 5947, unit: 'SACHET' },
-        { name: 'Test Pack One Med', stock: 50, expired: '2028-01-01', cost: 1520, unit: 'STRIP' },
-        { name: 'Caviplex Tab', stock: 60, expired: '2027-01-08', cost: 6934, unit: 'STRIP' },
-        { name: 'Micoral Cr', stock: 52, expired: '2028-05-01', cost: 4460, unit: 'TUBE' },
-        { name: 'Ketokonazole Cr', stock: 24, expired: '2027-06-01', cost: 5100, unit: 'TUBE' },
-        { name: 'Sutra Ok 3 S', stock: 75, expired: '2029-10-01', cost: 7414, unit: 'STRIP' }
+        { name: 'Sanmol Tab', stock: 28, expired: '2027-05-01', cost: 2008, unit: 'STRIP' },
+        { name: 'Paracetamol Tab', stock: 35, expired: '2029-05-01', cost: 1859, unit: 'STRIP' },
+        { name: 'Imboost Force Kaplet', stock: 22, expired: '2028-02-01', cost: 6238, unit: 'KAPLET' },
+        { name: 'Vicee Orange', stock: 48, expired: '2027-03-01', cost: 646, unit: 'TABLET' },
+        { name: 'Amlodipine 5mg Tab', stock: 18, expired: '2027-01-06', cost: 2558, unit: 'STRIP' },
+        { name: 'Cetirizine 10 mg Tab', stock: 20, expired: '2027-04-01', cost: 2470, unit: 'STRIP' },
+        { name: 'Paramex Tab', stock: 15, expired: '2027-01-04', cost: 2344, unit: 'STRIP' },
+        { name: 'Enervon C', stock: 14, expired: '2027-03-30', cost: 4609, unit: 'STRIP' },
+        { name: 'Ambroxol Tab', stock: 24, expired: '2028-06-01', cost: 1207, unit: 'STRIP' },
+        { name: 'Metformin Tab', stock: 19, expired: '2027-04-01', cost: 2173, unit: 'STRIP' },
+        { name: 'Demacolin Tab', stock: 32, expired: '2028-11-01', cost: 5200, unit: 'STRIP' },
+        { name: 'Tera-F Tab', stock: 12, expired: '2028-03-01', cost: 4520, unit: 'STRIP' },
+        { name: 'Fasidol Tab', stock: 18, expired: '2029-06-01', cost: 2890, unit: 'STRIP' },
+        { name: 'Hufagripp Flu', stock: 5, expired: '2028-04-01', cost: 21770, unit: 'BOTOL' },
+        { name: 'Kool Fever Anak', stock: 9, expired: '2027-12-01', cost: 5947, unit: 'SACHET' },
+        { name: 'Test Pack One Med', stock: 11, expired: '2028-01-01', cost: 1520, unit: 'STRIP' },
+        { name: 'Caviplex Tab', stock: 16, expired: '2027-01-08', cost: 6934, unit: 'STRIP' },
+        { name: 'Micoral Cr', stock: 13, expired: '2028-05-01', cost: 4460, unit: 'TUBE' },
+        { name: 'Ketokonazole Cr', stock: 7, expired: '2027-06-01', cost: 5100, unit: 'TUBE' },
+        { name: 'Sutra Ok 3 S', stock: 21, expired: '2029-10-01', cost: 7414, unit: 'STRIP' }
       ];
 
       for (const p of newProducts) {
@@ -270,54 +307,39 @@ const initDB = async () => {
       console.log('Seeded new medicine products');
 
       console.log('Seeding December 2025 transactions...');
-      const outletIds = [1, 2];
        
       for (let day = 1; day <= 31; day++) {
         const numTrans = Math.floor(Math.random() * 5) + 1;
          
         for (let i = 0; i < numTrans; i++) {
-          const outletId = outletIds[Math.floor(Math.random() * outletIds.length)];
           const amount = Math.floor(Math.random() * (500000 - 50000 + 1)) + 50000;
            
           const date = new Date(2025, 11, day, Math.floor(Math.random() * 14) + 8, Math.floor(Math.random() * 60), 0);
            
           await connection.query(
-            'INSERT INTO transactions (outlet_id, total_amount, transaction_date) VALUES (?, ?, ?)',
-            [outletId, amount, date]
+            'INSERT INTO transactions (total_amount, transaction_date) VALUES (?, ?)',
+            [amount, date]
           );
         }
       }
       console.log('Seeded transactions for Dec 2025');
     }
 
-    const [outlets] = await connection.query('SELECT * FROM outlets');
-    if (outlets.length === 0) {
-      await connection.query(`
-        INSERT INTO outlets (name, location) VALUES 
-        ('Cabang XYZ', 'Baktiseraga'),
-        ('Cabang ABC', 'Banyuning')
-      `);
-      console.log('Seeded outlets');
-    }
-
     const [cashiers] = await connection.query('SELECT * FROM users WHERE role = ?', ['cashier']);
     if (cashiers.length === 0) {
       const pwd = await bcrypt.hash('123456', 10);
-      const [allOutlets] = await connection.query('SELECT id FROM outlets');
-      if (allOutlets.length >= 2) {
-        await connection.query(
-          'INSERT INTO users (username, email, password, role, outlet_id) VALUES (?, ?, ?, ?, ?)',
-          ['kasir1', 'kasir1@example.com', pwd, 'cashier', allOutlets[0].id]
-        );
-        await connection.query(
-          'INSERT INTO users (username, email, password, role, outlet_id) VALUES (?, ?, ?, ?, ?)',
-          ['kasir2', 'kasir2@example.com', pwd, 'cashier', allOutlets[0].id]
-        );
-        await connection.query(
-          'INSERT INTO users (username, email, password, role, outlet_id) VALUES (?, ?, ?, ?, ?)',
-          ['kasir3', 'kasir3@example.com', pwd, 'cashier', allOutlets[1].id]
-        );
-      }
+      await connection.query(
+        'INSERT INTO users (username, email, password, role) VALUES (?, ?, ?, ?)',
+        ['kasir1', 'kasir1@example.com', pwd, 'cashier']
+      );
+      await connection.query(
+        'INSERT INTO users (username, email, password, role) VALUES (?, ?, ?, ?)',
+        ['kasir2', 'kasir2@example.com', pwd, 'cashier']
+      );
+      await connection.query(
+        'INSERT INTO users (username, email, password, role) VALUES (?, ?, ?, ?)',
+        ['kasir3', 'kasir3@example.com', pwd, 'cashier']
+      );
       console.log('Seeded cashiers');
     }
 

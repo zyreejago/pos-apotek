@@ -53,23 +53,29 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-[#F8F9FA]">
+    <div className="min-h-screen flex items-center justify-center p-4" style={{
+      backgroundImage: 'url("/bg-loginnregist.png")',
+      backgroundSize: 'cover',
+      backgroundPosition: 'center',
+      backgroundRepeat: 'no-repeat',
+      backgroundColor: '#F8F9FA'
+    }}>
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 w-full max-w-[480px] p-8 md:p-10">
         {/* Header */}
         <div className="text-center mb-8">
           <h1 className="text-2xl font-bold text-gray-900 mb-2">Sign in</h1>
           <p className="text-sm text-gray-500">
             Need an account?{' '}
-            <a href="#" className="text-blue-500 hover:text-blue-600 font-medium">
+            <Link href="/register" className="text-blue-500 hover:text-blue-600 font-medium">
               Sign up
-            </a>
+            </Link>
           </p>
         </div>
 
-        {/* Social Login Buttons */}
-        {/* <div className="flex gap-4 mb-8">
-          <button type="button" className="flex-1 flex items-center justify-center gap-2 py-2.5 px-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium text-gray-700">
-            <svg className="w-5 h-5" viewBox="0 0 24 24">
+        {/* Social Login Buttons
+        <div className="flex gap-3 mb-6">
+          <button type="button" className="flex-1 flex items-center justify-center gap-2 py-2 px-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-xs font-medium text-gray-700">
+            <svg className="w-4 h-4" viewBox="0 0 24 24">
               <path
                 d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
                 fill="#4285F4"
@@ -89,8 +95,8 @@ export default function LoginPage() {
             </svg>
             Use Google
           </button>
-          <button type="button" className="flex-1 flex items-center justify-center gap-2 py-2.5 px-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium text-gray-700">
-            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+          <button type="button" className="flex-1 flex items-center justify-center gap-2 py-2 px-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-xs font-medium text-gray-700">
+            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
               <path d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.48-3.24 0-1.44.62-2.2.44-3.06-.4C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.74 1.18 0 2.45-1.62 4.37-1.54 1.35.06 2.94.75 3.75 1.93-3.28 1.98-2.66 6.33 1.25 7.9-.66 1.87-1.75 3.65-3.02 4.94h-.43zm-3.34-14.8c.84-1.18 1.3-2.65 1.16-4.14-1.29.1-2.92.83-3.81 1.98-.82 1.05-1.4 2.65-1.16 3.99 1.48.16 3.08-.68 3.81-1.83z" />
             </svg>
             Use Apple
@@ -98,12 +104,12 @@ export default function LoginPage() {
         </div> */}
 
         {/* Divider */}
-        {/* <div className="relative mb-8">
+        {/* <div className="relative mb-6">
           <div className="absolute inset-0 flex items-center">
             <div className="w-full border-t border-gray-200"></div>
           </div>
-          <div className="relative flex justify-center text-sm">
-            <span className="px-4 bg-white text-gray-400 text-xs font-medium uppercase tracking-wider">OR</span>
+          <div className="relative flex justify-center text-xs">
+            <span className="px-3 bg-white text-gray-400 font-medium uppercase tracking-wider">OR</span>
           </div>
         </div> */}
         

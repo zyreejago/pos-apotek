@@ -32,7 +32,6 @@ interface TransactionItem {
 interface Transaction {
   id: number;
   transaction_date: string;
-  outlet_name: string;
   total_amount: number;
   items: TransactionItem[];
 }
@@ -149,14 +148,13 @@ export default function TransactionReportPage() {
       doc.text(`Tanggal Rilis: ${new Date().toLocaleString('id-ID', { dateStyle: 'full', timeStyle: 'short' })}`, 105, 58, { align: "center" });
 
       // 3. Table Content
-      const tableColumn = ["No", "Waktu", "Outlet", "Total", "Detail Item"];
+      const tableColumn = ["No", "Waktu", "Total", "Detail Item"];
       const tableRows: (string | number)[][] = [];
 
       data.transactions.forEach((t, index) => {
         const transactionData = [
           index + 1,
           formatDate(t.transaction_date),
-          t.outlet_name || '-',
           formatCurrency(t.total_amount),
           // Format items as a simple list string
           t.items.map((i) => `${i.product_name} (${i.quantity}x)`).join(', ')
@@ -351,7 +349,6 @@ export default function TransactionReportPage() {
                     <thead>
                         <tr className="bg-gray-50 text-gray-500 font-medium border-b border-gray-100">
                             <th className="px-6 py-4">Waktu</th>
-                            <th className="px-6 py-4">Outlet</th>
                             <th className="px-6 py-4">Detail Item</th>
                             <th className="px-6 py-4 text-right">Total</th>
                         </tr>
@@ -359,17 +356,16 @@ export default function TransactionReportPage() {
                     <tbody className="divide-y divide-gray-50">
                         {loading ? (
                             <tr>
-                                <td colSpan={4} className="px-6 py-8 text-center text-gray-500">Loading data...</td>
+                                <td colSpan={3} className="px-6 py-8 text-center text-gray-500">Loading data...</td>
                             </tr>
                         ) : data.transactions.length === 0 ? (
                             <tr>
-                                <td colSpan={4} className="px-6 py-8 text-center text-gray-500">Tidak ada transaksi pada periode ini</td>
+                                <td colSpan={3} className="px-6 py-8 text-center text-gray-500">Tidak ada transaksi pada periode ini</td>
                             </tr>
                         ) : (
                             data.transactions.map((t) => (
                                 <tr key={t.id} className="hover:bg-gray-50 transition-colors">
                                     <td className="px-6 py-4 text-gray-600 align-top whitespace-nowrap">{formatDate(t.transaction_date)}</td>
-                                    <td className="px-6 py-4 text-gray-600 align-top">{t.outlet_name || '-'}</td>
                                     <td className="px-6 py-4 text-gray-600 align-top">
                                       <ul className="list-disc list-inside space-y-1">
                                         {t.items.map((item, idx: number) => (

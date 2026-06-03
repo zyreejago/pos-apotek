@@ -13,7 +13,6 @@ import {
 } from 'recharts';
 import { 
   Search, 
-  MapPin, 
   ArrowUpRight,
   ChevronDown
 } from 'lucide-react';
@@ -30,24 +29,15 @@ interface Earning {
   value: number;
 }
 
-interface Outlet {
-  id: number;
-  name: string;
-  location: string;
-  cashiers: string[];
-}
-
 interface Cashier {
   id: number;
   username: string;
-  outlet_name: string;
   description: string;
 }
 
 interface DashboardData {
   stockRecommendations: StockRec[];
   earnings: { name: string; value: string | number }[];
-  outlets: Outlet[];
   cashiers: Cashier[];
 }
 
@@ -55,7 +45,6 @@ export default function Dashboard() {
   const router = useRouter();
   const [stockRecommendations, setStockRecommendations] = useState<StockRec[]>([]);
   const [earningsData, setEarningsData] = useState<Earning[]>([]);
-  const [outlets, setOutlets] = useState<Outlet[]>([]);
   const [cashiers, setCashiers] = useState<Cashier[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -95,7 +84,6 @@ export default function Dashboard() {
         const data: DashboardData = await response.json();
         setStockRecommendations(data.stockRecommendations || []);
         setEarningsData((data.earnings || []).map((e) => ({ ...e, value: typeof e.value === 'string' ? parseFloat(e.value) : e.value })));
-        setOutlets(data.outlets || []);
         setCashiers(data.cashiers || []);
       } catch (err) {
         console.error(err);
@@ -125,8 +113,7 @@ export default function Dashboard() {
   const currentSales = earningsData.length > 0 ? earningsData[earningsData.length - 1].value : 0;
   
   const filteredCashiers = cashiers.filter(cashier => 
-    cashier.username.toLowerCase().includes(searchQuery.toLowerCase()) || 
-    cashier.outlet_name?.toLowerCase().includes(searchQuery.toLowerCase())
+    cashier.username.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   // Pagination Logic
@@ -142,28 +129,28 @@ export default function Dashboard() {
         title="Dashboard"
         subtitle="Sales Dashboard"
         breadcrumbs={[{ label: 'Dashboards' }, { label: 'Default' }]}
-        rightContent={
-          <button className="bg-white px-4 py-2 rounded-lg text-sm font-medium text-gray-700 shadow-sm border border-gray-200 flex items-center gap-2">
-            <span className="w-2 h-2 bg-green-500 rounded-full"></span>
-            Cabang XYZ
-          </button>
-        }
       />
 
       {/* Main Grid Content */}
       <div className="p-8 pt-0">
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         
         {/* Card 1: Rekomendasi Stock Harian */}
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 lg:col-span-1">
+        <div 
+          className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 cursor-pointer hover:shadow-md transition-shadow"
+          onClick={() => router.push('/recommendations')}
+        >
           <div className="flex justify-between items-center mb-6">
             <h3 className="font-semibold text-gray-800">Peramalan Stock</h3>
+            <span className="text-blue-600 text-sm flex items-center gap-1">
+              Lihat Semua <ArrowUpRight size={14} />
+            </span>
           </div>
           
           <div className="flex justify-between text-xs font-medium text-gray-400 mb-4 border-b pb-2">
             <span>Products</span>
-            <span className="text-green-500 flex items-center gap-1">
-              <ArrowUpRight size={14} /> Peramalan
+            <span className="text-blue-600 flex items-center gap-1">
+              Tambahan Stok
             </span>
           </div>
 
@@ -171,8 +158,8 @@ export default function Dashboard() {
             {stockRecommendations.length > 0 ? stockRecommendations.map((item, index) => (
               <div key={index} className="flex justify-between items-center">
                 <span className="text-gray-700 font-medium text-sm">{item.name}</span>
-                <span className="bg-gray-100 text-gray-600 px-3 py-1 rounded-md text-sm font-bold">
-                  {item.count}
+                <span className={`px-3 py-1 rounded-md text-sm font-bold ${item.count && item.count > 0 ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
+                  {item.count !== null && item.count !== undefined ? item.count : '-'}
                 </span>
               </div>
             )) : <p className="text-sm text-gray-500">No recommendations available.</p>}
@@ -180,7 +167,7 @@ export default function Dashboard() {
         </div>
 
         {/* Card 2: Earnings Chart */}
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 lg:col-span-2">
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
           <div className="flex justify-between items-center mb-6">
             <h3 className="font-semibold text-gray-800">Earnings</h3>
             <button className="text-gray-400 text-sm flex items-center gap-1 hover:text-gray-600">
@@ -228,48 +215,15 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Card 3: Outlets */}
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 lg:col-span-1">
-          <div className="flex justify-between items-center mb-6">
-            <h3 className="font-semibold text-gray-800">Outlets</h3>
-          </div>
-
-          <div className="space-y-4">
-            {outlets.map((outlet, index) => (
-              <div key={index} className="bg-gray-50 p-4 rounded-xl">
-                <div className="flex justify-between text-xs text-gray-400 mb-2">
-                    <div className="flex items-center gap-1"><MapPin size={12}/> Location</div>
-                    <div className="flex items-center gap-1">Casier</div>
-                </div>
-                <div className="flex justify-between items-center">
-                    <span className="font-semibold text-gray-700">{outlet.name}</span>
-                    <div className="flex -space-x-2">
-                        {outlet.cashiers.slice(0, 3).map((_, i) => (
-                             <div key={i} className="w-8 h-8 rounded-full border-2 border-white bg-slate-200 flex items-center justify-center text-xs text-slate-500">
-                                👤
-                             </div>
-                        ))}
-                        {outlet.cashiers.length > 3 && (
-                            <div className="w-8 h-8 rounded-full border-2 border-white bg-green-500 text-white flex items-center justify-center text-xs font-bold">
-                                +{outlet.cashiers.length - 3}
-                            </div>
-                        )}
-                    </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Card 4: Casier Table */}
+        {/* Card 3: Casier Table */}
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 lg:col-span-2">
           <div className="flex justify-between items-center mb-6">
-            <h3 className="font-semibold text-gray-800">Casier</h3>
+            <h3 className="font-semibold text-gray-800">Cashier</h3>
             <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
                 <input 
                     type="text" 
-                    placeholder="Search Casier" 
+                    placeholder="Search Cashier" 
                     className="pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-64"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
@@ -282,10 +236,7 @@ export default function Dashboard() {
                 <thead>
                     <tr className="border-b border-gray-100 text-left">
                         <th className="py-3 px-4 text-xs font-medium text-gray-400 uppercase tracking-wider">
-                            Outlets <ChevronDown size={12} className="inline ml-1" />
-                        </th>
-                        <th className="py-3 px-4 text-xs font-medium text-gray-400 uppercase tracking-wider">
-                            Casier <ChevronDown size={12} className="inline ml-1" />
+                            Cashier <ChevronDown size={12} className="inline ml-1" />
                         </th>
                     </tr>
                 </thead>
@@ -293,17 +244,14 @@ export default function Dashboard() {
                     {paginatedCashiers.map((item, index) => (
                         <tr key={index} className="hover:bg-gray-50">
                             <td className="py-4 px-4">
-                                <div>
-                                    <p className="text-sm font-semibold text-gray-900">{item.outlet_name || 'Unassigned'}</p>
-                                    <p className="text-xs text-gray-500">{item.description}</p>
-                                </div>
-                            </td>
-                            <td className="py-4 px-4">
                                 <div className="flex items-center gap-2">
                                      <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-xs text-slate-500">
                                          👤
                                      </div>
-                                     <span className="text-sm text-gray-700">{item.username}</span>
+                                     <div>
+                                        <p className="text-sm font-semibold text-gray-900">{item.username}</p>
+                                        <p className="text-xs text-gray-500">{item.description}</p>
+                                     </div>
                                 </div>
                             </td>
                         </tr>

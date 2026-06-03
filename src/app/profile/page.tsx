@@ -81,8 +81,9 @@ export default function ProfilePage() {
       // Notify other components about user update
       window.dispatchEvent(new Event('user:updated'));
       
-    } catch (error: any) {
-      goeyToast.error("Error", { description: error.message });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Terjadi kesalahan";
+      goeyToast.error("Error", { description: message });
     } finally {
       setSavingProfile(false);
     }
@@ -115,8 +116,9 @@ export default function ProfilePage() {
       
       goeyToast.success("Success", { description: "Password berhasil diubah" });
       setPasswordData({ oldPassword: "", newPassword: "", confirmPassword: "" });
-    } catch (error: any) {
-      goeyToast.error("Error", { description: error.message });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Terjadi kesalahan";
+      goeyToast.error("Error", { description: message });
     } finally {
       setSavingPassword(false);
     }

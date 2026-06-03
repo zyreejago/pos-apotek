@@ -20,13 +20,14 @@ export function middleware(request: NextRequest) {
   const token = request.cookies.get('token')?.value
   
   const isLoginPage = request.nextUrl.pathname === '/login'
+  const isRegisterPage = request.nextUrl.pathname === '/register'
   const isForgotPasswordPage = request.nextUrl.pathname === '/forgot-password'
   
-  if (!token && !isLoginPage && !isForgotPasswordPage) {
+  if (!token && !isLoginPage && !isRegisterPage && !isForgotPasswordPage) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
   
-  if (token && (isLoginPage || isForgotPasswordPage)) {
+  if (token && (isLoginPage || isRegisterPage || isForgotPasswordPage)) {
     return NextResponse.redirect(new URL('/dashboard', request.url))
   }
  

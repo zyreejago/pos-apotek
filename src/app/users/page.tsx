@@ -13,15 +13,8 @@ interface UserData {
   username: string;
   email: string;
   role: string;
-  outlet_id: number | null;
-  outlet_name: string | null;
   created_at: string;
   status?: string;
-}
-
-interface Outlet {
-  id: number;
-  name: string;
 }
 
 interface Role {
@@ -50,7 +43,6 @@ type UserFormData = {
   email: string;
   password: string;
   role: string;
-  outlet_id: string;
   status: 'active' | 'inactive';
 };
 
@@ -59,7 +51,6 @@ export default function UsersPage() {
   const { checkActionPermission } = useRequirePermission('Management Pengguna');
 
   const [users, setUsers] = useState<UserData[]>([]);
-  const [outlets, setOutlets] = useState<Outlet[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -82,7 +73,6 @@ export default function UsersPage() {
     email: '',
     password: '',
     role: 'Cashier',
-    outlet_id: '',
     status: 'active'
   });
 
@@ -156,26 +146,6 @@ export default function UsersPage() {
     }
   }, [authHeaders, currentPage, debouncedSearchQuery, handleUnauthorized, itemsPerPage, safeJson]);
 
-  const fetchOutlets = useCallback(async () => {
-    try {
-      const res = await fetch('http://localhost:5000/api/outlets', { headers: authHeaders });
-      if (res.status === 401) {
-        handleUnauthorized();
-        return;
-      }
-      if (res.ok) {
-        const data = await safeJson<unknown>(res);
-        if (Array.isArray(data)) {
-          setOutlets(data as Outlet[]);
-        } else {
-          setOutlets([]);
-        }
-      }
-    } catch (error) {
-      console.error('Error fetching outlets:', error);
-    }
-  }, [authHeaders, handleUnauthorized, safeJson]);
-
   const fetchRoles = useCallback(async () => {
     try {
       const res = await fetch('http://localhost:5000/api/rbac/roles', { headers: authHeaders });
@@ -205,9 +175,8 @@ export default function UsersPage() {
   }, [fetchUsers]);
 
   useEffect(() => {
-    fetchOutlets();
     fetchRoles();
-  }, [fetchOutlets, fetchRoles]);
+  }, [fetchRoles]);
 
   const normalizeStatus = (status?: string): 'active' | 'inactive' => {
     return status === 'inactive' ? 'inactive' : 'active';
@@ -220,7 +189,6 @@ export default function UsersPage() {
       email: '',
       password: '',
       role: 'Cashier',
-      outlet_id: '',
       status: 'active'
     });
     setIsModalOpen(true);
@@ -234,7 +202,6 @@ export default function UsersPage() {
       email: user.email || '',
       password: '',
       role: user.role,
-      outlet_id: user.outlet_id ? user.outlet_id.toString() : '',
       status: normalizeStatus(user.status)
     });
     setIsModalOpen(true);
@@ -249,16 +216,16 @@ export default function UsersPage() {
     e.preventDefault();
     
     if (modalMode === 'add' && !checkActionPermission('create')) {
-        goeyToast.error('Akses Ditolak', {
-          description: 'Anda tidak memiliki izin untuk membuat pengguna baru.'
-        });
-        return;
+      goeyToast.error('Akses Ditolak', {
+        description: 'Anda tidak memiliki izin untuk membuat pengguna baru.'
+      });
+      return;
     }
     if (modalMode === 'edit' && !checkActionPermission('edit')) {
-        goeyToast.error('Akses Ditolak', {
-          description: 'Anda tidak memiliki izin untuk mengedit pengguna.'
-        });
-        return;
+      goeyToast.error('Akses Ditolak', {
+        description: 'Anda tidak memiliki izin untuk mengedit pengguna.'
+      });
+      return;
     }
 
     const url = modalMode === 'add' 
@@ -272,7 +239,6 @@ export default function UsersPage() {
         username: formData.username,
         email: formData.email,
         role: formData.role,
-        outlet_id: formData.outlet_id ? parseInt(formData.outlet_id) : null,
         status: formData.status
       };
 
@@ -419,10 +385,6 @@ export default function UsersPage() {
           <div className="p-4 flex flex-col md:flex-row justify-between items-center gap-4 border-b border-gray-100">
             <div className="text-sm font-medium text-gray-700">{showingText}</div>
             <div className="flex items-center gap-2 w-full md:w-auto">
-              {/* <button className="flex items-center gap-2 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors">
-                <Filter size={16} />
-                Filters
-              </button> */}
               <div className="relative flex-1 md:w-72">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
                 <input 
@@ -444,7 +406,6 @@ export default function UsersPage() {
             ) : (
               users.map((user) => {
                 const isActive = user.status !== 'inactive';
-                const outletLabel = user.outlet_name ? user.outlet_name : 'Tanpa outlet';
 
                 return (
                   <div key={user.id} className="group bg-white p-4 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md hover:border-blue-100 transition-all duration-200 flex items-center justify-between">
@@ -458,7 +419,6 @@ export default function UsersPage() {
                       <div className="min-w-0">
                         <h3 className="text-sm font-bold text-gray-900 leading-tight group-hover:text-blue-600 transition-colors truncate">{user.username}</h3>
                         <p className="text-xs font-medium text-gray-500 mt-0.5 truncate">{user.email}</p>
-                        <p className="text-xs font-medium text-gray-400 mt-0.5 truncate">{outletLabel}</p>
                       </div>
                     </div>
                     
@@ -622,20 +582,6 @@ export default function UsersPage() {
                   >
                     <option value="active">Active</option>
                     <option value="inactive">Inactive</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Outlet</label>
-                  <select
-                    value={formData.outlet_id}
-                    onChange={(e) => setFormData(prev => ({ ...prev, outlet_id: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                  >
-                    <option value="">Select Outlet</option>
-                    {outlets.map(outlet => (
-                        <option key={outlet.id} value={outlet.id}>{outlet.name}</option>
-                    ))}
                   </select>
                 </div>
               </div>

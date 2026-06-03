@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Script from "next/script";
 import { Poppins } from "next/font/google";
 import "./globals.css";
 import Sidebar from "@/components/Sidebar";
@@ -23,6 +24,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
+      <head>
+        <Script src="https://app.sandbox.midtrans.com/snap/snap.js" data-client-key="Mid-client-xuNHby_qkzOxDK5D" strategy="afterInteractive" />
+      </head>
       <body
         className={`${poppins.variable} antialiased flex h-screen bg-gray-50 font-sans`}
       >

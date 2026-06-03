@@ -49,7 +49,7 @@ function buildResetCodeEmailHtml({ code }) {
   `;
 }
 
-module.exports = function registerPasswordResetRoutes(app, pool, bcrypt) {
+function registerPasswordResetRoutes(app, pool, bcrypt) {
   // Create reusable transporter object using the default SMTP transport
   const transporter = nodemailer.createTransport({
     service: 'gmail',
@@ -188,3 +188,11 @@ module.exports = function registerPasswordResetRoutes(app, pool, bcrypt) {
     }
   });
 };
+
+registerPasswordResetRoutes._test = {
+  isValidEmail,
+  generateSixDigitCode,
+  buildResetCodeEmailHtml,
+};
+
+module.exports = registerPasswordResetRoutes;

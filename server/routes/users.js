@@ -14,7 +14,7 @@ module.exports = function registerUserRoutes(app, pool, bcrypt, authenticate, ch
       const connection = await pool.getConnection();
 
       let query =
-        'SELECT u.id, u.username, u.email, u.role, u.outlet_id, u.status, u.created_at, o.name as outlet_name FROM users u LEFT JOIN outlets o ON u.outlet_id = o.id';
+        'SELECT u.id, u.username, u.email, u.role, u.status, u.created_at FROM users u';
       let countQuery = 'SELECT COUNT(*) as total FROM users u';
       let params = [];
 
@@ -61,7 +61,7 @@ module.exports = function registerUserRoutes(app, pool, bcrypt, authenticate, ch
     authenticate,
     checkPermission('Management Pengguna', 'create'),
     async (req, res) => {
-      const { username, email, password, role, outlet_id, status } = req.body;
+      const { username, email, password, role, status } = req.body;
 
       if (!username || !email || !password || !role) {
         return res
@@ -77,15 +77,14 @@ module.exports = function registerUserRoutes(app, pool, bcrypt, authenticate, ch
       try {
         const hashedPassword = await bcrypt.hash(password, 10);
         const [result] = await pool.query(
-          'INSERT INTO users (username, email, password, role, outlet_id, status) VALUES (?, ?, ?, ?, ?, ?)',
-          [username, email, hashedPassword, role, outlet_id || null, status || 'active']
+          'INSERT INTO users (username, email, password, role, status) VALUES (?, ?, ?, ?, ?)',
+          [username, email, hashedPassword, role, status || 'active']
         );
         res.status(201).json({
           id: result.insertId,
           username,
           email,
           role,
-          outlet_id,
           status: status || 'active',
         });
       } catch (error) {
@@ -105,7 +104,7 @@ module.exports = function registerUserRoutes(app, pool, bcrypt, authenticate, ch
     checkPermission('Management Pengguna', 'edit'),
     async (req, res) => {
       const id = parseInt(req.params.id);
-      const { username, email, password, role, outlet_id, status } = req.body;
+      const { username, email, password, role, status } = req.body;
 
       if (!id) return res.status(400).json({ message: 'Invalid ID' });
 
@@ -134,8 +133,8 @@ module.exports = function registerUserRoutes(app, pool, bcrypt, authenticate, ch
         }
 
         let query =
-          'UPDATE users SET username = ?, email = ?, role = ?, outlet_id = ?, status = ?';
-        let params = [username, email, role, outlet_id || null, status || 'active'];
+          'UPDATE users SET username = ?, email = ?, role = ?, status = ?';
+        let params = [username, email, role, status || 'active'];
 
         if (password) {
           const hashedPassword = await bcrypt.hash(password, 10);
