@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Trash2 } from "lucide-react";
 import { goeyToast } from "@/components/ui/goey-toaster";
 import ConfirmModal from "@/components/ConfirmModal";
+import OffCanvas from "@/components/OffCanvas";
 import Header from "@/components/Header";
 import { useRequirePermission } from "@/hooks/useRequirePermission";
 
@@ -491,25 +492,35 @@ export default function Page() {
         </div>
       </div>
 
-      {/* Add Role Modal */}
-      {showAdd && (
-        <div className="fixed inset-0 bg-black/30 flex items-center justify-center">
-          <div className="bg-white w-[420px] max-w-[90vw] rounded-xl p-6">
-            <div className="text-lg font-semibold mb-4">Add Role & Permissions</div>
-            <input value={newRole} onChange={e => setNewRole(e.target.value)} placeholder="Role name" className="w-full px-3 py-2 border border-gray-200 rounded-lg mb-4" />
-            <div className="flex justify-end gap-3">
-              <button onClick={() => setShowAdd(false)} className="px-4 py-2 rounded-lg border border-gray-200" disabled={isSaving}>Cancel</button>
-              <button 
-                onClick={addRole} 
-                className="px-4 py-2 rounded-lg bg-blue-500 text-white disabled:bg-blue-300 disabled:cursor-not-allowed"
-                disabled={isSaving || !newRole.trim()}
-              >
-                {isSaving ? "Saving..." : "Save"}
-              </button>
-            </div>
-          </div>
+      {/* Add Role OffCanvas */}
+      <OffCanvas
+        isOpen={showAdd}
+        onClose={() => setShowAdd(false)}
+        title="Add Role & Permissions"
+      >
+        <input 
+          value={newRole} 
+          onChange={e => setNewRole(e.target.value)} 
+          placeholder="Role name" 
+          className="w-full px-3 py-2 border border-gray-200 rounded-lg mb-6" 
+        />
+        <div className="flex justify-end gap-3">
+          <button 
+            onClick={() => setShowAdd(false)} 
+            className="px-4 py-2 rounded-lg border border-gray-200 text-gray-700" 
+            disabled={isSaving}
+          >
+            Cancel
+          </button>
+          <button 
+            onClick={addRole} 
+            className="px-4 py-2 rounded-lg bg-blue-600 text-white disabled:bg-blue-300 disabled:cursor-not-allowed"
+            disabled={isSaving || !newRole.trim()}
+          >
+            {isSaving ? "Saving..." : "Save"}
+          </button>
         </div>
-      )}
+      </OffCanvas>
 
       <ConfirmModal
         isOpen={confirmModal.isOpen}

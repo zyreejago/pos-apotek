@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useRequirePermission } from '@/hooks/useRequirePermission';
-import Header from '@/components/Header';
+import PageHeader from '@/components/PageHeader';
 import { goeyToast } from '@/components/ui/goey-toaster';
 
 type ForecastRow = {
@@ -196,7 +196,7 @@ export default function Page() {
 
   return (
     <div className="bg-gray-50 min-h-screen relative">
-      <Header
+      <PageHeader
         title="Peramalan Stok (Debug)"
         breadcrumbs={[{ label: 'Peramalan Stok' }, { label: 'Rekomendasi Stok (Debug)' }]}
       />

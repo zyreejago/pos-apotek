@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from 'react';
-import Header from '@/components/Header';
+import PageHeader from '@/components/PageHeader';
 import { goeyToast } from '@/components/ui/goey-toaster';
 import { Download, Calendar, Loader2 } from 'lucide-react';
 import jsPDF from 'jspdf';
@@ -211,7 +211,7 @@ export default function BalanceSheetAccountingPage() {
 
   return (
     <div className="bg-gray-50 min-h-screen relative">
-      <Header
+      <PageHeader
         title="Neraca Keuangan"
         subtitle="Laporan Keuangan"
         breadcrumbs={[{ label: 'Sales Report' }, { label: 'Neraca Keuangan' }]}

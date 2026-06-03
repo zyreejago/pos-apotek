@@ -2,22 +2,18 @@
 
 import React from 'react';
 import ProfileDropdown from './ProfileDropdown';
+import { useHeader } from '@/context/HeaderContext';
 
 interface Breadcrumb {
   label: string;
   href?: string;
 }
 
-interface HeaderProps {
-  title?: string;
-  subtitle?: string;
-  breadcrumbs?: Breadcrumb[];
-  rightContent?: React.ReactNode;
-}
-
-export default function Header({ title, subtitle, breadcrumbs = [], rightContent }: HeaderProps) {
+export default function Header() {
+  const { headerState } = useHeader();
+  const { title, subtitle, breadcrumbs = [], rightContent } = headerState;
   return (
-    <header className="bg-white px-6 py-4 flex justify-between items-center shrink-0 shadow-sm z-50 mb-6 sticky top-0">
+    <header className="bg-white px-6 py-4 mb-8 flex justify-between items-center shrink-0 shadow-sm z-50 sticky top-0">
       <div>
         {breadcrumbs.length > 0 ? (
           <div className="flex items-center gap-4 text-sm text-gray-500">

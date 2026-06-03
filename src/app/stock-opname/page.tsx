@@ -6,7 +6,7 @@ import { Search, Filter, Save, AlertCircle } from 'lucide-react';
 import { goeyToast } from "@/components/ui/goey-toaster";
 import ConfirmModal from '@/components/ConfirmModal';
 import { useRequirePermission } from '@/hooks/useRequirePermission';
-import Header from '@/components/Header';
+import PageHeader from '@/components/PageHeader';
 
 interface Product {
   id: number;
@@ -259,7 +259,7 @@ export default function StockOpnamePage() {
 
   return (
     <div className="bg-gray-50 min-h-screen relative">
-      <Header 
+      <PageHeader 
         title="Stock Opname"
         breadcrumbs={[{ label: 'Inventory' }, { label: 'Stock Opname' }]}
         rightContent={

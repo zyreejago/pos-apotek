@@ -2,10 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Search, Filter, Plus, Edit, X, Trash2 } from 'lucide-react';
+import { Search, Filter, Plus, Edit, Trash2 } from 'lucide-react';
 import { goeyToast } from "@/components/ui/goey-toaster";
 import ConfirmModal from '@/components/ConfirmModal';
-import Header from '@/components/Header';
+import OffCanvas from '@/components/OffCanvas';
+import PageHeader from '@/components/PageHeader';
 import { useRequirePermission } from '@/hooks/useRequirePermission';
 
 interface UserData {
@@ -64,8 +65,8 @@ export default function UsersPage() {
     totalPages: 1
   });
 
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [modalMode, setModalMode] = useState<ModalMode>('add');
+  const [isOffCanvasOpen, setIsOffCanvasOpen] = useState(false);
+  const [offCanvasMode, setOffCanvasMode] = useState<ModalMode>('add');
   const [selectedUser, setSelectedUser] = useState<UserData | null>(null);
   
   const [formData, setFormData] = useState<UserFormData>({
@@ -182,8 +183,8 @@ export default function UsersPage() {
     return status === 'inactive' ? 'inactive' : 'active';
   };
   
-  const handleOpenAddModal = () => {
-    setModalMode('add');
+  const handleOpenAddOffCanvas = () => {
+    setOffCanvasMode('add');
     setFormData({
       username: '',
       email: '',
@@ -191,11 +192,11 @@ export default function UsersPage() {
       role: 'Cashier',
       status: 'active'
     });
-    setIsModalOpen(true);
+    setIsOffCanvasOpen(true);
   };
 
-  const handleOpenEditModal = (user: UserData) => {
-    setModalMode('edit');
+  const handleOpenEditOffCanvas = (user: UserData) => {
+    setOffCanvasMode('edit');
     setSelectedUser(user);
     setFormData({
       username: user.username,
@@ -204,35 +205,35 @@ export default function UsersPage() {
       role: user.role,
       status: normalizeStatus(user.status)
     });
-    setIsModalOpen(true);
+    setIsOffCanvasOpen(true);
   };
 
-  const handleCloseModal = () => {
-    setIsModalOpen(false);
+  const handleCloseOffCanvas = () => {
+    setIsOffCanvasOpen(false);
     setSelectedUser(null);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (modalMode === 'add' && !checkActionPermission('create')) {
+    if (offCanvasMode === 'add' && !checkActionPermission('create')) {
       goeyToast.error('Akses Ditolak', {
         description: 'Anda tidak memiliki izin untuk membuat pengguna baru.'
       });
       return;
     }
-    if (modalMode === 'edit' && !checkActionPermission('edit')) {
+    if (offCanvasMode === 'edit' && !checkActionPermission('edit')) {
       goeyToast.error('Akses Ditolak', {
         description: 'Anda tidak memiliki izin untuk mengedit pengguna.'
       });
       return;
     }
 
-    const url = modalMode === 'add' 
+    const url = offCanvasMode === 'add' 
       ? 'http://localhost:5000/api/users'
       : `http://localhost:5000/api/users/${selectedUser?.id}`;
     
-    const method = modalMode === 'add' ? 'POST' : 'PUT';
+    const method = offCanvasMode === 'add' ? 'POST' : 'PUT';
     
     try {
       const payload: Record<string, unknown> = {
@@ -242,7 +243,7 @@ export default function UsersPage() {
         status: formData.status
       };
 
-      if (modalMode === 'add' || formData.password.trim().length > 0) {
+      if (offCanvasMode === 'add' || formData.password.trim().length > 0) {
         payload.password = formData.password;
       }
 
@@ -263,10 +264,10 @@ export default function UsersPage() {
       const data = await safeJson<{ message?: string }>(res);
 
       if (res.ok) {
-        handleCloseModal();
+        handleCloseOffCanvas();
         fetchUsers();
-        goeyToast.success(modalMode === 'add' ? 'Pengguna Berhasil Ditambahkan' : 'Pengguna Berhasil Diperbarui', {
-          description: `Pengguna "${formData.username}" dengan role "${formData.role}" telah berhasil ${modalMode === 'add' ? 'ditambahkan ke sistem' : 'diperbarui'}.`
+        goeyToast.success(offCanvasMode === 'add' ? 'Pengguna Berhasil Ditambahkan' : 'Pengguna Berhasil Diperbarui', {
+          description: `Pengguna "${formData.username}" dengan role "${formData.role}" telah berhasil ${offCanvasMode === 'add' ? 'ditambahkan ke sistem' : 'diperbarui'}.`
         });
       } else {
         goeyToast.error('Gagal Menyimpan Pengguna', {
@@ -364,13 +365,13 @@ export default function UsersPage() {
 
   return (
     <div className="bg-gray-50 min-h-screen relative">
-      <Header 
+      <PageHeader 
         title="Manage Pengguna"
         breadcrumbs={[{ label: 'Pengguna' }, { label: 'Manage Pengguna' }]}
         rightContent={
           checkActionPermission('create') && (
             <button 
-              onClick={handleOpenAddModal}
+              onClick={handleOpenAddOffCanvas}
               className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium transition-colors"
             >
               <Plus size={16} />
@@ -438,7 +439,7 @@ export default function UsersPage() {
                       <div className="flex items-center gap-1 pl-2 border-l border-gray-100">
                         {checkActionPermission('edit') && (
                           <button 
-                            onClick={() => handleOpenEditModal(user)}
+                            onClick={() => handleOpenEditOffCanvas(user)}
                             className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all duration-200"
                             title="Edit User"
                           >
@@ -508,103 +509,93 @@ export default function UsersPage() {
         </div>
       </div>
 
-      {/* Add/Edit Modal */}
-      {isModalOpen && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-lg w-full max-w-md mx-4">
-            <div className="flex justify-between items-center p-6 border-b border-gray-100">
-              <h2 className="text-xl font-bold text-gray-800">
-                {modalMode === 'add' ? 'Add User' : 'Edit User'}
-              </h2>
-              <button onClick={handleCloseModal} className="text-gray-400 hover:text-gray-600">
-                <X size={24} />
-              </button>
-            </div>
-            
-            <form onSubmit={handleSubmit} className="p-6">
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Username</label>
-                  <input
-                    type="text"
-                    required
-                    value={formData.username}
-                    onChange={(e) => setFormData(prev => ({ ...prev, username: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                    placeholder="Enter username"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                  <input
-                    type="email"
-                    required
-                    value={formData.email}
-                    onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                    placeholder="Enter email"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">{modalMode === 'edit' ? 'Password (opsional)' : 'Password'}</label>
-                  <input
-                    type="password"
-                    required={modalMode === 'add'}
-                    value={formData.password}
-                    onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                    placeholder="Enter password"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
-                  <select
-                    value={formData.role}
-                    onChange={(e) => setFormData(prev => ({ ...prev, role: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                  >
-                    {roles.map(role => (
-                        <option key={role.id} value={role.name}>{role.name}</option>
-                    ))}
-                    {roles.length === 0 && <option value="Cashier">Cashier</option>}
-                  </select>
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-                  <select
-                    value={formData.status}
-                    onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value as 'active' | 'inactive' }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                  >
-                    <option value="active">Active</option>
-                    <option value="inactive">Inactive</option>
-                  </select>
-                </div>
-              </div>
-              
-              <div className="flex justify-end gap-3 mt-6">
-                <button
-                  type="button"
-                  onClick={handleCloseModal}
-                  className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 text-white bg-blue-600 hover:bg-blue-700 rounded-lg text-sm font-medium transition-colors"
-                >
-                  Save
-                </button>
-              </div>
-            </form>
+      {/* Add/Edit OffCanvas */}
+      <OffCanvas
+        isOpen={isOffCanvasOpen}
+        onClose={handleCloseOffCanvas}
+        title={offCanvasMode === 'add' ? 'Add User' : 'Edit User'}
+      >
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Username</label>
+            <input
+              type="text"
+              required
+              value={formData.username}
+              onChange={(e) => setFormData(prev => ({ ...prev, username: e.target.value }))}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+              placeholder="Enter username"
+            />
           </div>
-        </div>
-      )}
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+            <input
+              type="email"
+              required
+              value={formData.email}
+              onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+              placeholder="Enter email"
+            />
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{offCanvasMode === 'edit' ? 'Password (opsional)' : 'Password'}</label>
+            <input
+              type="password"
+              required={offCanvasMode === 'add'}
+              value={formData.password}
+              onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+              placeholder="Enter password"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
+            <select
+              value={formData.role}
+              onChange={(e) => setFormData(prev => ({ ...prev, role: e.target.value }))}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+            >
+              {roles.map(role => (
+                  <option key={role.id} value={role.name}>{role.name}</option>
+              ))}
+              {roles.length === 0 && <option value="Cashier">Cashier</option>}
+            </select>
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+            <select
+              value={formData.status}
+              onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value as 'active' | 'inactive' }))}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+            >
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+            </select>
+          </div>
+        
+        
+          <div className="flex justify-end gap-3 mt-6">
+            <button
+              type="button"
+              onClick={handleCloseOffCanvas}
+              className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-4 py-2 text-white bg-blue-600 hover:bg-blue-700 rounded-lg text-sm font-medium transition-colors"
+            >
+              Save
+            </button>
+          </div>
+        </form>
+      </OffCanvas>
 
       <ConfirmModal
         isOpen={confirmModal.isOpen}

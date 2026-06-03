@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import Header from "@/components/Header";
+import PageHeader from "@/components/PageHeader";
 import { goeyToast } from "@/components/ui/goey-toaster";
 import { Loader2, Save, Key, User } from "lucide-react";
 
@@ -127,7 +127,7 @@ export default function ProfilePage() {
   if (loading) {
     return (
       <div className="flex flex-col h-full bg-gray-50">
-        <Header title="Profile Settings" />
+        <PageHeader title="Profile Settings" />
         <div className="flex-1 flex items-center justify-center">
           <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
         </div>
@@ -137,7 +137,7 @@ export default function ProfilePage() {
 
   return (
     <div className="flex flex-col h-full bg-gray-50">
-      <Header title="Profile Settings" subtitle="Manage your account details and password" />
+      <PageHeader title="Profile Settings" subtitle="Manage your account details and password" />
       <div className="flex-1 p-4 md:p-8 overflow-y-auto">
         <div className="max-w-4xl mx-auto space-y-6 pb-10">
           

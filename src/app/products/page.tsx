@@ -1,12 +1,14 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { Search, Filter, Plus, Edit, Trash2, X, PackageOpen } from 'lucide-react';
+import { Search, Filter, Plus, Edit, Trash2, PackageOpen, Info } from 'lucide-react';
 import { goeyToast } from "@/components/ui/goey-toaster";
 import ConfirmModal from '@/components/ConfirmModal';
-import Header from '@/components/Header';
+import PageHeader from '@/components/PageHeader';
+import OffCanvas from '@/components/OffCanvas';
 import { useRequirePermission } from '@/hooks/useRequirePermission';
+import { useKeyboardShortcuts } from '@/context/KeyboardShortcutsContext';
 
 interface Product {
   id: number;
@@ -16,7 +18,13 @@ interface Product {
   stock: number;
   unit: string;
   expired_date: string | null;
-  category: string;
+  location_code: string;
+  supplier_id: number | null;
+  supplier_name: string | null;
+  stock_type: 'belum_bayar' | 'konsinyasi' | 'dp' | 'lunas' | null;
+  purchase_date: string | null;
+  dp_amount?: number;
+  due_date?: string | null;
 }
 
 interface Batch {
@@ -48,8 +56,20 @@ interface ProductFormData {
   stock: string;
   unit: string;
   expired_date: string;
-  category: string;
+  location_code: string;
+  supplier_id: string;
+  stock_type: 'belum_bayar' | 'konsinyasi' | 'dp' | 'lunas';
+  purchase_date: string;
+  dp_amount?: string;
+  due_date?: string;
+  invoice_number?: string;
 }
+
+// For multiple products
+interface ProductItem extends ProductFormData {
+  id: string;
+}
+
 
 interface BatchFormData {
   supplier_id: string;
@@ -63,9 +83,18 @@ interface BatchFormData {
 
 export default function ProductsPage() {
   const router = useRouter();
+  const { setSearchInputRef } = useKeyboardShortcuts();
+  const searchRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setSearchInputRef(searchRef);
+    return () => setSearchInputRef({ current: null });
+  }, [setSearchInputRef]);
   // Permission Check
   const { checkActionPermission } = useRequirePermission('Management Product');
 
+  // Local product state (to add new products without server)
+  const [allProducts, setAllProducts] = useState<Product[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [suppliers, setSuppliers] = useState<{ id: number; name: string }[]>([]);
   const [loading, setLoading] = useState(true);
@@ -80,10 +109,10 @@ export default function ProductsPage() {
     totalPages: 1
   });
 
-  // Modal States
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isBatchesModalOpen, setIsBatchesModalOpen] = useState(false);
-  const [modalMode, setModalMode] = useState<'add' | 'edit'>('add');
+  // OffCanvas States
+  const [isProductOffCanvasOpen, setIsProductOffCanvasOpen] = useState(false);
+  const [isBatchesOffCanvasOpen, setIsBatchesOffCanvasOpen] = useState(false);
+  const [productOffCanvasMode, setProductOffCanvasMode] = useState<'add' | 'edit'>('add');
   const [batchModalMode, setBatchModalMode] = useState<'add' | 'edit'>('add');
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [selectedBatch, setSelectedBatch] = useState<Batch | null>(null);
@@ -95,6 +124,9 @@ export default function ProductsPage() {
     title: '',
     message: '',
     onConfirm: () => {},
+    onClose: () => {},
+    confirmText: 'Confirm',
+    cancelText: 'Cancel',
     variant: 'danger' as 'danger' | 'warning' | 'info'
   });
 
@@ -110,6 +142,7 @@ export default function ProductsPage() {
   });
 
   // Form State
+  const [isMultipleProducts, setIsMultipleProducts] = useState(false);
   const [formData, setFormData] = useState<ProductFormData>({
     name: '',
     cost_price: '',
@@ -117,8 +150,15 @@ export default function ProductsPage() {
     stock: '',
     unit: 'pcs',
     expired_date: '',
-    category: 'General'
+    location_code: '',
+    supplier_id: '',
+    stock_type: 'belum_bayar',
+    purchase_date: new Date().toISOString().split('T')[0],
+    invoice_number: '',
+    dp_amount: '',
+    due_date: ''
   });
+  const [multipleProducts, setMultipleProducts] = useState<ProductItem[]>([]);
 
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
   const authHeaders = useMemo<Record<string, string>>(() => {
@@ -126,51 +166,83 @@ export default function ProductsPage() {
     return { Authorization: `Bearer ${token}` };
   }, [token]);
 
-  const fetchProducts = useCallback(async () => {
+  const fetchProducts = useCallback(() => {
     setLoading(true);
     try {
-      const res = await fetch(`http://localhost:5000/api/products?page=${currentPage}&limit=${itemsPerPage}&search=${debouncedSearchQuery}`, {
-        headers: authHeaders
-      });
-
-      if (res.status === 401) {
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-        document.cookie = "token=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT";
-        router.push('/login');
-        return;
+      // Mock data untuk 20 produk dengan kode lokasi
+      const mockProducts: Product[] = [
+        { id: 1, name: "Paracetamol 500mg", cost_price: 2500, selling_price: 5000, stock: 100, unit: "tablet", expired_date: "2026-12-31", location_code: "A-01-01", supplier_id: 1, supplier_name: "PT Sumber Makmur", stock_type: "lunas", purchase_date: "2025-06-01", invoice_number: "INV-001" },
+        { id: 2, name: "Amoxicillin 250mg", cost_price: 3000, selling_price: 6000, stock: 80, unit: "tablet", expired_date: "2027-01-15", location_code: "A-01-02", supplier_id: 2, supplier_name: "PT Buana Saraswati", stock_type: "belum_bayar", purchase_date: "2025-06-05", invoice_number: "INV-002" },
+        { id: 3, name: "Ibuprofen 400mg", cost_price: 2800, selling_price: 5500, stock: 120, unit: "tablet", expired_date: "2026-11-20", location_code: "A-01-03", supplier_id: 1, supplier_name: "PT Sumber Makmur", stock_type: "konsinyasi", purchase_date: "2025-06-10", invoice_number: "INV-003" },
+        { id: 4, name: "Omeprazole 20mg", cost_price: 5000, selling_price: 10000, stock: 50, unit: "kapsul", expired_date: "2027-03-10", location_code: "A-02-01", supplier_id: 3, supplier_name: "PT Budhi Kurniawan Sejati", stock_type: "dp", purchase_date: "2025-06-08", dp_amount: 2500, due_date: "2025-07-08", invoice_number: "INV-004" },
+        { id: 5, name: "Cetirizine 10mg", cost_price: 3500, selling_price: 7000, stock: 90, unit: "tablet", expired_date: "2026-09-30", location_code: "A-02-02", supplier_id: 2, supplier_name: "PT Buana Saraswati", stock_type: "lunas", purchase_date: "2025-06-12", invoice_number: "INV-005" },
+        { id: 6, name: "Loratadine 10mg", cost_price: 4000, selling_price: 8000, stock: 60, unit: "tablet", expired_date: "2027-02-28", location_code: "A-02-03", supplier_id: 1, supplier_name: "PT Sumber Makmur", stock_type: "konsinyasi", purchase_date: "2025-06-15", invoice_number: "INV-006" },
+        { id: 7, name: "Dexamethasone 0.5mg", cost_price: 2000, selling_price: 4000, stock: 150, unit: "tablet", expired_date: "2026-10-15", location_code: "B-01-01", supplier_id: 3, supplier_name: "PT Budhi Kurniawan Sejati", stock_type: "belum_bayar", purchase_date: "2025-06-02", invoice_number: "INV-007" },
+        { id: 8, name: "Metformin 500mg", cost_price: 1800, selling_price: 3500, stock: 200, unit: "tablet", expired_date: "2027-04-20", location_code: "B-01-02", supplier_id: 2, supplier_name: "PT Buana Saraswati", stock_type: "lunas", purchase_date: "2025-06-03", invoice_number: "INV-008" },
+        { id: 9, name: "Simvastatin 20mg", cost_price: 4500, selling_price: 9000, stock: 40, unit: "tablet", expired_date: "2026-12-01", location_code: "B-01-03", supplier_id: 1, supplier_name: "PT Sumber Makmur", stock_type: "dp", purchase_date: "2025-06-07", dp_amount: 2250, due_date: "2025-07-07", invoice_number: "INV-009" },
+        { id: 10, name: "Amlodipine 5mg", cost_price: 3200, selling_price: 6500, stock: 70, unit: "tablet", expired_date: "2027-01-30", location_code: "B-02-01", supplier_id: 3, supplier_name: "PT Budhi Kurniawan Sejati", stock_type: "konsinyasi", purchase_date: "2025-06-09", invoice_number: "INV-010" },
+        { id: 11, name: "Losartan 50mg", cost_price: 3800, selling_price: 7500, stock: 85, unit: "tablet", expired_date: "2026-08-10", location_code: "B-02-02", supplier_id: 2, supplier_name: "PT Buana Saraswati", stock_type: "belum_bayar", purchase_date: "2025-06-11", invoice_number: "INV-011" },
+        { id: 12, name: "Vitamin C 500mg", cost_price: 1500, selling_price: 3000, stock: 300, unit: "tablet", expired_date: "2027-06-01", location_code: "C-01-01", supplier_id: 1, supplier_name: "PT Sumber Makmur", stock_type: "lunas", purchase_date: "2025-06-04", invoice_number: "INV-012" },
+        { id: 13, name: "Vitamin B Complex", cost_price: 2200, selling_price: 4500, stock: 180, unit: "tablet", expired_date: "2027-05-15", location_code: "C-01-02", supplier_id: 3, supplier_name: "PT Budhi Kurniawan Sejati", stock_type: "dp", purchase_date: "2025-06-06", dp_amount: 1100, due_date: "2025-07-06", invoice_number: "INV-013" },
+        { id: 14, name: "Magnesium Oxide 400mg", cost_price: 2000, selling_price: 4000, stock: 110, unit: "tablet", expired_date: "2026-11-30", location_code: "C-01-03", supplier_id: 2, supplier_name: "PT Buana Saraswati", stock_type: "konsinyasi", purchase_date: "2025-06-13", invoice_number: "INV-014" },
+        { id: 15, name: "Zinc Sulfate 20mg", cost_price: 1700, selling_price: 3400, stock: 95, unit: "tablet", expired_date: "2027-02-14", location_code: "C-02-01", supplier_id: 1, supplier_name: "PT Sumber Makmur", stock_type: "lunas", purchase_date: "2025-06-14", invoice_number: "INV-015" },
+        { id: 16, name: "Betadine Solution", cost_price: 8000, selling_price: 16000, stock: 50, unit: "botol", expired_date: "2028-01-01", location_code: "G-01-01", supplier_id: 2, supplier_name: "PT Buana Saraswati", stock_type: "belum_bayar", purchase_date: "2025-06-01", invoice_number: "INV-016" },
+        { id: 17, name: "Alcohol 70%", cost_price: 5000, selling_price: 10000, stock: 60, unit: "botol", expired_date: "2027-12-31", location_code: "G-01-02", supplier_id: 3, supplier_name: "PT Budhi Kurniawan Sejati", stock_type: "lunas", purchase_date: "2025-06-05", invoice_number: "INV-017" },
+        { id: 18, name: "Hydrocortisone Cream", cost_price: 6000, selling_price: 12000, stock: 35, unit: "tube", expired_date: "2027-03-01", location_code: "CH-01", supplier_id: 1, supplier_name: "PT Sumber Makmur", stock_type: "konsinyasi", purchase_date: "2025-06-08", invoice_number: "INV-018" },
+        { id: 19, name: "Salbutamol Inhaler", cost_price: 15000, selling_price: 30000, stock: 20, unit: "pcs", expired_date: "2026-10-01", location_code: "CH-02", supplier_id: 2, supplier_name: "PT Buana Saraswati", stock_type: "dp", purchase_date: "2025-06-10", dp_amount: 7500, due_date: "2025-07-10", invoice_number: "INV-019" },
+        { id: 20, name: "Neosporin Ointment", cost_price: 4500, selling_price: 9000, stock: 45, unit: "tube", expired_date: "2027-04-15", location_code: "B-02-T", supplier_id: 3, supplier_name: "PT Budhi Kurniawan Sejati", stock_type: "belum_bayar", purchase_date: "2025-06-03", invoice_number: "INV-020" }
+      ];
+      
+      // Initialize allProducts if empty
+      if (allProducts.length === 0) {
+        setAllProducts(mockProducts);
       }
-
-      if (res.status === 403) {
-        setProducts([]);
-        setPagination({ total: 0, page: 1, limit: itemsPerPage, totalPages: 1 });
-        goeyToast.error('Akses Ditolak', {
-          description: 'Anda tidak memiliki izin untuk melihat daftar produk.'
-        });
-        return;
+      
+      // Filter berdasarkan search query
+      let filteredProducts = allProducts.length > 0 ? allProducts : mockProducts;
+      if (debouncedSearchQuery) {
+        const searchLower = debouncedSearchQuery.toLowerCase();
+        filteredProducts = filteredProducts.filter(p => 
+          p.name.toLowerCase().includes(searchLower) || 
+          p.location_code.toLowerCase().includes(searchLower) || 
+          (p.supplier_name && p.supplier_name.toLowerCase().includes(searchLower))
+        );
       }
-
-      const data = await res.json();
-      setProducts(data.data);
-      setPagination(data.pagination);
+      
+      // Pagination
+      const startIndex = (currentPage - 1) * itemsPerPage;
+      const paginatedProducts = filteredProducts.slice(startIndex, startIndex + itemsPerPage);
+      const totalPages = Math.ceil(filteredProducts.length / itemsPerPage);
+      
+      setProducts(paginatedProducts);
+      setPagination({ total: filteredProducts.length, page: currentPage, limit: itemsPerPage, totalPages });
     } catch (error) {
       console.error('Error fetching products:', error);
     } finally {
       setLoading(false);
     }
-  }, [authHeaders, currentPage, itemsPerPage, debouncedSearchQuery, router]);
+  }, [currentPage, itemsPerPage, debouncedSearchQuery, allProducts]);
 
   const fetchSuppliers = useCallback(async () => {
     try {
-      const res = await fetch('http://localhost:5000/api/suppliers', {
-        headers: authHeaders
-      });
-      const data = await res.json();
-      setSuppliers(data.data || []);
+      // Mock suppliers
+      const mockSuppliers = [
+        { id: 1, name: "PT Sumber Makmur" },
+        { id: 2, name: "PT Buana Saraswati" },
+        { id: 3, name: "PT Budhi Kurniawan Sejati" },
+        { id: 4, name: "PT Jaya Bersama" },
+        { id: 5, name: "PT Sejahtera Abadi" },
+        { id: 6, name: "PT Prima Mandiri" },
+        { id: 7, name: "PT Global Medika" },
+        { id: 8, name: "PT Nusantara Farma" },
+        { id: 9, name: "PT Indah Jaya" },
+        { id: 10, name: "PT Cipta Sehat" }
+      ];
+      setSuppliers(mockSuppliers);
     } catch (error) {
       console.error('Error fetching suppliers:', error);
     }
-  }, [authHeaders]);
+  }, []);
 
   const fetchBatches = useCallback(async (productId: number) => {
     try {
@@ -190,10 +262,10 @@ export default function ProductsPage() {
   }, [fetchProducts, fetchSuppliers]);
 
   // Batches Handlers
-  const handleOpenBatchesModal = (product: Product) => {
+  const handleOpenBatchesOffCanvas = (product: Product) => {
     setSelectedProduct(product);
     fetchBatches(product.id);
-    setIsBatchesModalOpen(true);
+    setIsBatchesOffCanvasOpen(true);
   };
 
   const handleOpenAddBatchModal = () => {
@@ -342,8 +414,10 @@ export default function ProductsPage() {
   };
 
   // Handlers
-  const handleOpenAddModal = () => {
-    setModalMode('add');
+  const handleOpenAddOffCanvas = () => {
+    setProductOffCanvasMode('add');
+    setIsMultipleProducts(false);
+    setMultipleProducts([]);
     setFormData({
       name: '',
       cost_price: '',
@@ -351,13 +425,18 @@ export default function ProductsPage() {
       stock: '',
       unit: 'pcs',
       expired_date: '',
-      category: 'General'
+      location_code: '',
+      supplier_id: '',
+      stock_type: 'belum_bayar',
+      purchase_date: new Date().toISOString().split('T')[0],
+      invoice_number: ''
     });
-    setIsModalOpen(true);
+    setIsProductOffCanvasOpen(true);
   };
 
-  const handleOpenEditModal = (product: Product) => {
-    setModalMode('edit');
+  const handleOpenEditOffCanvas = (product: Product) => {
+    setProductOffCanvasMode('edit');
+    setIsMultipleProducts(false);
     setSelectedProduct(product);
     setFormData({
       name: product.name,
@@ -366,13 +445,19 @@ export default function ProductsPage() {
       stock: product.stock.toString(),
       unit: product.unit || 'pcs',
       expired_date: product.expired_date ? new Date(product.expired_date).toISOString().split('T')[0] : '',
-      category: product.category || 'General'
+      location_code: product.location_code || '',
+      supplier_id: product.supplier_id?.toString() || '',
+      stock_type: product.stock_type || 'belum_bayar',
+      purchase_date: product.purchase_date ? new Date(product.purchase_date).toISOString().split('T')[0] : '',
+      dp_amount: product.dp_amount?.toString() || '',
+      due_date: product.due_date ? new Date(product.due_date).toISOString().split('T')[0] : '',
+      invoice_number: product.invoice_number || ''
     });
-    setIsModalOpen(true);
+    setIsProductOffCanvasOpen(true);
   };
 
-  const handleCloseModal = () => {
-    setIsModalOpen(false);
+  const handleCloseProductOffCanvas = () => {
+    setIsProductOffCanvasOpen(false);
     setSelectedProduct(null);
   };
 
@@ -381,69 +466,115 @@ export default function ProductsPage() {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
     // Permission check
-    if (modalMode === 'add' && !checkActionPermission('create')) {
+    if (productOffCanvasMode === 'add' && !checkActionPermission('create')) {
         goeyToast.error('Akses Ditolak', {
             description: "Anda tidak memiliki izin untuk menambah produk baru."
         });
         return;
     }
-    if (modalMode === 'edit' && !checkActionPermission('edit')) {
+    if (productOffCanvasMode === 'edit' && !checkActionPermission('edit')) {
         goeyToast.error('Akses Ditolak', {
             description: "Anda tidak memiliki izin untuk mengubah data produk."
         });
         return;
     }
 
-    const url = modalMode === 'add' 
-      ? 'http://localhost:5000/api/products'
-      : `http://localhost:5000/api/products/${selectedProduct?.id}`;
-    
-    const method = modalMode === 'add' ? 'POST' : 'PUT';
-    
-    try {
-      const res = await fetch(url, {
-        method,
-        headers: {
-          'Content-Type': 'application/json',
-          ...authHeaders
-        },
-        body: JSON.stringify({
-          ...formData,
+    // Helper function to get supplier name
+    const getSupplierName = (supplierId: string | number | null) => {
+      if (!supplierId) return null;
+      const id = Number(supplierId);
+      const supplier = suppliers.find(s => s.id === id);
+      return supplier ? supplier.name : null;
+    };
+
+    if (productOffCanvasMode === 'edit' && selectedProduct) {
+      // Edit single product
+      const updatedProduct: Product = {
+        ...selectedProduct,
+        name: formData.name,
+        cost_price: Number(formData.cost_price),
+        selling_price: Number(formData.selling_price),
+        stock: Number(formData.stock),
+        unit: formData.unit,
+        expired_date: formData.expired_date || null,
+        location_code: formData.location_code,
+        supplier_id: formData.supplier_id ? Number(formData.supplier_id) : null,
+        supplier_name: getSupplierName(formData.supplier_id),
+        stock_type: formData.stock_type,
+        purchase_date: formData.purchase_date || null,
+        dp_amount: formData.dp_amount ? Number(formData.dp_amount) : null,
+        due_date: formData.due_date || null,
+        invoice_number: formData.invoice_number || null
+      };
+      
+      setAllProducts(prev => 
+        prev.map(p => p.id === selectedProduct.id ? updatedProduct : p)
+      );
+      
+      handleCloseProductOffCanvas();
+      goeyToast.success('Produk berhasil diperbarui', {
+        description: `Produk "${formData.name}" telah berhasil diperbarui.`
+      });
+    } else {
+      // Add mode
+      const newProducts: Product[] = [];
+      if (isMultipleProducts) {
+        if (multipleProducts.length === 0) {
+          goeyToast.error('Daftar produk kosong', { description: 'Silakan tambahkan setidaknya satu produk.' });
+          return;
+        }
+        const maxId = allProducts.reduce((max, p) => p.id > max ? p.id : max, 0);
+        multipleProducts.forEach((item, index) => {
+          newProducts.push({
+            id: maxId + index + 1,
+            name: item.name,
+            cost_price: Number(item.cost_price),
+            selling_price: Number(item.selling_price),
+            stock: Number(item.stock),
+            unit: item.unit,
+            expired_date: item.expired_date || null,
+            location_code: item.location_code,
+            supplier_id: item.supplier_id ? Number(item.supplier_id) : null,
+            supplier_name: getSupplierName(item.supplier_id),
+            stock_type: item.stock_type,
+            purchase_date: item.purchase_date || null,
+            dp_amount: item.dp_amount ? Number(item.dp_amount) : null,
+            due_date: item.due_date || null,
+            invoice_number: formData.invoice_number || null
+          });
+        });
+      } else {
+        // Single product add
+        const maxId = allProducts.reduce((max, p) => p.id > max ? p.id : max, 0);
+        newProducts.push({
+          id: maxId + 1,
+          name: formData.name,
           cost_price: Number(formData.cost_price),
           selling_price: Number(formData.selling_price),
           stock: Number(formData.stock),
-          expired_date: formData.expired_date || null
-        }),
-      });
-
-      if (res.status === 401) {
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-        document.cookie = "token=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT";
-        router.push('/login');
-        return;
-      }
-
-      if (res.ok) {
-        handleCloseModal();
-        fetchProducts();
-        goeyToast.success(`Produk berhasil ${modalMode === 'add' ? 'ditambahkan' : 'diperbarui'}`, {
-          description: `Produk "${formData.name}" dengan harga ${formatCurrency(Number(formData.selling_price))} telah berhasil ${modalMode === 'add' ? 'ditambahkan ke katalog' : 'diperbarui'}.`
-        });
-      } else {
-        const data = await res.json().catch(() => null);
-        goeyToast.error('Gagal menyimpan produk', {
-            description: data?.message || "Terjadi kesalahan saat menyimpan data produk."
+          unit: formData.unit,
+          expired_date: formData.expired_date || null,
+          location_code: formData.location_code,
+          supplier_id: formData.supplier_id ? Number(formData.supplier_id) : null,
+          supplier_name: getSupplierName(formData.supplier_id),
+          stock_type: formData.stock_type,
+          purchase_date: formData.purchase_date || null,
+          dp_amount: formData.dp_amount ? Number(formData.dp_amount) : null,
+          due_date: formData.due_date || null,
+          invoice_number: formData.invoice_number || null
         });
       }
-    } catch (error) {
-      console.error('Error saving product:', error);
-      goeyToast.error('Terjadi kesalahan sistem', {
-          description: "Gagal terhubung ke server. Silakan coba lagi."
+      
+      // Add new products
+      setAllProducts(prev => [...prev, ...newProducts]);
+      
+      handleCloseProductOffCanvas();
+      goeyToast.success(`Produk berhasil ditambahkan`, {
+        description: `${newProducts.length} produk telah berhasil ditambahkan ke katalog.`
       });
     }
   };
@@ -471,47 +602,28 @@ export default function ProductsPage() {
     }
 
     try {
-      const res = await fetch(`http://localhost:5000/api/products/${product.id}`, {
-        method: 'DELETE',
-        headers: authHeaders
+      // Delete from local state
+      setAllProducts(prev => prev.filter(p => p.id !== product.id));
+      goeyToast.success('Produk Berhasil Dihapus', {
+        description: `Produk "${product.name}" telah berhasil dihapus dari katalog.`
       });
-
-      if (res.status === 401) {
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-        document.cookie = "token=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT";
-        router.push('/login');
-        return;
-      }
-
-      if (res.ok) {
-        fetchProducts();
-        goeyToast.success('Produk Berhasil Dihapus', {
-          description: `Produk "${product.name}" telah berhasil dihapus dari katalog.`
-        });
-      } else {
-        const data = await res.json().catch(() => null);
-        goeyToast.error('Gagal Menghapus Produk', {
-          description: data?.message || 'Terjadi kesalahan saat menghapus produk.'
-        });
-      }
     } catch (error) {
       console.error('Error deleting product:', error);
       goeyToast.error('Terjadi Kesalahan', {
-        description: 'Gagal menghapus produk. Periksa koneksi internet Anda.'
+        description: 'Gagal menghapus produk.'
       });
     }
   };
 
   return (
     <div className="bg-gray-50 min-h-screen relative">
-      <Header 
+      <PageHeader 
         title="Products"
         subtitle={`All Products: ${pagination.total}`}
         rightContent={
           checkPermission('create') && (
             <button 
-              onClick={handleOpenAddModal}
+              onClick={handleOpenAddOffCanvas}
               className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium transition-colors"
             >
               <Plus size={16} />
@@ -533,6 +645,7 @@ export default function ProductsPage() {
             <div className="relative flex-1 md:w-64">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
               <input
+                ref={searchRef}
                 type="text"
                 placeholder="Search Products"
                 className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
@@ -554,6 +667,9 @@ export default function ProductsPage() {
               <tr>
                 {/* <th className="px-6 py-4 cursor-pointer hover:text-gray-700">ID ↕</th> */}
                 <th className="px-6 py-4 cursor-pointer hover:text-gray-700">Name </th>
+                <th className="px-6 py-4 cursor-pointer hover:text-gray-700">Kode Lokasi </th>
+                <th className="px-6 py-4 cursor-pointer hover:text-gray-700">Supplier </th>
+                <th className="px-6 py-4 cursor-pointer hover:text-gray-700">Stock Type </th>
                 <th className="px-6 py-4 cursor-pointer hover:text-gray-700">Cost Price </th>
                 <th className="px-6 py-4 cursor-pointer hover:text-gray-700">Selling Price </th>
                 <th className="px-6 py-4 cursor-pointer hover:text-gray-700">Expired Date </th>
@@ -564,13 +680,13 @@ export default function ProductsPage() {
             <tbody className="">
               {loading ? (
                 <tr>
-                  <td colSpan={8} className="px-6 py-8 text-center text-gray-500">
+                  <td colSpan={10} className="px-6 py-8 text-center text-gray-500">
                     Loading products...
                   </td>
                 </tr>
               ) : products.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-6 py-8 text-center text-gray-500">
+                  <td colSpan={10} className="px-6 py-8 text-center text-gray-500">
                     No products found.
                   </td>
                 </tr>
@@ -579,6 +695,26 @@ export default function ProductsPage() {
                   <tr key={product.id} className="hover:bg-gray-50 transition-colors group">
                     {/* <td className="px-6 py-4 text-gray-500">#{product.id}</td> */}
                     <td className="px-6 py-4 font-medium text-gray-900">{product.name}</td>
+                    <td className="px-6 py-4 text-gray-600 font-medium">{product.location_code || '-'}</td>
+                    <td className="px-6 py-4 text-gray-600">{product.supplier_name || '-'}</td>
+                    <td className="px-6 py-4">
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        product.stock_type === 'lunas' 
+                          ? 'bg-green-100 text-green-700' 
+                          : product.stock_type === 'belum_bayar'
+                          ? 'bg-yellow-100 text-yellow-700'
+                          : product.stock_type === 'konsinyasi'
+                          ? 'bg-purple-100 text-purple-700'
+                          : product.stock_type === 'dp'
+                          ? 'bg-blue-100 text-blue-700'
+                          : 'bg-gray-100 text-gray-700'
+                      }`}>
+                        {product.stock_type === 'lunas' ? 'Lunas' : 
+                         product.stock_type === 'belum_bayar' ? 'Belum Bayar' : 
+                         product.stock_type === 'konsinyasi' ? 'Konsinyasi' : 
+                         product.stock_type === 'dp' ? 'DP' : '-'}
+                      </span>
+                    </td>
                     <td className="px-6 py-4 text-gray-600">{formatCurrency(product.cost_price)}</td>
                     <td className="px-6 py-4 text-gray-600">{formatCurrency(product.selling_price)}</td>
                     <td className="px-6 py-4">
@@ -591,7 +727,7 @@ export default function ProductsPage() {
                       <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                         {checkPermission('edit') && (
                         <button 
-                          onClick={() => handleOpenBatchesModal(product)}
+                          onClick={() => handleOpenBatchesOffCanvas(product)}
                           className="p-1 text-green-600 hover:bg-green-50 rounded"
                           title="Batches"
                         >
@@ -600,7 +736,7 @@ export default function ProductsPage() {
                         )}
                         {checkPermission('edit') && (
                         <button 
-                          onClick={() => handleOpenEditModal(product)}
+                          onClick={() => handleOpenEditOffCanvas(product)}
                           className="p-1 text-blue-600 hover:bg-blue-50 rounded"
                           title="Edit"
                         >
@@ -672,22 +808,51 @@ export default function ProductsPage() {
       </div>
       </div>
 
-      {/* Add/Edit Modal */}
-      {isModalOpen && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-lg w-full max-w-lg mx-4">
-            <div className="flex justify-between items-center p-6 border-b border-gray-100">
-              <h2 className="text-xl font-bold text-gray-800">
-                {modalMode === 'add' ? 'Add New Product' : 'Edit Product'}
-              </h2>
-              <button onClick={handleCloseModal} className="text-gray-400 hover:text-gray-600">
-                <X size={24} />
-              </button>
+      {/* Add/Edit Product OffCanvas */}
+      <OffCanvas
+        isOpen={isProductOffCanvasOpen}
+        onClose={handleCloseProductOffCanvas}
+        title={productOffCanvasMode === 'add' ? 'Add New Product' : 'Edit Product'}
+      >
+        <form onSubmit={handleSubmit}>
+          <div className="space-y-4">
+            {/* Single/Multiple Toggle (only when adding) */}
+            {productOffCanvasMode === 'add' && (
+              <div className="flex bg-gray-100 rounded-lg p-1">
+                <button
+                  type="button"
+                  onClick={() => setIsMultipleProducts(false)}
+                  className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${!isMultipleProducts ? 'bg-white shadow text-blue-600' : 'text-gray-600 hover:text-gray-800'}`}
+                >
+                  1 Product
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsMultipleProducts(true)}
+                  className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${isMultipleProducts ? 'bg-white shadow text-blue-600' : 'text-gray-600 hover:text-gray-800'}`}
+                >
+                  Multiple Products
+                </button>
+              </div>
+            )}
+
+            {/* Invoice Number */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Nomor Faktur</label>
+              <input
+                type="text"
+                name="invoice_number"
+                value={formData.invoice_number}
+                onChange={handleInputChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                placeholder="FKT-001"
+              />
             </div>
-            
-            <form onSubmit={handleSubmit} className="p-6">
-              <div className="grid grid-cols-2 gap-4 mb-4">
-                <div className="col-span-2">
+
+            {/* Render form based on single/multiple */}
+            {productOffCanvasMode === 'edit' || !isMultipleProducts ? (
+              <React.Fragment>
+                <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Product Name</label>
                   <input
                     type="text"
@@ -700,76 +865,148 @@ export default function ProductsPage() {
                   />
                 </div>
                 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Cost Price (IDR)</label>
-                  <input
-                    type="number"
-                    name="cost_price"
-                    required
-                    min="0"
-                    value={formData.cost_price}
-                    onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                    placeholder="0"
-                  />
-                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Cost Price (IDR)</label>
+                    <input
+                      type="number"
+                      name="cost_price"
+                      required
+                      min="0"
+                      value={formData.cost_price}
+                      onChange={handleInputChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                      placeholder="0"
+                    />
+                  </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Selling Price (IDR)</label>
-                  <input
-                    type="number"
-                    name="selling_price"
-                    required
-                    min="0"
-                    value={formData.selling_price}
-                    onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                    placeholder="0"
-                  />
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Selling Price (IDR)</label>
+                    <input
+                      type="number"
+                      name="selling_price"
+                      required
+                      min="0"
+                      value={formData.selling_price}
+                      onChange={handleInputChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                      placeholder="0"
+                    />
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Stock</label>
+                    <input
+                      type="number"
+                      name="stock"
+                      required
+                      min="0"
+                      value={formData.stock}
+                      onChange={handleInputChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                      placeholder="0"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Unit</label>
+                    <select
+                      name="unit"
+                      value={formData.unit}
+                      onChange={handleInputChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                    >
+                      <option value="pcs">Pcs</option>
+                      <option value="box">Box</option>
+                      <option value="strip">Strip</option>
+                      <option value="bottle">Bottle</option>
+                    </select>
+                  </div>
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Stock</label>
-                  <input
-                    type="number"
-                    name="stock"
-                    required
-                    min="0"
-                    value={formData.stock}
-                    onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                    placeholder="0"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Unit</label>
-                  <select
-                    name="unit"
-                    value={formData.unit}
-                    onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                  >
-                    <option value="pcs">Pcs</option>
-                    <option value="box">Box</option>
-                    <option value="strip">Strip</option>
-                    <option value="bottle">Bottle</option>
-                  </select>
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-2">
+                    Kode Lokasi
+                    <button
+                      type="button"
+                      className="text-gray-500 hover:text-gray-700 transition-colors"
+                      onClick={() => setConfirmModal({
+                        isOpen: true,
+                        title: "Format Kode Lokasi",
+                        message: (
+                          <ul className="text-sm text-gray-600 space-y-2 mt-2">
+                            <li><span className="font-medium">A-01-03:</span> Rak A, Baris 01, Kolom 03</li>
+                            <li><span className="font-medium">B-02-T:</span> Rak B, Baris 02, Tingkat Atas (T)</li>
+                            <li><span className="font-medium">C-01-M:</span> Rak C, Baris 01, Tingkat Tengah (M)</li>
+                            <li><span className="font-medium">G-01-05:</span> Gudang (G), Rak 01, Slot 05</li>
+                            <li><span className="font-medium">CH-01:</span> Chiller/Kulkas (CH), Rak 01</li>
+                          </ul>
+                        ),
+                        onConfirm: () => setConfirmModal({ ...confirmModal, isOpen: false }),
+                        onClose: () => setConfirmModal({ ...confirmModal, isOpen: false }),
+                        confirmText: "Tutup",
+                        cancelText: "Tutup",
+                        variant: "info"
+                      })}
+                    >
+                      <Info size={16} />
+                    </button>
+                  </label>
                   <input
                     type="text"
-                    name="category"
-                    value={formData.category}
+                    name="location_code"
+                    value={formData.location_code}
                     onChange={handleInputChange}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                    placeholder="General"
+                    placeholder="A-01-03"
                   />
                 </div>
 
-                <div className="col-span-2">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Supplier</label>
+                    <select
+                      name="supplier_id"
+                      value={formData.supplier_id}
+                      onChange={handleInputChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                    >
+                      <option value="">Select Supplier</option>
+                      {suppliers.map((s) => (
+                        <option key={s.id} value={s.id}>{s.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Stock Type</label>
+                    <select
+                      name="stock_type"
+                      value={formData.stock_type}
+                      onChange={handleInputChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                    >
+                      <option value="belum_bayar">Belum Bayar</option>
+                      <option value="konsinyasi">Konsinyasi</option>
+                      <option value="dp">DP</option>
+                      <option value="lunas">Lunas</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Purchase Date</label>
+                  <input
+                    type="date"
+                    name="purchase_date"
+                    value={formData.purchase_date}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                  />
+                </div>
+
+                <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Expired Date</label>
                   <input
                     type="date"
@@ -779,239 +1016,459 @@ export default function ProductsPage() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                   />
                 </div>
+
+                {/* DP Fields (only show if stock type is DP) */}
+                {formData.stock_type === 'dp' && (
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">DP Amount (IDR)</label>
+                      <input
+                        type="number"
+                        name="dp_amount"
+                        min="0"
+                        value={formData.dp_amount}
+                        onChange={handleInputChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                        placeholder="0"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Due Date</label>
+                      <input
+                        type="date"
+                        name="due_date"
+                        value={formData.due_date}
+                        onChange={handleInputChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                      />
+                    </div>
+                  </div>
+                )}
+              </React.Fragment>
+            ) : (
+              // Multiple Products Section
+              <div className="space-y-4">
+                <div className="border border-gray-200 rounded-lg p-4">
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Supplier</label>
+                    <select
+                      value={formData.supplier_id}
+                      onChange={(e) => setFormData({ ...formData, supplier_id: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                    >
+                      <option value="">Pilih Supplier</option>
+                      {suppliers.map((s) => (
+                        <option key={s.id} value={s.id}>{s.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  
+                  <h3 className="font-medium text-gray-700 mb-3">Tambahkan Produk</h3>
+                  <div className="grid grid-cols-2 gap-4 mb-3">
+                    <div>
+                      <label className="block text-xs text-gray-600 mb-1">Nama Produk</label>
+                      <input
+                        type="text"
+                        value={formData.name}
+                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                        className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm"
+                        placeholder="Nama Produk"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-600 mb-1">Kode Lokasi</label>
+                      <input
+                        type="text"
+                        value={formData.location_code}
+                        onChange={(e) => setFormData({ ...formData, location_code: e.target.value })}
+                        className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm"
+                        placeholder="A-01-03"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-600 mb-1">Harga Beli</label>
+                      <input
+                        type="number"
+                        value={formData.cost_price}
+                        onChange={(e) => setFormData({ ...formData, cost_price: e.target.value })}
+                        className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm"
+                        placeholder="0"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-600 mb-1">Harga Jual</label>
+                      <input
+                        type="number"
+                        value={formData.selling_price}
+                        onChange={(e) => setFormData({ ...formData, selling_price: e.target.value })}
+                        className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm"
+                        placeholder="0"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-600 mb-1">Stock</label>
+                      <input
+                        type="number"
+                        value={formData.stock}
+                        onChange={(e) => setFormData({ ...formData, stock: e.target.value })}
+                        className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm"
+                        placeholder="0"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-600 mb-1">Unit</label>
+                      <select
+                        value={formData.unit}
+                        onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
+                        className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm"
+                      >
+                        <option value="pcs">Pcs</option>
+                        <option value="box">Box</option>
+                        <option value="strip">Strip</option>
+                        <option value="bottle">Bottle</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-600 mb-1">Tgl Kadaluarsa</label>
+                      <input
+                        type="date"
+                        value={formData.expired_date}
+                        onChange={(e) => setFormData({ ...formData, expired_date: e.target.value })}
+                        className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-600 mb-1">Stock Type</label>
+                      <select
+                        value={formData.stock_type}
+                        onChange={(e) => setFormData({ ...formData, stock_type: e.target.value as any })}
+                        className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm"
+                      >
+                        <option value="belum_bayar">Belum Bayar</option>
+                        <option value="konsinyasi">Konsinyasi</option>
+                        <option value="dp">DP</option>
+                        <option value="lunas">Lunas</option>
+                      </select>
+                    </div>
+                  </div>
+                  {/* DP Fields for multiple products */}
+                  {formData.stock_type === 'dp' && (
+                    <div className="grid grid-cols-2 gap-4 mb-3">
+                      <div>
+                        <label className="block text-xs text-gray-600 mb-1">DP Amount (IDR)</label>
+                        <input
+                          type="number"
+                          min="0"
+                          value={formData.dp_amount}
+                          onChange={(e) => setFormData({ ...formData, dp_amount: e.target.value })}
+                          className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm"
+                          placeholder="0"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-600 mb-1">Due Date</label>
+                        <input
+                          type="date"
+                          value={formData.due_date}
+                          onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
+                          className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm"
+                        />
+                      </div>
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!formData.name || !formData.cost_price || !formData.stock) return;
+                      setMultipleProducts([
+                        ...multipleProducts,
+                        {
+                          ...formData,
+                          id: Date.now().toString()
+                        }
+                      ]);
+                      // Reset form for next product
+                      setFormData({
+                        ...formData,
+                        name: '',
+                        location_code: '',
+                        cost_price: '',
+                        selling_price: '',
+                        stock: '',
+                        expired_date: '',
+                        dp_amount: '',
+                        due_date: ''
+                      });
+                    }}
+                    className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-md transition-colors"
+                  >
+                    + Tambahkan ke Daftar
+                  </button>
+                </div>
+
+                {/* Product List */}
+                {multipleProducts.length > 0 && (
+                  <div>
+                    <h3 className="font-medium text-gray-700 mb-2">Daftar Produk ({multipleProducts.length})</h3>
+                    <div className="space-y-2 max-h-60 overflow-y-auto">
+                      {multipleProducts.map((item, index) => (
+                        <div key={item.id} className="flex items-center justify-between bg-gray-50 p-3 rounded-lg">
+                          <div className="text-sm">
+                            <div className="font-medium text-gray-800">{index + 1}. {item.name}</div>
+                            <div className="text-gray-600 text-xs">
+                              {formatCurrency(Number(item.cost_price))} | Stok: {item.stock} {item.unit} | {(() => {
+                                const typeMap: Record<string, string> = {
+                                  belum_bayar: 'Belum Bayar',
+                                  konsinyasi: 'Konsinyasi',
+                                  dp: 'DP',
+                                  lunas: 'Lunas'
+                                };
+                                return typeMap[item.stock_type] || item.stock_type;
+                              })()}
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setMultipleProducts(multipleProducts.filter(p => p.id !== item.id));
+                            }}
+                            className="text-red-500 hover:text-red-700"
+                          >
+                            <Trash2 size={18} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
-              
+            )}
+          </div>
+          
+          <div className="flex justify-end gap-3 mt-8">
+            <button
+              type="button"
+              onClick={handleCloseProductOffCanvas}
+              className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-4 py-2 text-white bg-blue-600 hover:bg-blue-700 rounded-lg text-sm font-medium transition-colors"
+            >
+              {productOffCanvasMode === 'add' ? 'Create Product' : 'Save Changes'}
+            </button>
+          </div>
+        </form>
+      </OffCanvas>
+
+      {/* Batches OffCanvas */}
+      {isBatchesOffCanvasOpen && selectedProduct && (
+        <OffCanvas
+          isOpen={isBatchesOffCanvasOpen}
+          onClose={() => setIsBatchesOffCanvasOpen(false)}
+          title={`Batches for ${selectedProduct.name}`}
+          width="800px"
+        >
+          <div className="mb-4">
+            <p className="text-sm text-gray-500">Total stock: {selectedProduct.stock} {selectedProduct.unit}</p>
+          </div>
+
+          <div className="mb-4 flex justify-between items-center">
+            <h3 className="font-semibold text-gray-700">Batch List</h3>
+            <button
+              onClick={handleOpenAddBatchModal}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium transition-colors"
+            >
+              <Plus size={16} /> Add Batch
+            </button>
+          </div>
+
+          {batches.length === 0 ? (
+            <div className="text-center py-10 text-gray-500">
+              No batches found. Add your first batch!
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm text-left">
+                <thead className="bg-gray-50 text-gray-500 font-medium">
+                  <tr>
+                    <th className="px-4 py-3">Batch Number</th>
+                    <th className="px-4 py-3">Supplier</th>
+                    <th className="px-4 py-3">Stock Type</th>
+                    <th className="px-4 py-3">Purchase Date</th>
+                    <th className="px-4 py-3">Expired Date</th>
+                    <th className="px-4 py-3">Initial Qty</th>
+                    <th className="px-4 py-3">Remaining Qty</th>
+                    <th className="px-4 py-3">Cost Price</th>
+                    <th className="px-4 py-3 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {batches.map((batch) => (
+                    <tr key={batch.id} className="border-b border-gray-100 hover:bg-gray-50">
+                      <td className="px-4 py-3">{batch.batch_number || '-'}</td>
+                      <td className="px-4 py-3">{batch.supplier_name || '-'}</td>
+                      <td className="px-4 py-3">
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                          batch.stock_type === 'beli_normal' 
+                            ? 'bg-blue-100 text-blue-700' 
+                            : 'bg-purple-100 text-purple-700'
+                        }`}>
+                          {batch.stock_type === 'beli_normal' ? 'Normal' : 'Consignment'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">{batch.purchase_date ? new Date(batch.purchase_date).toLocaleDateString('id-ID') : '-'}</td>
+                      <td className="px-4 py-3">
+                        {batch.expired_date ? new Date(batch.expired_date).toLocaleDateString('id-ID') : '-'}
+                      </td>
+                      <td className="px-4 py-3">{batch.initial_quantity}</td>
+                      <td className="px-4 py-3 font-medium">{batch.remaining_quantity}</td>
+                      <td className="px-4 py-3">{formatCurrency(batch.cost_price)}</td>
+                      <td className="px-4 py-3 text-right">
+                        <div className="flex justify-end gap-2">
+                          <button
+                            onClick={() => handleOpenEditBatchModal(batch)}
+                            className="p-1 text-blue-600 hover:bg-blue-50 rounded"
+                            title="Edit"
+                          >
+                            <Edit size={14} />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteBatch(batch)}
+                            className="p-1 text-red-600 hover:bg-red-50 rounded"
+                            title="Delete"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* Batch Form */}
+          {(batchModalMode === 'add' || selectedBatch) && (
+            <div className="mt-6 border-t border-gray-100 pt-6">
+              <h3 className="font-semibold text-gray-700 mb-4">
+                {batchModalMode === 'add' ? 'Add New Batch' : 'Edit Batch'}
+              </h3>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Supplier</label>
+                  <select
+                    name="supplier_id"
+                    value={batchFormData.supplier_id}
+                    onChange={handleBatchInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  >
+                    <option value="">Select Supplier</option>
+                    {suppliers.map((s) => (
+                      <option key={s.id} value={s.id}>{s.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Batch Number</label>
+                  <input
+                    type="text"
+                    name="batch_number"
+                    value={batchFormData.batch_number}
+                    onChange={handleBatchInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    placeholder="Optional"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Stock Type</label>
+                  <select
+                    name="stock_type"
+                    value={batchFormData.stock_type}
+                    onChange={handleBatchInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  >
+                    <option value="beli_normal">Normal Purchase</option>
+                    <option value="consignment">Consignment</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Purchase Date</label>
+                  <input
+                    type="date"
+                    name="purchase_date"
+                    value={batchFormData.purchase_date}
+                    onChange={handleBatchInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Initial Quantity</label>
+                  <input
+                    type="number"
+                    name="initial_quantity"
+                    value={batchFormData.initial_quantity}
+                    onChange={handleBatchInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    placeholder="0"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Cost Price</label>
+                  <input
+                    type="number"
+                    name="cost_price"
+                    value={batchFormData.cost_price}
+                    onChange={handleBatchInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    placeholder="0"
+                  />
+                </div>
+                <div className="col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Expired Date</label>
+                  <input
+                    type="date"
+                    name="expired_date"
+                    value={batchFormData.expired_date}
+                    onChange={handleBatchInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  />
+                </div>
+              </div>
               <div className="flex justify-end gap-3 mt-6">
                 <button
                   type="button"
-                  onClick={handleCloseModal}
+                  onClick={() => {
+                    setBatchFormData({
+                      supplier_id: '',
+                      batch_number: '',
+                      stock_type: 'beli_normal',
+                      purchase_date: '',
+                      initial_quantity: '',
+                      cost_price: '',
+                      expired_date: ''
+                    });
+                    setSelectedBatch(null);
+                    setBatchModalMode('add');
+                  }}
                   className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium transition-colors"
                 >
                   Cancel
                 </button>
                 <button
-                  type="submit"
+                  type="button"
+                  onClick={handleSaveBatch}
                   className="px-4 py-2 text-white bg-blue-600 hover:bg-blue-700 rounded-lg text-sm font-medium transition-colors"
                 >
-                  {modalMode === 'add' ? 'Create Product' : 'Save Changes'}
+                  {batchModalMode === 'add' ? 'Add Batch' : 'Save Batch'}
                 </button>
               </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Batches Modal */}
-      {isBatchesModalOpen && selectedProduct && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-lg w-full max-w-5xl mx-4 max-h-[90vh] overflow-hidden flex flex-col">
-            <div className="flex justify-between items-center p-6 border-b border-gray-100">
-              <div>
-                <h2 className="text-xl font-bold text-gray-800">Batches for {selectedProduct.name}</h2>
-                <p className="text-sm text-gray-500">Total stock: {selectedProduct.stock} {selectedProduct.unit}</p>
-              </div>
-              <button onClick={() => setIsBatchesModalOpen(false)} className="text-gray-400 hover:text-gray-600">
-                <X size={24} />
-              </button>
             </div>
-
-            <div className="flex-1 overflow-auto p-6">
-              <div className="mb-4 flex justify-between items-center">
-                <h3 className="font-semibold text-gray-700">Batch List</h3>
-                <button
-                  onClick={handleOpenAddBatchModal}
-                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium transition-colors"
-                >
-                  <Plus size={16} /> Add Batch
-                </button>
-              </div>
-
-              {batches.length === 0 ? (
-                <div className="text-center py-10 text-gray-500">
-                  No batches found. Add your first batch!
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm text-left">
-                    <thead className="bg-gray-50 text-gray-500 font-medium">
-                      <tr>
-                        <th className="px-4 py-3">Batch Number</th>
-                        <th className="px-4 py-3">Supplier</th>
-                        <th className="px-4 py-3">Stock Type</th>
-                        <th className="px-4 py-3">Purchase Date</th>
-                        <th className="px-4 py-3">Expired Date</th>
-                        <th className="px-4 py-3">Initial Qty</th>
-                        <th className="px-4 py-3">Remaining Qty</th>
-                        <th className="px-4 py-3">Cost Price</th>
-                        <th className="px-4 py-3 text-right">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {batches.map((batch) => (
-                        <tr key={batch.id} className="border-b border-gray-100 hover:bg-gray-50">
-                          <td className="px-4 py-3">{batch.batch_number || '-'}</td>
-                          <td className="px-4 py-3">{batch.supplier_name || '-'}</td>
-                          <td className="px-4 py-3">
-                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                              batch.stock_type === 'beli_normal' 
-                                ? 'bg-blue-100 text-blue-700' 
-                                : 'bg-purple-100 text-purple-700'
-                            }`}>
-                              {batch.stock_type === 'beli_normal' ? 'Normal' : 'Consignment'}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3">{batch.purchase_date ? new Date(batch.purchase_date).toLocaleDateString('id-ID') : '-'}</td>
-                          <td className="px-4 py-3">
-                            {batch.expired_date ? new Date(batch.expired_date).toLocaleDateString('id-ID') : '-'}
-                          </td>
-                          <td className="px-4 py-3">{batch.initial_quantity}</td>
-                          <td className="px-4 py-3 font-medium">{batch.remaining_quantity}</td>
-                          <td className="px-4 py-3">{formatCurrency(batch.cost_price)}</td>
-                          <td className="px-4 py-3 text-right">
-                            <div className="flex justify-end gap-2">
-                              <button
-                                onClick={() => handleOpenEditBatchModal(batch)}
-                                className="p-1 text-blue-600 hover:bg-blue-50 rounded"
-                                title="Edit"
-                              >
-                                <Edit size={14} />
-                              </button>
-                              <button
-                                onClick={() => handleDeleteBatch(batch)}
-                                className="p-1 text-red-600 hover:bg-red-50 rounded"
-                                title="Delete"
-                              >
-                                <Trash2 size={14} />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-
-              {/* Batch Form */}
-              {(batchModalMode === 'add' || selectedBatch) && (
-                <div className="mt-6 border-t border-gray-100 pt-6">
-                  <h3 className="font-semibold text-gray-700 mb-4">
-                    {batchModalMode === 'add' ? 'Add New Batch' : 'Edit Batch'}
-                  </h3>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Supplier</label>
-                      <select
-                        name="supplier_id"
-                        value={batchFormData.supplier_id}
-                        onChange={handleBatchInputChange}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                      >
-                        <option value="">Select Supplier</option>
-                        {suppliers.map((s) => (
-                          <option key={s.id} value={s.id}>{s.name}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Batch Number</label>
-                      <input
-                        type="text"
-                        name="batch_number"
-                        value={batchFormData.batch_number}
-                        onChange={handleBatchInputChange}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                        placeholder="Optional"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Stock Type</label>
-                      <select
-                        name="stock_type"
-                        value={batchFormData.stock_type}
-                        onChange={handleBatchInputChange}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                      >
-                        <option value="beli_normal">Normal Purchase</option>
-                        <option value="consignment">Consignment</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Purchase Date</label>
-                      <input
-                        type="date"
-                        name="purchase_date"
-                        value={batchFormData.purchase_date}
-                        onChange={handleBatchInputChange}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Initial Quantity</label>
-                      <input
-                        type="number"
-                        name="initial_quantity"
-                        value={batchFormData.initial_quantity}
-                        onChange={handleBatchInputChange}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                        placeholder="0"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Cost Price</label>
-                      <input
-                        type="number"
-                        name="cost_price"
-                        value={batchFormData.cost_price}
-                        onChange={handleBatchInputChange}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                        placeholder="0"
-                      />
-                    </div>
-                    <div className="col-span-2">
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Expired Date</label>
-                      <input
-                        type="date"
-                        name="expired_date"
-                        value={batchFormData.expired_date}
-                        onChange={handleBatchInputChange}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                      />
-                    </div>
-                  </div>
-                  <div className="flex justify-end gap-3 mt-6">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setBatchFormData({
-                          supplier_id: '',
-                          batch_number: '',
-                          stock_type: 'beli_normal',
-                          purchase_date: '',
-                          initial_quantity: '',
-                          cost_price: '',
-                          expired_date: ''
-                        });
-                        setSelectedBatch(null);
-                        setBatchModalMode('add');
-                      }}
-                      className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium transition-colors"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleSaveBatch}
-                      className="px-4 py-2 text-white bg-blue-600 hover:bg-blue-700 rounded-lg text-sm font-medium transition-colors"
-                    >
-                      {batchModalMode === 'add' ? 'Add Batch' : 'Save Batch'}
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
+          )}
+        </OffCanvas>
       )}
 
       {/* Confirm Modal */}

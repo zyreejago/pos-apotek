@@ -5,7 +5,7 @@ import { Search, ShoppingCart, Plus, Minus, X, CreditCard } from 'lucide-react';
 
 import { goeyToast } from "@/components/ui/goey-toaster";
 import { useRequirePermission } from '@/hooks/useRequirePermission';
-import Header from '@/components/Header';
+import PageHeader from '@/components/PageHeader';
 import { useRouter } from 'next/navigation';
 
 interface Product {
@@ -416,7 +416,7 @@ export default function POSTransactionsPage() {
   return (
     <div className="flex flex-col h-screen bg-gray-50 overflow-hidden">
       {/* Header */}
-      <Header 
+      <PageHeader 
         breadcrumbs={[{ label: 'Transactions' }, { label: 'Point Of Sales' }]}
       />
 

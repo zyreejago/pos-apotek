@@ -1,14 +1,14 @@
 "use client";
 
 import React from 'react';
-import { AlertTriangle, X } from 'lucide-react';
+import { AlertTriangle, X, Info } from 'lucide-react';
 
 interface ConfirmModalProps {
   isOpen: boolean;
   onClose: () => void;
   onConfirm: () => void | Promise<void>;
   title: string;
-  message: string;
+  message: React.ReactNode;
   confirmText?: string;
   cancelText?: string;
   variant?: 'danger' | 'warning' | 'info';
@@ -53,7 +53,7 @@ export default function ConfirmModal({
       <div className="bg-white rounded-xl shadow-lg w-full max-w-md mx-4 p-6 transform transition-all scale-100">
         <div className="flex justify-between items-start mb-4">
           <div className={`w-12 h-12 ${styles.iconBg} rounded-full flex items-center justify-center ${styles.iconColor}`}>
-            <AlertTriangle size={24} />
+            {variant === 'info' ? <Info size={24} /> : <AlertTriangle size={24} />}
           </div>
           <button 
             onClick={onClose}

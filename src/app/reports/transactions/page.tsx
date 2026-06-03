@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import Header from '@/components/Header';
+import PageHeader from '@/components/PageHeader';
 import { goeyToast } from "@/components/ui/goey-toaster";
 import { Download, Calendar, Search } from 'lucide-react';
 import { 
@@ -239,7 +239,7 @@ export default function TransactionReportPage() {
 
   return (
     <div className="bg-gray-50 min-h-screen relative pb-10">
-      <Header
+      <PageHeader
         title="Laporan Transaksi"
         subtitle="Sales Report"
         breadcrumbs={[{ label: 'Sales Report' }, { label: 'Laporan Transaksi' }]}

@@ -2,10 +2,11 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { Search, Filter, Plus, Edit, Trash2, X, FileText, Image as ImageIcon } from 'lucide-react';
+import { Search, Filter, Plus, Edit, Trash2, FileText, Image as ImageIcon } from 'lucide-react';
 import { goeyToast } from "@/components/ui/goey-toaster";
 import ConfirmModal from '@/components/ConfirmModal';
-import Header from '@/components/Header';
+import OffCanvas from '@/components/OffCanvas';
+import PageHeader from '@/components/PageHeader';
 import { useRequirePermission } from '@/hooks/useRequirePermission';
 
 interface Prescription {
@@ -53,9 +54,9 @@ export default function PrescriptionsPage() {
     totalPages: 1
   });
 
-  // Modal States
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [modalMode, setModalMode] = useState<'add' | 'edit'>('add');
+  // OffCanvas States
+  const [isOffCanvasOpen, setIsOffCanvasOpen] = useState(false);
+  const [offCanvasMode, setOffCanvasMode] = useState<'add' | 'edit'>('add');
   const [selectedPrescription, setSelectedPrescription] = useState<Prescription | null>(null);
 
   // Confirm Modal State
@@ -142,8 +143,8 @@ export default function PrescriptionsPage() {
     }
   };
 
-  const handleOpenAddModal = () => {
-    setModalMode('add');
+  const handleOpenAddOffCanvas = () => {
+    setOffCanvasMode('add');
     setFormData({
       prescription_code: '',
       image: null,
@@ -152,11 +153,11 @@ export default function PrescriptionsPage() {
       notes: ''
     });
     setImagePreview(null);
-    setIsModalOpen(true);
+    setIsOffCanvasOpen(true);
   };
 
-  const handleOpenEditModal = (prescription: Prescription) => {
-    setModalMode('edit');
+  const handleOpenEditOffCanvas = (prescription: Prescription) => {
+    setOffCanvasMode('edit');
     setSelectedPrescription(prescription);
     setFormData({
       prescription_code: prescription.prescription_code || '',
@@ -166,7 +167,7 @@ export default function PrescriptionsPage() {
       notes: prescription.notes || ''
     });
     setImagePreview(prescription.image_url ? `http://localhost:5000${prescription.image_url}` : null);
-    setIsModalOpen(true);
+    setIsOffCanvasOpen(true);
   };
 
   const handleOpenDeleteModal = (prescription: Prescription) => {
@@ -186,13 +187,13 @@ export default function PrescriptionsPage() {
     e.preventDefault();
     
     // Permission check
-    if (modalMode === 'add' && !checkActionPermission('create')) {
+    if (offCanvasMode === 'add' && !checkActionPermission('create')) {
         goeyToast.error('Akses Ditolak', {
             description: "Anda tidak memiliki izin untuk menambahkan resep baru."
         });
         return;
     }
-    if (modalMode === 'edit' && !checkActionPermission('edit')) {
+    if (offCanvasMode === 'edit' && !checkActionPermission('edit')) {
         goeyToast.error('Akses Ditolak', {
             description: "Anda tidak memiliki izin untuk mengubah data resep ini."
         });
@@ -200,11 +201,11 @@ export default function PrescriptionsPage() {
     }
 
     try {
-      const url = modalMode === 'add' 
+      const url = offCanvasMode === 'add' 
         ? 'http://localhost:5000/api/inventory/prescriptions' 
         : `http://localhost:5000/api/inventory/prescriptions/${selectedPrescription?.id}`;
       
-      const method = modalMode === 'add' ? 'POST' : 'PUT';
+      const method = offCanvasMode === 'add' ? 'POST' : 'PUT';
       
       const formDataToSend = new FormData();
       formDataToSend.append('prescription_code', formData.prescription_code);
@@ -225,13 +226,13 @@ export default function PrescriptionsPage() {
       });
 
       if (res.ok) {
-        setIsModalOpen(false);
+        setIsOffCanvasOpen(false);
         fetchPrescriptions();
-        goeyToast.success(`Resep berhasil ${modalMode === 'add' ? 'ditambahkan' : 'diperbarui'}`, {
-          description: `Data resep telah berhasil ${modalMode === 'add' ? 'disimpan ke dalam sistem' : 'diperbarui'}.`
+        goeyToast.success(`Resep berhasil ${offCanvasMode === 'add' ? 'ditambahkan' : 'diperbarui'}`, {
+          description: `Data resep telah berhasil ${offCanvasMode === 'add' ? 'disimpan ke dalam sistem' : 'diperbarui'}.`
         });
       } else {
-        goeyToast.error(modalMode === 'add' ? 'Gagal Menambah Resep' : 'Gagal Memperbarui Resep', {
+        goeyToast.error(offCanvasMode === 'add' ? 'Gagal Menambah Resep' : 'Gagal Memperbarui Resep', {
             description: "Terjadi kesalahan saat menyimpan data. Silakan periksa kembali input Anda."
         });
       }
@@ -278,13 +279,13 @@ export default function PrescriptionsPage() {
 
   return (
     <div className="bg-gray-50 min-h-screen relative">
-      <Header 
+      <PageHeader 
         title="Resep Dokter"
         subtitle="Data Resep Dokter"
         rightContent={
           checkActionPermission('create') && (
             <button 
-              onClick={handleOpenAddModal}
+              onClick={handleOpenAddOffCanvas}
               className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium transition-colors"
             >
               <Plus size={16} />
@@ -372,7 +373,7 @@ export default function PrescriptionsPage() {
                         <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                           {checkActionPermission('edit') && (
                             <button 
-                              onClick={() => handleOpenEditModal(prescription)}
+                              onClick={() => handleOpenEditOffCanvas(prescription)}
                               className="p-1 text-blue-600 hover:bg-blue-50 rounded"
                               title="Edit"
                             >
@@ -399,90 +400,81 @@ export default function PrescriptionsPage() {
         </div>
       </div>
 
-      {/* Add/Edit Modal */}
-      {isModalOpen && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-lg mx-4">
-            <div className="flex justify-between items-center p-6 border-b border-gray-100">
-              <h3 className="text-xl font-bold text-gray-800">
-                {modalMode === 'add' ? 'Tambah Resep Baru' : 'Edit Resep'}
-              </h3>
-              <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600">
-                <X size={20} />
-              </button>
-            </div>
-            
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Kode Resep</label>
-                <input 
-                  type="text" 
-                  name="prescription_code"
-                  className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Masukkan kode resep"
-                  value={formData.prescription_code}
-                  onChange={handleInputChange}
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Tanggal Resep</label>
-                <input 
-                  type="date" 
-                  name="prescription_date"
-                  className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  value={formData.prescription_date}
-                  onChange={handleInputChange}
-                />
-              </div>
-
-              <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Upload Gambar Resep</label>
-        <input 
-          type="file" 
-          name="image"
-          accept="image/*"
-          className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-          onChange={handleInputChange}
-        />
-        {imagePreview && (
-          <div className="mt-2">
-            <img src={imagePreview} alt="Preview" className="max-h-48 rounded-lg border" />
+      {/* Add/Edit OffCanvas */}
+      <OffCanvas
+        isOpen={isOffCanvasOpen}
+        onClose={() => setIsOffCanvasOpen(false)}
+        title={offCanvasMode === 'add' ? 'Tambah Resep Baru' : 'Edit Resep'}
+      >
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Kode Resep</label>
+            <input 
+              type="text" 
+              name="prescription_code"
+              className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="Masukkan kode resep"
+              value={formData.prescription_code}
+              onChange={handleInputChange}
+            />
           </div>
-        )}
-      </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Catatan</label>
-                <textarea 
-                  name="notes"
-                  className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Catatan tambahan..."
-                  rows={3}
-                  value={formData.notes}
-                  onChange={handleInputChange}
-                />
-              </div>
-
-              <div className="flex gap-3 mt-6">
-                <button 
-                  type="button"
-                  onClick={() => setIsModalOpen(false)}
-                  className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 font-medium rounded-lg hover:bg-gray-200 transition-colors"
-                >
-                  Batal
-                </button>
-                <button 
-                  type="submit"
-                  className="flex-1 px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
-                >
-                  {modalMode === 'add' ? 'Tambah Resep' : 'Simpan Perubahan'}
-                </button>
-              </div>
-            </form>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Tanggal Resep</label>
+            <input 
+              type="date" 
+              name="prescription_date"
+              className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              value={formData.prescription_date}
+              onChange={handleInputChange}
+            />
           </div>
-        </div>
-      )}
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Upload Gambar Resep</label>
+            <input 
+              type="file" 
+              name="image"
+              accept="image/*"
+              className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              onChange={handleInputChange}
+            />
+            {imagePreview && (
+              <div className="mt-2">
+                <img src={imagePreview} alt="Preview" className="max-h-48 rounded-lg border" />
+              </div>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Catatan</label>
+            <textarea 
+              name="notes"
+              className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="Catatan tambahan..."
+              rows={3}
+              value={formData.notes}
+              onChange={handleInputChange}
+            />
+          </div>
+
+          <div className="flex gap-3 mt-6">
+            <button 
+              type="button"
+              onClick={() => setIsOffCanvasOpen(false)}
+              className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 font-medium rounded-lg hover:bg-gray-200 transition-colors"
+            >
+              Batal
+            </button>
+            <button 
+              type="submit"
+              className="flex-1 px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              {offCanvasMode === 'add' ? 'Tambah Resep' : 'Simpan Perubahan'}
+            </button>
+          </div>
+        </form>
+      </OffCanvas>
 
       {/* Confirm Modal */}
       <ConfirmModal

@@ -18,6 +18,8 @@ import {
   ChevronRight,
   Activity
 } from 'lucide-react';
+import { useOffCanvas } from '@/context/OffCanvasContext';
+import { useSidebar } from '@/context/SidebarContext';
 
 interface Permission {
   module: string;
@@ -31,7 +33,8 @@ export default function Sidebar() {
   const router = useRouter();
   const [isReportOpen, setIsReportOpen] = useState(true);
   const [isSettingsOpen, setIsSettingsOpen] = useState(true);
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  const { isCollapsed, toggleSidebar } = useSidebar();
+  const { isAnyOffCanvasOpen } = useOffCanvas();
   const [permissions, setPermissions] = useState<Permission[]>([]);
   const [userRole, setUserRole] = useState<string>('');
   const [loading, setLoading] = useState(true);
@@ -153,6 +156,21 @@ export default function Sidebar() {
     };
   }, [isAuthPage, pathname, syncAuth]);
 
+  // Auto collapse sidebar when any offcanvas opens
+  // useEffect(() => {
+  //   if (isAnyOffCanvasOpen) {
+  //     setUserCollapsedState(isCollapsed);
+  //     setIsCollapsed(true);
+  //   } else {
+  //     setIsCollapsed(userCollapsedState);
+  //   }
+  // }, [isAnyOffCanvasOpen]);
+
+  // Update userCollapsedState when user manually toggles
+  const handleToggleCollapse = () => {
+    toggleSidebar();
+  };
+
   const canShow = (module: string) => {
     if (loading) return false;
     if (userRole === 'superadmin') return true;
@@ -178,7 +196,7 @@ export default function Sidebar() {
           {!isCollapsed && <span className="text-lg font-bold text-slate-800 leading-tight">Apotek Sumber Waras</span>}
         </div>
         <button 
-            onClick={() => setIsCollapsed(!isCollapsed)}
+            onClick={handleToggleCollapse}
             className="p-1.5 rounded-lg hover:bg-gray-100 border border-gray-200 text-gray-400 shrink-0"
         >
              {isCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}

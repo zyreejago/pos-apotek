@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
+import { useKeyboardShortcuts } from '@/context/KeyboardShortcutsContext';
 import { useRouter } from 'next/navigation';
 import { 
   LineChart, 
@@ -16,7 +17,7 @@ import {
   ArrowUpRight,
   ChevronDown
 } from 'lucide-react';
-import Header from '@/components/Header';
+import PageHeader from '@/components/PageHeader';
 
 // Interfaces
 interface StockRec {
@@ -43,6 +44,13 @@ interface DashboardData {
 
 export default function Dashboard() {
   const router = useRouter();
+  const { setSearchInputRef } = useKeyboardShortcuts();
+  const searchRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setSearchInputRef(searchRef);
+    return () => setSearchInputRef({ current: null });
+  }, [setSearchInputRef]);
   const [stockRecommendations, setStockRecommendations] = useState<StockRec[]>([]);
   const [earningsData, setEarningsData] = useState<Earning[]>([]);
   const [cashiers, setCashiers] = useState<Cashier[]>([]);
@@ -125,7 +133,7 @@ export default function Dashboard() {
   return (
     <div className="bg-gray-50 min-h-screen font-sans relative">
       {/* Top Header */}
-      <Header 
+      <PageHeader 
         title="Dashboard"
         subtitle="Sales Dashboard"
         breadcrumbs={[{ label: 'Dashboards' }, { label: 'Default' }]}
@@ -222,6 +230,7 @@ export default function Dashboard() {
             <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
                 <input 
+                    ref={searchRef}
                     type="text" 
                     placeholder="Search Cashier" 
                     className="pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-64"

@@ -2,11 +2,12 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { Search, Filter, Edit, Trash2, X } from 'lucide-react';
+import { Search, Filter, Edit, Trash2 } from 'lucide-react';
 import { goeyToast } from "@/components/ui/goey-toaster";
 import ConfirmModal from '@/components/ConfirmModal';
+import OffCanvas from '@/components/OffCanvas';
 import { useRequirePermission } from '@/hooks/useRequirePermission';
-import Header from '@/components/Header';
+import PageHeader from '@/components/PageHeader';
 
 interface Supplier {
   id: number;
@@ -47,9 +48,9 @@ export default function SuppliersPage() {
     totalPages: 1
   });
 
-  // Modal States
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [modalMode, setModalMode] = useState<'add' | 'edit'>('add');
+  // OffCanvas States
+  const [isOffCanvasOpen, setIsOffCanvasOpen] = useState(false);
+  const [offCanvasMode, setOffCanvasMode] = useState<'add' | 'edit'>('add');
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
 
   // Confirm Modal State
@@ -124,19 +125,19 @@ export default function SuppliersPage() {
     }));
   };
 
-  const openAddModal = () => {
-    setModalMode('add');
+  const openAddOffCanvas = () => {
+    setOffCanvasMode('add');
     setFormData({
       name: '',
       contact_person: '',
       phone: '',
       address: ''
     });
-    setIsModalOpen(true);
+    setIsOffCanvasOpen(true);
   };
 
-  const openEditModal = (supplier: Supplier) => {
-    setModalMode('edit');
+  const openEditOffCanvas = (supplier: Supplier) => {
+    setOffCanvasMode('edit');
     setSelectedSupplier(supplier);
     setFormData({
       name: supplier.name,
@@ -144,7 +145,7 @@ export default function SuppliersPage() {
       phone: supplier.phone || '',
       address: supplier.address || ''
     });
-    setIsModalOpen(true);
+    setIsOffCanvasOpen(true);
   };
 
   const openDeleteModal = (supplier: Supplier) => {
@@ -164,13 +165,13 @@ export default function SuppliersPage() {
     e.preventDefault();
     
     // Permission check
-    if (modalMode === 'add' && !checkActionPermission('create')) {
+    if (offCanvasMode === 'add' && !checkActionPermission('create')) {
         goeyToast.error('Akses Ditolak', {
             description: "Anda tidak memiliki izin untuk menambahkan supplier baru."
         });
         return;
     }
-    if (modalMode === 'edit' && !checkActionPermission('edit')) {
+    if (offCanvasMode === 'edit' && !checkActionPermission('edit')) {
         goeyToast.error('Akses Ditolak', {
             description: "Anda tidak memiliki izin untuk mengubah data supplier ini."
         });
@@ -178,11 +179,11 @@ export default function SuppliersPage() {
     }
 
     try {
-      const url = modalMode === 'add' 
+      const url = offCanvasMode === 'add' 
         ? 'http://localhost:5000/api/suppliers' 
         : `http://localhost:5000/api/suppliers/${selectedSupplier?.id}`;
       
-      const method = modalMode === 'add' ? 'POST' : 'PUT';
+      const method = offCanvasMode === 'add' ? 'POST' : 'PUT';
       
       const res = await fetch(url, {
         method,
@@ -194,13 +195,13 @@ export default function SuppliersPage() {
       });
 
       if (res.ok) {
-        setIsModalOpen(false);
+        setIsOffCanvasOpen(false);
         fetchSuppliers();
-        goeyToast.success(`Supplier berhasil ${modalMode === 'add' ? 'ditambahkan' : 'diperbarui'}`, {
-          description: `Data supplier "${formData.name}" ${formData.contact_person ? `(CP: ${formData.contact_person})` : ''} telah berhasil ${modalMode === 'add' ? 'disimpan ke dalam sistem' : 'diperbarui'}.`
+        goeyToast.success(`Supplier berhasil ${offCanvasMode === 'add' ? 'ditambahkan' : 'diperbarui'}`, {
+          description: `Data supplier "${formData.name}" ${formData.contact_person ? `(CP: ${formData.contact_person})` : ''} telah berhasil ${offCanvasMode === 'add' ? 'disimpan ke dalam sistem' : 'diperbarui'}.`
         });
       } else {
-        goeyToast.error(modalMode === 'add' ? 'Gagal Menambah Supplier' : 'Gagal Memperbarui Supplier', {
+        goeyToast.error(offCanvasMode === 'add' ? 'Gagal Menambah Supplier' : 'Gagal Memperbarui Supplier', {
             description: "Terjadi kesalahan saat menyimpan data. Silakan periksa kembali input Anda."
         });
       }
@@ -247,7 +248,7 @@ export default function SuppliersPage() {
 
   return (
     <div className="bg-gray-50 min-h-screen relative">
-      <Header 
+      <PageHeader 
         title="Supplier"
         subtitle="Management Supplier"
         breadcrumbs={[{ label: 'Supplier' }, { label: 'Management Supplier' }]}
@@ -282,7 +283,7 @@ export default function SuppliersPage() {
                 
                 {checkActionPermission('create') && (
                 <button 
-                    onClick={openAddModal}
+                    onClick={openAddOffCanvas}
                     className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 flex items-center gap-2 shadow-sm shadow-blue-200"
                 >
                     Add Supplier
@@ -325,7 +326,7 @@ export default function SuppliersPage() {
                       <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                         {checkActionPermission('edit') && (
                           <button 
-                            onClick={() => openEditModal(supplier)}
+                            onClick={() => openEditOffCanvas(supplier)}
                             className="p-1 text-blue-600 hover:bg-blue-50 rounded"
                             title="Edit"
                           >
@@ -404,91 +405,79 @@ export default function SuppliersPage() {
       </div>
       </div>
 
-      {/* Add/Edit Modal */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-lg overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
-              <h3 className="font-bold text-lg text-gray-800">
-                {modalMode === 'add' ? 'Add Supplier' : 'Edit Supplier'}
-              </h3>
-              <button 
-                onClick={() => setIsModalOpen(false)}
-                className="text-gray-400 hover:text-gray-600 transition-colors"
-              >
-                <X size={20} />
-              </button>
-            </div>
-            
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Supplier Name</label>
-                <input 
-                  type="text" 
-                  name="name"
-                  required
-                  className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="e.g. PT. Sumber Makmur"
-                  value={formData.name}
-                  onChange={handleInputChange}
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Contact Person</label>
-                <input 
-                  type="text" 
-                  name="contact_person"
-                  className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="e.g. John Doe"
-                  value={formData.contact_person}
-                  onChange={handleInputChange}
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
-                <input 
-                  type="text" 
-                  name="phone"
-                  className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="e.g. 08123456789"
-                  value={formData.phone}
-                  onChange={handleInputChange}
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
-                <textarea 
-                  name="address"
-                  className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="e.g. Jl. Sudirman No. 1"
-                  rows={3}
-                  value={formData.address}
-                  onChange={handleInputChange}
-                />
-              </div>
-
-              <div className="flex gap-3 mt-6">
-                <button 
-                  type="button"
-                  onClick={() => setIsModalOpen(false)}
-                  className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 font-medium rounded-lg hover:bg-gray-200 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button 
-                  type="submit"
-                  className="flex-1 px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors shadow-sm shadow-blue-200"
-                >
-                  {modalMode === 'add' ? 'Add Supplier' : 'Save Changes'}
-                </button>
-              </div>
-            </form>
+      {/* Add/Edit OffCanvas */}
+      <OffCanvas
+        isOpen={isOffCanvasOpen}
+        onClose={() => setIsOffCanvasOpen(false)}
+        title={offCanvasMode === 'add' ? 'Add Supplier' : 'Edit Supplier'}
+      >
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Supplier Name</label>
+            <input 
+              type="text" 
+              name="name"
+              required
+              className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="e.g. PT. Sumber Makmur"
+              value={formData.name}
+              onChange={handleInputChange}
+            />
           </div>
-        </div>
-      )}
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Contact Person</label>
+            <input 
+              type="text" 
+              name="contact_person"
+              className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="e.g. John Doe"
+              value={formData.contact_person}
+              onChange={handleInputChange}
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+            <input 
+              type="text" 
+              name="phone"
+              className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="e.g. 08123456789"
+              value={formData.phone}
+              onChange={handleInputChange}
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
+            <textarea 
+              name="address"
+              className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="e.g. Jl. Sudirman No. 1"
+              rows={3}
+              value={formData.address}
+              onChange={handleInputChange}
+            />
+          </div>
+
+          <div className="flex gap-3 mt-6">
+            <button 
+              type="button"
+              onClick={() => setIsOffCanvasOpen(false)}
+              className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 font-medium rounded-lg hover:bg-gray-200 transition-colors"
+            >
+              Cancel
+            </button>
+            <button 
+              type="submit"
+              className="flex-1 px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors shadow-sm shadow-blue-200"
+            >
+              {offCanvasMode === 'add' ? 'Add Supplier' : 'Save Changes'}
+            </button>
+          </div>
+        </form>
+      </OffCanvas>
 
       {/* Confirm Modal */}
       <ConfirmModal

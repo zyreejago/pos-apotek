@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRequirePermission } from '@/hooks/useRequirePermission';
-import Header from '@/components/Header';
+import PageHeader from '@/components/PageHeader';
 
 export default function Page() {
   useRequirePermission('Substitutions');
@@ -43,7 +43,7 @@ export default function Page() {
 
   return (
     <div className="bg-gray-50 min-h-screen relative">
-      <Header 
+      <PageHeader 
         title="Substitutions"
         subtitle="Subtitusi Products"
         breadcrumbs={[{ label: 'Products' }, { label: 'Substitutions' }]}
