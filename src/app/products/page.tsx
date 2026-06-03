@@ -735,13 +735,13 @@ export default function ProductsPage() {
             <tbody className="">
               {loading ? (
                 <tr>
-                  <td colSpan={10} className="px-6 py-8 text-center text-gray-500">
+                  <td colSpan={9} className="px-6 py-8 text-center text-gray-500">
                     Loading products...
                   </td>
                 </tr>
               ) : products.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="px-6 py-8 text-center text-gray-500">
+                  <td colSpan={9} className="px-6 py-8 text-center text-gray-500">
                     No products found.
                   </td>
                 </tr>
@@ -1011,14 +1011,22 @@ export default function ProductsPage() {
                       <Info size={16} />
                     </button>
                   </label>
-                  <input
-                    type="text"
+                  <select
                     name="location_code"
                     value={formData.location_code}
                     onChange={handleInputChange}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                    placeholder="A-01-03"
-                  />
+                  >
+                    <option value="">Pilih Kode Lokasi</option>
+                    <option value="A-01-03">A-01-03 (Rak A, Baris 01, Kolom 03)</option>
+                    <option value="A-02-01">A-02-01 (Rak A, Baris 02, Kolom 01)</option>
+                    <option value="B-01-03">B-01-03 (Rak B, Baris 01, Kolom 03)</option>
+                    <option value="C-01-02">C-01-02 (Rak C, Baris 01, Kolom 02)</option>
+                    <option value="CH-01">CH-01 (Chiller 01)</option>
+                    <option value="CH-02">CH-02 (Chiller 02)</option>
+                    <option value="G-01-01">G-01-01 (Gudang, Rak 01)</option>
+                    <option value="G-01-05">G-01-05 (Gudang, Rak 05)</option>
+                  </select>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
@@ -1134,13 +1142,21 @@ export default function ProductsPage() {
                     </div>
                     <div>
                       <label className="block text-xs text-gray-600 mb-1">Kode Lokasi</label>
-                      <input
-                        type="text"
+                      <select
                         value={formData.location_code}
                         onChange={(e) => setFormData({ ...formData, location_code: e.target.value })}
                         className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm"
-                        placeholder="A-01-03"
-                      />
+                      >
+                        <option value="">Pilih Lokasi</option>
+                        <option value="A-01-03">A-01-03</option>
+                        <option value="A-02-01">A-02-01</option>
+                        <option value="B-01-03">B-01-03</option>
+                        <option value="C-01-02">C-01-02</option>
+                        <option value="CH-01">CH-01</option>
+                        <option value="CH-02">CH-02</option>
+                        <option value="G-01-01">G-01-01</option>
+                        <option value="G-01-05">G-01-05</option>
+                      </select>
                     </div>
                     <div>
                       <label className="block text-xs text-gray-600 mb-1">Harga Beli</label>
