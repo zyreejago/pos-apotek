@@ -25,6 +25,8 @@ interface Product {
   dp_amount?: number;
   due_date?: string | null;
   invoice_number?: string | null;
+  purchase_unit?: string | null;
+  unit_multiplier?: number;
 }
 
 interface Faktur {
@@ -82,6 +84,8 @@ interface ProductFormData {
   dp_amount?: string;
   due_date?: string;
   invoice_number?: string;
+  purchase_unit?: string;
+  unit_multiplier?: string;
 }
 
 // For multiple products
@@ -171,7 +175,7 @@ export default function ProductsPage() {
     cost_price: '',
     selling_price: '',
     stock: '',
-    unit: 'pcs',
+    unit: 'Tablet',
     expired_date: '',
     location_code: '',
     supplier_id: '',
@@ -179,7 +183,9 @@ export default function ProductsPage() {
     purchase_date: new Date().toISOString().split('T')[0],
     invoice_number: '',
     dp_amount: '',
-    due_date: ''
+    due_date: '',
+    purchase_unit: 'Box',
+    unit_multiplier: '1'
   });
   const [multipleProducts, setMultipleProducts] = useState<ProductItem[]>([]);
 
@@ -417,6 +423,24 @@ export default function ProductsPage() {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
+  const formatStock = (stock: number, multiplier: number, purchaseUnit: string, baseUnit: string) => {
+    const mult = multiplier || 1;
+    if (mult <= 1) {
+      return `${stock} ${baseUnit}`;
+    }
+    const pUnit = purchaseUnit || 'Box';
+    const bUnit = baseUnit || 'Tablet';
+    const boxes = Math.floor(stock / mult);
+    const remaining = stock % mult;
+    if (boxes > 0 && remaining > 0) {
+      return `${boxes} ${pUnit} ${remaining} ${bUnit}`;
+    } else if (boxes > 0) {
+      return `${boxes} ${pUnit}`;
+    } else {
+      return `${remaining} ${bUnit}`;
+    }
+  };
+
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('id-ID', {
       style: 'currency',
@@ -458,13 +482,15 @@ export default function ProductsPage() {
       cost_price: '',
       selling_price: '',
       stock: '',
-      unit: 'pcs',
+      unit: 'Tablet',
       expired_date: '',
       location_code: '',
       supplier_id: '',
       stock_type: 'belum_bayar',
       purchase_date: new Date().toISOString().split('T')[0],
-      invoice_number: ''
+      invoice_number: '',
+      purchase_unit: 'Box',
+      unit_multiplier: '1'
     });
     setIsProductOffCanvasOpen(true);
   };
@@ -477,8 +503,8 @@ export default function ProductsPage() {
       name: product.name,
       cost_price: product.cost_price.toString(),
       selling_price: product.selling_price.toString(),
-      stock: product.stock.toString(),
-      unit: product.unit || 'pcs',
+      stock: (product.stock / (product.unit_multiplier || 1)).toString(),
+      unit: product.unit || 'Tablet',
       expired_date: product.expired_date ? new Date(product.expired_date).toISOString().split('T')[0] : '',
       location_code: product.location_code || '',
       supplier_id: product.supplier_id?.toString() || '',
@@ -486,7 +512,9 @@ export default function ProductsPage() {
       purchase_date: product.purchase_date ? new Date(product.purchase_date).toISOString().split('T')[0] : '',
       dp_amount: product.dp_amount?.toString() || '',
       due_date: product.due_date ? new Date(product.due_date).toISOString().split('T')[0] : '',
-      invoice_number: product.invoice_number || ''
+      invoice_number: product.invoice_number || '',
+      purchase_unit: product.purchase_unit || 'Box',
+      unit_multiplier: (product.unit_multiplier || 1).toString()
     });
     setIsProductOffCanvasOpen(true);
   };
@@ -520,14 +548,17 @@ export default function ProductsPage() {
 
     if (productOffCanvasMode === 'edit' && selectedProduct) {
       try {
+        const multiplier = Number(formData.unit_multiplier) || 1;
         const payload = {
           name: formData.name,
           cost_price: Number(formData.cost_price),
           selling_price: Number(formData.selling_price) || 0,
-          stock: Number(formData.stock) || 0,
-          unit: formData.unit || 'pcs',
+          stock: Number(formData.stock) * multiplier,
+          unit: formData.unit || 'Tablet',
           expired_date: formData.expired_date || null,
-          location_code: formData.location_code || null
+          location_code: formData.location_code || null,
+          purchase_unit: formData.purchase_unit || 'Box',
+          unit_multiplier: multiplier
         };
         const res = await fetch(`http://localhost:5000/api/products/${selectedProduct.id}`, {
           method: 'PUT',
@@ -552,6 +583,9 @@ export default function ProductsPage() {
             p => p.name.trim().toLowerCase() === item.name.trim().toLowerCase()
           );
 
+          const multiplier = Number(item.unit_multiplier) || 1;
+          const calculatedStock = Number(item.stock) * multiplier;
+
           let productId = null;
           if (existingProduct) {
             productId = existingProduct.id;
@@ -560,10 +594,12 @@ export default function ProductsPage() {
               name: existingProduct.name,
               cost_price: Number(item.cost_price) || existingProduct.cost_price,
               selling_price: Number(item.selling_price) || existingProduct.selling_price || 0,
-              stock: item.supplier_id ? Number(existingProduct.stock) : Number(existingProduct.stock) + Number(item.stock),
-              unit: item.unit || existingProduct.unit || 'pcs',
+              stock: item.supplier_id ? Number(existingProduct.stock) : Number(existingProduct.stock) + calculatedStock,
+              unit: item.unit || existingProduct.unit || 'Tablet',
               expired_date: item.expired_date || existingProduct.expired_date || null,
-              location_code: item.location_code || existingProduct.location_code || null
+              location_code: item.location_code || existingProduct.location_code || null,
+              purchase_unit: item.purchase_unit || existingProduct.purchase_unit || 'Box',
+              unit_multiplier: multiplier
             };
             await fetch(`http://localhost:5000/api/products/${productId}`, {
               method: 'PUT',
@@ -576,10 +612,12 @@ export default function ProductsPage() {
               name: item.name,
               cost_price: Number(item.cost_price),
               selling_price: Number(item.selling_price) || 0,
-              stock: item.supplier_id ? 0 : Number(item.stock) || 0,
-              unit: item.unit || 'pcs',
+              stock: item.supplier_id ? 0 : calculatedStock,
+              unit: item.unit || 'Tablet',
               expired_date: item.expired_date || null,
-              location_code: item.location_code || null
+              location_code: item.location_code || null,
+              purchase_unit: item.purchase_unit || 'Box',
+              unit_multiplier: multiplier
             };
             const res = await fetch(`http://localhost:5000/api/products`, {
               method: 'POST',
@@ -598,7 +636,7 @@ export default function ProductsPage() {
               batch_number: item.invoice_number || null,
               stock_type: item.stock_type || 'belum_bayar',
               purchase_date: item.purchase_date || null,
-              initial_quantity: Number(item.stock) || 0,
+              initial_quantity: calculatedStock,
               cost_price: Number(item.cost_price) || 0,
               expired_date: item.expired_date || null
             };
@@ -784,7 +822,9 @@ export default function ProductsPage() {
                         {formatDate(product.expired_date)}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-gray-600">{product.stock}</td>
+                    <td className="px-6 py-4 text-gray-600">
+                      {formatStock(product.stock, product.unit_multiplier || 1, product.purchase_unit || 'Box', product.unit || 'Tablet')}
+                    </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                         {checkPermission('edit') && (
@@ -961,7 +1001,7 @@ export default function ProductsPage() {
                 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Stock</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Stock (Dalam {formData.purchase_unit || 'Box'})</label>
                     <input
                       type="number"
                       name="stock"
@@ -975,18 +1015,55 @@ export default function ProductsPage() {
                   </div>
                   
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Unit</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Unit Pembelian</label>
+                    <select
+                      name="purchase_unit"
+                      value={formData.purchase_unit}
+                      onChange={handleInputChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                    >
+                      <option value="Box">Box</option>
+                      <option value="Strip">Strip</option>
+                      <option value="Botol">Botol</option>
+                      <option value="Tube">Tube</option>
+                      <option value="Pcs">Pcs</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Unit Dasar</label>
                     <select
                       name="unit"
                       value={formData.unit}
                       onChange={handleInputChange}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                     >
-                      <option value="pcs">Pcs</option>
-                      <option value="box">Box</option>
-                      <option value="strip">Strip</option>
-                      <option value="bottle">Bottle</option>
+                      <option value="Tablet">Tablet</option>
+                      <option value="Kapsul">Kapsul</option>
+                      <option value="Kaplet">Kaplet</option>
+                      <option value="Pil">Pil</option>
+                      <option value="Lozenges (hisap)">Lozenges (hisap)</option>
+                      <option value="Sachet (serbuk)">Sachet (serbuk)</option>
+                      <option value="Tube">Tube</option>
+                      <option value="Botol">Botol</option>
+                      <option value="Pcs">Pcs</option>
                     </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Isi per Unit Pembelian</label>
+                    <input
+                      type="number"
+                      name="unit_multiplier"
+                      required
+                      min="1"
+                      value={formData.unit_multiplier}
+                      onChange={handleInputChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                      placeholder="1"
+                    />
                   </div>
                 </div>
                 
@@ -1186,7 +1263,7 @@ export default function ProductsPage() {
                       />
                     </div>
                     <div>
-                      <label className="block text-xs text-gray-600 mb-1">Stock</label>
+                      <label className="block text-xs text-gray-600 mb-1">Stock ({formData.purchase_unit || 'Box'})</label>
                       <input
                         type="number"
                         value={formData.stock}
@@ -1196,17 +1273,47 @@ export default function ProductsPage() {
                       />
                     </div>
                     <div>
-                      <label className="block text-xs text-gray-600 mb-1">Unit</label>
+                      <label className="block text-xs text-gray-600 mb-1">Unit Pembelian</label>
+                      <select
+                        value={formData.purchase_unit}
+                        onChange={(e) => setFormData({ ...formData, purchase_unit: e.target.value })}
+                        className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm"
+                      >
+                        <option value="Box">Box</option>
+                        <option value="Strip">Strip</option>
+                        <option value="Botol">Botol</option>
+                        <option value="Tube">Tube</option>
+                        <option value="Pcs">Pcs</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-600 mb-1">Unit Dasar</label>
                       <select
                         value={formData.unit}
                         onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
                         className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm"
                       >
-                        <option value="pcs">Pcs</option>
-                        <option value="box">Box</option>
-                        <option value="strip">Strip</option>
-                        <option value="bottle">Bottle</option>
+                        <option value="Tablet">Tablet</option>
+                        <option value="Kapsul">Kapsul</option>
+                        <option value="Kaplet">Kaplet</option>
+                        <option value="Pil">Pil</option>
+                        <option value="Lozenges (hisap)">Lozenges (hisap)</option>
+                        <option value="Sachet (serbuk)">Sachet (serbuk)</option>
+                        <option value="Tube">Tube</option>
+                        <option value="Botol">Botol</option>
+                        <option value="Pcs">Pcs</option>
                       </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-600 mb-1">Isi per Unit Pembelian</label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={formData.unit_multiplier}
+                        onChange={(e) => setFormData({ ...formData, unit_multiplier: e.target.value })}
+                        className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm"
+                        placeholder="1"
+                      />
                     </div>
                     <div>
                       <label className="block text-xs text-gray-600 mb-1">Tgl Kadaluarsa</label>
@@ -1296,7 +1403,9 @@ export default function ProductsPage() {
                         stock: '',
                         expired_date: '',
                         dp_amount: '',
-                        due_date: ''
+                        due_date: '',
+                        purchase_unit: 'Box',
+                        unit_multiplier: '1'
                       });
                     }}
                     className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-md transition-colors"
@@ -1314,8 +1423,8 @@ export default function ProductsPage() {
                         <div key={item.id} className="flex items-center justify-between bg-gray-50 p-3 rounded-lg">
                           <div className="text-sm">
                             <div className="font-medium text-gray-800">{index + 1}. {item.name}</div>
-                            <div className="text-gray-600 text-xs">
-                              {formatCurrency(Number(item.cost_price))} | Stok: {item.stock} {item.unit} | {(() => {
+                             <div className="text-gray-600 text-xs">
+                              {formatCurrency(Number(item.cost_price))} | Stok: {item.stock} {item.purchase_unit} (isi: {item.unit_multiplier} {item.unit}) | {(() => {
                                 const typeMap: Record<string, string> = {
                                   belum_bayar: 'Belum Bayar',
                                   konsinyasi: 'Konsinyasi',
@@ -1371,7 +1480,7 @@ export default function ProductsPage() {
           width="800px"
         >
           <div className="mb-4">
-            <p className="text-sm text-gray-500">Total stock: {selectedProduct.stock} {selectedProduct.unit}</p>
+            <p className="text-sm text-gray-500">Total stock: {formatStock(selectedProduct.stock, selectedProduct.unit_multiplier || 1, selectedProduct.purchase_unit || 'Box', selectedProduct.unit || 'Tablet')}</p>
           </div>
 
           <div className="mb-4 flex justify-between items-center">

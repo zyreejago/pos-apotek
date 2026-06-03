@@ -93,7 +93,7 @@ module.exports = function registerProductRoutes(app, pool, authenticate, checkPe
     authenticate,
     checkPermission('Management Product', 'create'),
     async (req, res) => {
-    const { name, cost_price, selling_price, stock, category, unit, expired_date, location_code } =
+    const { name, cost_price, selling_price, stock, category, unit, expired_date, location_code, purchase_unit, unit_multiplier } =
       req.body;
 
     if (!name || !cost_price) {
@@ -105,7 +105,7 @@ module.exports = function registerProductRoutes(app, pool, authenticate, checkPe
     try {
       const connection = await pool.getConnection();
       const [result] = await connection.query(
-        'INSERT INTO products (name, cost_price, selling_price, stock, category, unit, expired_date, location_code) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        'INSERT INTO products (name, cost_price, selling_price, stock, category, unit, expired_date, location_code, purchase_unit, unit_multiplier) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
         [
           name,
           cost_price,
@@ -115,6 +115,8 @@ module.exports = function registerProductRoutes(app, pool, authenticate, checkPe
           unit || 'pcs',
           expired_date || null,
           location_code || null,
+          purchase_unit || 'Box',
+          unit_multiplier || 1,
         ]
       );
       connection.release();
@@ -129,6 +131,8 @@ module.exports = function registerProductRoutes(app, pool, authenticate, checkPe
         unit,
         expired_date,
         location_code,
+        purchase_unit: purchase_unit || 'Box',
+        unit_multiplier: unit_multiplier || 1,
       });
     } catch (error) {
       console.error('Error adding product:', error);
@@ -143,14 +147,14 @@ module.exports = function registerProductRoutes(app, pool, authenticate, checkPe
     checkPermission('Management Product', 'edit'),
     async (req, res) => {
     const { id } = req.params;
-    const { name, cost_price, selling_price, stock, category, unit, expired_date, location_code } =
+    const { name, cost_price, selling_price, stock, category, unit, expired_date, location_code, purchase_unit, unit_multiplier } =
       req.body;
 
     try {
       const connection = await pool.getConnection();
       await connection.query(
-        'UPDATE products SET name = ?, cost_price = ?, selling_price = ?, stock = ?, category = ?, unit = ?, expired_date = ?, location_code = ? WHERE id = ?',
-        [name, cost_price, selling_price, stock, category, unit, expired_date, location_code || null, id]
+        'UPDATE products SET name = ?, cost_price = ?, selling_price = ?, stock = ?, category = ?, unit = ?, expired_date = ?, location_code = ?, purchase_unit = ?, unit_multiplier = ? WHERE id = ?',
+        [name, cost_price, selling_price, stock, category, unit, expired_date, location_code || null, purchase_unit || 'Box', unit_multiplier || 1, id]
       );
       connection.release();
 

@@ -16,6 +16,8 @@ interface Product {
   stock: number;
   unit: string;
   category: string;
+  purchase_unit?: string | null;
+  unit_multiplier?: number;
 }
 
 interface CartItem extends Product {
@@ -114,6 +116,24 @@ export default function POSTransactionsPage() {
 
   const formatCurrency = (val: number) => 
     new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(val);
+
+  const formatStock = (stock: number, multiplier: number, purchaseUnit: string, baseUnit: string) => {
+    const mult = multiplier || 1;
+    if (mult <= 1) {
+      return `${stock} ${baseUnit}`;
+    }
+    const pUnit = purchaseUnit || 'Box';
+    const bUnit = baseUnit || 'Tablet';
+    const boxes = Math.floor(stock / mult);
+    const remaining = stock % mult;
+    if (boxes > 0 && remaining > 0) {
+      return `${boxes} ${pUnit} ${remaining} ${bUnit}`;
+    } else if (boxes > 0) {
+      return `${boxes} ${pUnit}`;
+    } else {
+      return `${remaining} ${bUnit}`;
+    }
+  };
 
   // Calculations
   const subtotal = cart.reduce((sum, item) => sum + (item.selling_price * item.quantity), 0);
@@ -450,7 +470,7 @@ export default function POSTransactionsPage() {
                     <div className="flex justify-between items-start mb-2">
                         <h3 className="font-semibold text-gray-800 line-clamp-2 h-12">{product.name}</h3>
                         <span className="text-xs font-medium bg-gray-100 text-gray-600 px-2 py-1 rounded-full">
-                            Stock: {product.stock}
+                            Stock: {formatStock(product.stock, product.unit_multiplier || 1, product.purchase_unit || 'Box', product.unit || 'Tablet')}
                         </span>
                     </div>
                     <div className="flex justify-between items-end">

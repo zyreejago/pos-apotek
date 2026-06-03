@@ -76,6 +76,8 @@ const initDB = async () => {
         expired_date DATE,
         category VARCHAR(100),
         location_code VARCHAR(100) NULL,
+        purchase_unit VARCHAR(50) DEFAULT 'Box',
+        unit_multiplier INT DEFAULT 1,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
@@ -116,6 +118,12 @@ const initDB = async () => {
     } catch (e) {}
     try {
       await connection.query(`ALTER TABLE products ADD COLUMN location_code VARCHAR(100) NULL`);
+    } catch (e) {}
+    try {
+      await connection.query(`ALTER TABLE products ADD COLUMN purchase_unit VARCHAR(50) DEFAULT 'Box'`);
+    } catch (e) {}
+    try {
+      await connection.query(`ALTER TABLE products ADD COLUMN unit_multiplier INT DEFAULT 1`);
     } catch (e) {}
     try {
       await connection.query(`ALTER TABLE batches MODIFY COLUMN stock_type VARCHAR(50) DEFAULT 'belum_bayar'`);
@@ -492,8 +500,8 @@ const initDB = async () => {
         let selling = Math.ceil((p.cost * margin) / 100) * 100;
         
         await connection.query(
-          'INSERT INTO products (name, stock, cost_price, selling_price, unit, expired_date, category) VALUES (?, ?, ?, ?, ?, ?, ?)',
-          [p.name, p.stock, p.cost, selling, p.unit, p.expired, 'Medicine']
+          'INSERT INTO products (name, stock, cost_price, selling_price, unit, expired_date, category, purchase_unit, unit_multiplier) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          [p.name, p.stock, p.cost, selling, p.unit, p.expired, 'Medicine', 'Box', 1]
         );
       }
       console.log('Seeded new medicine products');
