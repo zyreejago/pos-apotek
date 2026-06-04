@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { Search, Plus, Edit, Trash2, FileText, Info } from 'lucide-react';
+import { Search, Plus, Edit, Trash2, FileText, Info, UploadCloud, Camera } from 'lucide-react';
 import { goeyToast } from "@/components/ui/goey-toaster";
 import ConfirmModal from '@/components/ConfirmModal';
 import PageHeader from '@/components/PageHeader';
@@ -113,6 +113,10 @@ interface FakturFormData {
 export default function ProductsPage() {
   const { setSearchInputRef } = useKeyboardShortcuts();
   const searchRef = useRef<HTMLInputElement>(null);
+  const productFileInputRef = useRef<HTMLInputElement>(null);
+  const productCameraInputRef = useRef<HTMLInputElement>(null);
+  const fakturFileInputRef = useRef<HTMLInputElement>(null);
+  const fakturCameraInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setSearchInputRef(searchRef);
@@ -331,6 +335,30 @@ export default function ProductsPage() {
   const handleFakturInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFakturFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleProductImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      setProductFormImageFile(file);
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        setProductFormImagePreview(event.target?.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleFakturImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      setFakturImageFile(file);
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        setFakturImagePreview(event.target?.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   const handleSaveFaktur = async () => {
@@ -1056,44 +1084,63 @@ export default function ProductsPage() {
                   )}
                 </div>
                 <div className="mb-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Bukti Faktur</label>
-                  <div className="flex flex-col gap-2">
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={(e) => {
-                        if (e.target.files && e.target.files[0]) {
-                          const file = e.target.files[0];
-                          setProductFormImageFile(file);
-                          const reader = new FileReader();
-                          reader.onload = (event) => {
-                            setProductFormImagePreview(event.target?.result as string);
-                          };
-                          reader.readAsDataURL(file);
-                        } else {
-                          setProductFormImageFile(null);
-                          setProductFormImagePreview(null);
-                        }
-                      }}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                    />
-                    {productFormImagePreview && (
-                      <div className="relative w-full max-w-md">
-                        <img
-                          src={productFormImagePreview}
-                          alt="Preview Bukti Faktur"
-                          className="w-full h-48 object-contain border rounded-lg p-1 bg-gray-50"
-                        />
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Bukti Faktur</label>
+                  <div className="flex flex-col gap-4 items-start">
+                    {/* Image Input UI */}
+                    <div className="w-full flex flex-col gap-3">
+                      <div className="flex gap-2">
                         <button
                           type="button"
-                          onClick={() => {
-                            setProductFormImageFile(null);
-                            setProductFormImagePreview(null);
-                          }}
-                          className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full hover:bg-red-600 transition-colors"
+                          onClick={() => productFileInputRef.current?.click()}
+                          className="flex-1 flex items-center justify-center gap-2 py-3 px-4 border-2 border-dashed border-gray-300 rounded-xl hover:border-blue-500 hover:bg-blue-50 transition-colors text-sm font-medium text-gray-600"
                         >
-                          <Trash2 size={16} />
+                          <UploadCloud size={20} className="text-gray-400" />
+                          Pilih File
                         </button>
+                        <button
+                          type="button"
+                          onClick={() => productCameraInputRef.current?.click()}
+                          className="flex-1 flex items-center justify-center gap-2 py-3 px-4 border-2 border-dashed border-gray-300 rounded-xl hover:border-blue-500 hover:bg-blue-50 transition-colors text-sm font-medium text-gray-600"
+                        >
+                          <Camera size={20} className="text-gray-400" />
+                          Ambil Foto
+                        </button>
+                      </div>
+
+                      {/* Hidden File Inputs */}
+                      <input
+                        type="file"
+                        ref={productFileInputRef}
+                        accept="image/*"
+                        className="hidden"
+                        onChange={handleProductImageChange}
+                      />
+                      <input
+                        type="file"
+                        ref={productCameraInputRef}
+                        accept="image/*"
+                        capture="environment"
+                        className="hidden"
+                        onChange={handleProductImageChange}
+                      />
+                    </div>
+
+                    {/* Preview */}
+                    {productFormImagePreview && (
+                      <div className="relative w-full max-w-sm h-48 shrink-0 rounded-xl overflow-hidden border-2 border-gray-200 group">
+                        <img src={productFormImagePreview} alt="Preview" className="w-full h-full object-cover" />
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setProductFormImageFile(null);
+                              setProductFormImagePreview(null);
+                            }}
+                            className="p-2 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
                       </div>
                     )}
                   </div>
@@ -1767,52 +1814,67 @@ export default function ProductsPage() {
                   />
                 </div>
                 <div className="col-span-2 md:col-span-1">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Bukti Faktur</label>
-                  <div className="flex flex-col gap-2">
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={(e) => {
-                        if (e.target.files && e.target.files[0]) {
-                          const file = e.target.files[0];
-                          setFakturImageFile(file);
-                          const reader = new FileReader();
-                          reader.onload = (event) => {
-                            setFakturImagePreview(event.target?.result as string);
-                          };
-                          reader.readAsDataURL(file);
-                        } else {
-                          setFakturImageFile(null);
-                          if (selectedFaktur?.image_url) {
-                            setFakturImagePreview(`http://localhost:5000${selectedFaktur.image_url}`);
-                          } else {
-                            setFakturImagePreview(null);
-                          }
-                        }
-                      }}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                    />
-                    {fakturImagePreview && (
-                      <div className="relative w-full max-w-md">
-                        <img
-                          src={fakturImagePreview}
-                          alt="Preview Bukti Faktur"
-                          className="w-full h-48 object-contain border rounded-lg p-1 bg-gray-50"
-                        />
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Bukti Faktur</label>
+                  <div className="flex flex-col gap-4 items-start">
+                    {/* Image Input UI */}
+                    <div className="w-full flex flex-col gap-3">
+                      <div className="flex gap-2">
                         <button
                           type="button"
-                          onClick={() => {
-                            setFakturImageFile(null);
-                            if (selectedFaktur?.image_url) {
-                              setFakturImagePreview(`http://localhost:5000${selectedFaktur.image_url}`);
-                            } else {
-                              setFakturImagePreview(null);
-                            }
-                          }}
-                          className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full hover:bg-red-600 transition-colors"
+                          onClick={() => fakturFileInputRef.current?.click()}
+                          className="flex-1 flex items-center justify-center gap-2 py-3 px-4 border-2 border-dashed border-gray-300 rounded-xl hover:border-blue-500 hover:bg-blue-50 transition-colors text-sm font-medium text-gray-600"
                         >
-                          <Trash2 size={16} />
+                          <UploadCloud size={20} className="text-gray-400" />
+                          Pilih File
                         </button>
+                        <button
+                          type="button"
+                          onClick={() => fakturCameraInputRef.current?.click()}
+                          className="flex-1 flex items-center justify-center gap-2 py-3 px-4 border-2 border-dashed border-gray-300 rounded-xl hover:border-blue-500 hover:bg-blue-50 transition-colors text-sm font-medium text-gray-600"
+                        >
+                          <Camera size={20} className="text-gray-400" />
+                          Ambil Foto
+                        </button>
+                      </div>
+
+                      {/* Hidden File Inputs */}
+                      <input
+                        type="file"
+                        ref={fakturFileInputRef}
+                        accept="image/*"
+                        className="hidden"
+                        onChange={handleFakturImageChange}
+                      />
+                      <input
+                        type="file"
+                        ref={fakturCameraInputRef}
+                        accept="image/*"
+                        capture="environment"
+                        className="hidden"
+                        onChange={handleFakturImageChange}
+                      />
+                    </div>
+
+                    {/* Preview */}
+                    {fakturImagePreview && (
+                      <div className="relative w-full max-w-sm h-48 shrink-0 rounded-xl overflow-hidden border-2 border-gray-200 group">
+                        <img src={fakturImagePreview} alt="Preview Bukti Faktur" className="w-full h-full object-cover" />
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setFakturImageFile(null);
+                              if (selectedFaktur?.image_url) {
+                                setFakturImagePreview(`http://localhost:5000${selectedFaktur.image_url}`);
+                              } else {
+                                setFakturImagePreview(null);
+                              }
+                            }}
+                            className="p-2 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
                       </div>
                     )}
                   </div>
