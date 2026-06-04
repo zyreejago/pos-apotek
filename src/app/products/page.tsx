@@ -1041,17 +1041,19 @@ export default function ProductsPage() {
                       ))}
                     </select>
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Nomor Faktur</label>
-                    <input
-                      type="text"
-                      name="invoice_number"
-                      value={formData.invoice_number ?? ''}
-                      onChange={handleInputChange}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                      placeholder="FKT-001"
-                    />
-                  </div>
+                  {!isMultipleProducts && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Nomor Batch (Opsional)</label>
+                      <input
+                        type="text"
+                        name="invoice_number"
+                        value={formData.invoice_number ?? ''}
+                        onChange={handleInputChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                        placeholder="Masukkan nomor batch"
+                      />
+                    </div>
+                  )}
                 </div>
                 <div className="mb-4">
                   <label className="block text-sm font-medium text-gray-700 mb-1">Bukti Faktur</label>
@@ -1479,17 +1481,27 @@ export default function ProductsPage() {
                       />
                     </div>
                     <div>
-                      <label className="block text-xs text-gray-600 mb-1">Tgl Kadaluarsa</label>
-                      <input
-                        type="date"
-                        name="expired_date"
-                        value={formData.expired_date}
-                        onChange={handleInputChange}
-                        className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm"
-                      />
-                    </div>
-                    
+                    <label className="block text-xs text-gray-600 mb-1">Tgl Kadaluarsa</label>
+                    <input
+                      type="date"
+                      name="expired_date"
+                      value={formData.expired_date}
+                      onChange={handleInputChange}
+                      className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm"
+                    />
                   </div>
+                  <div>
+                    <label className="block text-xs text-gray-600 mb-1">Nomor Batch (Opsional)</label>
+                    <input
+                      type="text"
+                      name="invoice_number"
+                      value={formData.invoice_number ?? ''}
+                      onChange={handleInputChange}
+                      className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm"
+                      placeholder="Masukkan nomor batch"
+                    />
+                  </div>
+                </div>
                   {/* DP Fields for multiple products */}
                 
                   <button
@@ -1533,6 +1545,7 @@ export default function ProductsPage() {
                         selling_price: '',
                         stock: '',
                         expired_date: '',
+                        invoice_number: '',
                         dp_amount: '',
                         due_date: '',
                         purchase_unit: 'Box',
@@ -1556,7 +1569,7 @@ export default function ProductsPage() {
                           <div className="text-sm">
                             <div className="font-medium text-gray-800">{index + 1}. {item.name}</div>
                              <div className="text-gray-600 text-xs">
-                              {formatCurrency(Number(item.cost_price))} | Stok: {item.stock} {item.purchase_unit} (isi: {item.unit_multiplier} {item.unit}) | {(() => {
+                              {formatCurrency(Number(item.cost_price))} | Stok: {item.stock} {item.purchase_unit} (isi: {item.unit_multiplier} {item.unit}) | Batch: {item.invoice_number || '-'} | {(() => {
                                 const typeMap: Record<string, string> = {
                                   belum_bayar: 'Belum Bayar',
                                   konsinyasi: 'Konsinyasi',
@@ -1743,14 +1756,14 @@ export default function ProductsPage() {
               </h3>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">No. Faktur</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Nomor Batch (Opsional)</label>
                   <input
                     type="text"
                     name="invoice_number"
                     value={fakturFormData.invoice_number}
                     onChange={handleFakturInputChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                    placeholder="FKT-001"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                    placeholder="Masukkan nomor batch"
                   />
                 </div>
                 <div className="col-span-2 md:col-span-1">
