@@ -33,7 +33,7 @@ export default function Sidebar() {
   const router = useRouter();
   const [isReportOpen, setIsReportOpen] = useState(true);
   const [isSettingsOpen, setIsSettingsOpen] = useState(true);
-  const { isCollapsed, toggleSidebar } = useSidebar();
+  const { isCollapsed, toggleSidebar, setIsCollapsed, userCollapsedState, setUserCollapsedState } = useSidebar();
   const { isAnyOffCanvasOpen } = useOffCanvas();
   const [permissions, setPermissions] = useState<Permission[]>([]);
   const [userRole, setUserRole] = useState<string>('');
@@ -157,14 +157,14 @@ export default function Sidebar() {
   }, [isAuthPage, pathname, syncAuth]);
 
   // Auto collapse sidebar when any offcanvas opens
-  // useEffect(() => {
-  //   if (isAnyOffCanvasOpen) {
-  //     setUserCollapsedState(isCollapsed);
-  //     setIsCollapsed(true);
-  //   } else {
-  //     setIsCollapsed(userCollapsedState);
-  //   }
-  // }, [isAnyOffCanvasOpen]);
+  useEffect(() => {
+    if (isAnyOffCanvasOpen) {
+      setUserCollapsedState(isCollapsed);
+      setIsCollapsed(true);
+    } else {
+      setIsCollapsed(userCollapsedState);
+    }
+  }, [isAnyOffCanvasOpen, isCollapsed, setIsCollapsed, setUserCollapsedState, userCollapsedState]);
 
   // Update userCollapsedState when user manually toggles
   const handleToggleCollapse = () => {
