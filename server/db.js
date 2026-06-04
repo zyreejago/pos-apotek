@@ -358,6 +358,26 @@ const initDB = async () => {
       )
     `);
 
+    // Audit trails table
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS audit_trails (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id INT NULL,
+        username VARCHAR(255) NULL,
+        role VARCHAR(50) NULL,
+        module VARCHAR(100) NOT NULL,
+        action VARCHAR(50) NOT NULL,
+        description TEXT,
+        ip_address VARCHAR(50) NULL,
+        user_agent TEXT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_audit_user (user_id),
+        INDEX idx_audit_created_at (created_at),
+        INDEX idx_audit_module (module),
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+      )
+    `);
+
     const [settings] = await connection.query('SELECT * FROM system_settings');
     if (settings.length === 0) {
       await connection.query(`

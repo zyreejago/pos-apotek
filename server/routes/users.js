@@ -1,4 +1,4 @@
-module.exports = function registerUserRoutes(app, pool, bcrypt, authenticate, checkPermission) {
+module.exports = function registerUserRoutes(app, pool, bcrypt, authenticate, checkPermission, createAuditTrail) {
   // Get all users with pagination and search
   app.get(
     '/api/users',
@@ -38,6 +38,17 @@ module.exports = function registerUserRoutes(app, pool, bcrypt, authenticate, ch
       const total = countResult[0].total;
 
       connection.release();
+
+      await createAuditTrail({
+        user_id: req.user.id,
+        username: req.user.username,
+        role: req.user.role,
+        module: 'Management Pengguna',
+        action: 'show',
+        description: `Melihat daftar pengguna${search ? ' dengan pencarian: ' + search : ''}`,
+        ip_address: req.ip,
+        user_agent: req.get('User-Agent')
+      });
 
       res.json({
         data: users,
@@ -80,6 +91,18 @@ module.exports = function registerUserRoutes(app, pool, bcrypt, authenticate, ch
           'INSERT INTO users (username, email, password, role, status) VALUES (?, ?, ?, ?, ?)',
           [username, email, hashedPassword, role, status || 'active']
         );
+
+        await createAuditTrail({
+          user_id: req.user.id,
+          username: req.user.username,
+          role: req.user.role,
+          module: 'Management Pengguna',
+          action: 'create',
+          description: `Membuat pengguna baru: ${username} (${email}) dengan role: ${role}`,
+          ip_address: req.ip,
+          user_agent: req.get('User-Agent')
+        });
+
         res.status(201).json({
           id: result.insertId,
           username,
@@ -146,6 +169,18 @@ module.exports = function registerUserRoutes(app, pool, bcrypt, authenticate, ch
         params.push(id);
 
         await pool.query(query, params);
+
+        await createAuditTrail({
+          user_id: req.user.id,
+          username: req.user.username,
+          role: req.user.role,
+          module: 'Management Pengguna',
+          action: 'edit',
+          description: `Memperbarui pengguna: ${existing[0].username} -> ${username} (${email})`,
+          ip_address: req.ip,
+          user_agent: req.get('User-Agent')
+        });
+
         res.json({ message: 'User updated successfully' });
       } catch (error) {
         if (error.code === 'ER_DUP_ENTRY') {
@@ -175,7 +210,7 @@ module.exports = function registerUserRoutes(app, pool, bcrypt, authenticate, ch
 
         // Check target user role
         const [existing] = await pool.query(
-          'SELECT role FROM users WHERE id = ?',
+          'SELECT username, email, role FROM users WHERE id = ?',
           [id]
         );
         if (existing.length === 0) {
@@ -196,6 +231,17 @@ module.exports = function registerUserRoutes(app, pool, bcrypt, authenticate, ch
         if (result.affectedRows === 0) {
           return res.status(404).json({ message: 'User not found' });
         }
+
+        await createAuditTrail({
+          user_id: req.user.id,
+          username: req.user.username,
+          role: req.user.role,
+          module: 'Management Pengguna',
+          action: 'delete',
+          description: `Menghapus pengguna: ${existing[0].username} (${existing[0].email})`,
+          ip_address: req.ip,
+          user_agent: req.get('User-Agent')
+        });
 
         res.json({ message: 'User deleted successfully' });
       } catch (error) {

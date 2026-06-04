@@ -332,6 +332,10 @@ export default function Sidebar() {
                 <NavItem href="/recommendations" icon={<Rocket size={20} />} label="Peramalan Stok" active={isActive('/recommendations')} isCollapsed={isCollapsed} />
             )}
             
+            {canShow('Audit Trail') && (
+                <NavItem href="/audit-trails" icon={<Activity size={20} />} label="Audit Trail" active={isActive('/audit-trails')} isCollapsed={isCollapsed} />
+            )}
+            
             <div className={`pt-4 pb-2 px-3 ${isCollapsed ? 'text-center' : ''}`}>
                 <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">{isCollapsed ? '...' : 'Others'}</span>
             </div>

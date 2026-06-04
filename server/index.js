@@ -16,6 +16,7 @@ const registerProfileRoutes = require('./routes/profile');
 const registerStockForecastRoutes = require('./routes/stock-forecast');
 const registerStockForecastOpenRouterRoutes = require('./routes/stock-forecast-openrouter');
 const registerInventoryRoutes = require('./routes/inventory');
+const { registerAuditTrailRoutes, createAuditTrail } = require('./routes/audit-trails');
 
 const envPath = path.join(__dirname, '..', '.env');
 console.log('Loading .env from:', envPath);
@@ -85,6 +86,17 @@ app.post('/api/register', async (req, res) => {
       [username, email, hashedPassword, 'user', 'active']
     );
 
+    await createAuditTrail(pool, {
+      user_id: result.insertId,
+      username: username,
+      role: 'user',
+      module: 'Management Pengguna',
+      action: 'register',
+      description: `Pengguna baru mendaftar: ${username} (${email})`,
+      ip_address: req.ip,
+      user_agent: req.get('User-Agent')
+    });
+
     const token = jwt.sign(
       { id: result.insertId, username, email, role: 'user' },
       JWT_SECRET,
@@ -134,9 +146,20 @@ app.post('/api/login', async (req, res) => {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
-    const token = jwt.sign({ id: user.id, username: user.username, role: user.role, email: user.email }, JWT_SECRET, {
-      expiresIn: '1d'
+    await createAuditTrail(pool, {
+      user_id: user.id,
+      username: user.username,
+      role: user.role,
+      module: 'Management Pengguna',
+      action: 'login',
+      description: `Pengguna login: ${user.username} (${email})`,
+      ip_address: req.ip,
+      user_agent: req.get('User-Agent')
     });
+
+    const token = jwt.sign({ id: user.id, username: user.username, role: user.role, email: user.email }, JWT_SECRET, {
+      expiresIn: '1d' }
+    );
 
     res.json({ 
       token, 
@@ -144,7 +167,7 @@ app.post('/api/login', async (req, res) => {
         id: user.id, 
         username: user.username, 
         email: user.email, 
-        role: user.role
+        role: user.role 
       } 
     });
   } catch (error) {
@@ -207,7 +230,8 @@ const RBAC_MODULES = [
   'Suppliers',
   'Stock Opname',
   'Resep Dokter',
-  'System Settings'
+  'System Settings',
+  'Audit Trail'
 ];
 
 app.get('/api/rbac/modules', authenticate, (req, res) => {
@@ -352,17 +376,18 @@ app.put('/api/rbac/permissions', authenticate, requireSuperadmin, async (req, re
 
 
 // Register feature routes
-registerUserRoutes(app, pool, bcrypt, authenticate, checkPermission);
+registerAuditTrailRoutes(app, pool, authenticate, checkPermission);
+registerUserRoutes(app, pool, bcrypt, authenticate, checkPermission, (params) => createAuditTrail(pool, params));
 registerPasswordResetRoutes(app, pool, bcrypt);
-registerProfileRoutes(app, pool, bcrypt, authenticate);
-registerProductRoutes(app, pool, authenticate, checkPermission);
-registerSettingsRoutes(app, pool, authenticate);
-registerTransactionRoutes(app, pool, authenticate, checkPermission);
-registerSupplierRoutes(app, pool, authenticate, checkPermission);
+registerProfileRoutes(app, pool, bcrypt, authenticate, (params) => createAuditTrail(pool, params));
+registerProductRoutes(app, pool, authenticate, checkPermission, (params) => createAuditTrail(pool, params));
+registerSettingsRoutes(app, pool, authenticate, (params) => createAuditTrail(pool, params));
+registerTransactionRoutes(app, pool, authenticate, checkPermission, (params) => createAuditTrail(pool, params));
+registerSupplierRoutes(app, pool, authenticate, checkPermission, (params) => createAuditTrail(pool, params));
 registerReportRoutes(app, pool, authenticate, checkPermission);
 registerStockForecastRoutes(app, pool, authenticate, checkPermission);
 registerStockForecastOpenRouterRoutes(app, pool, authenticate, checkPermission);
-registerInventoryRoutes(app, pool, authenticate, checkPermission, upload);
+registerInventoryRoutes(app, pool, authenticate, checkPermission, upload, (params) => createAuditTrail(pool, params));
 
 async function startServer() {
   await initDB();
