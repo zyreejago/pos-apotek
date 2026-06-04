@@ -172,6 +172,7 @@ export default function ProductsPage() {
     notes: ''
   });
   const [fakturImageFile, setFakturImageFile] = useState<File | null>(null);
+  const [fakturImagePreview, setFakturImagePreview] = useState<string | null>(null);
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
 
   // Form State
@@ -194,6 +195,7 @@ export default function ProductsPage() {
     unit_multiplier: '1'
   });
   const [productFormImageFile, setProductFormImageFile] = useState<File | null>(null);
+  const [productFormImagePreview, setProductFormImagePreview] = useState<string | null>(null);
   const [multipleProducts, setMultipleProducts] = useState<ProductItem[]>([]);
 
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
@@ -298,6 +300,7 @@ export default function ProductsPage() {
       notes: ''
     });
     setFakturImageFile(null);
+    setFakturImagePreview(null);
   };
 
   const handleOpenEditFakturModal = (faktur: Faktur) => {
@@ -322,6 +325,7 @@ export default function ProductsPage() {
       notes: faktur.notes || ''
     });
     setFakturImageFile(null);
+    setFakturImagePreview(faktur.image_url ? `http://localhost:5000${faktur.image_url}` : null);
   };
 
   const handleFakturInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
@@ -537,6 +541,7 @@ export default function ProductsPage() {
     setIsProductOffCanvasOpen(false);
     setSelectedProduct(null);
     setProductFormImageFile(null);
+    setProductFormImagePreview(null);
     setFormData({
       name: '',
       cost_price: '',
@@ -1050,16 +1055,46 @@ export default function ProductsPage() {
                 </div>
                 <div className="mb-4">
                   <label className="block text-sm font-medium text-gray-700 mb-1">Bukti Faktur</label>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => {
-                      if (e.target.files && e.target.files[0]) {
-                        setProductFormImageFile(e.target.files[0]);
-                      }
-                    }}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                  />
+                  <div className="flex flex-col gap-2">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => {
+                        if (e.target.files && e.target.files[0]) {
+                          const file = e.target.files[0];
+                          setProductFormImageFile(file);
+                          const reader = new FileReader();
+                          reader.onload = (event) => {
+                            setProductFormImagePreview(event.target?.result as string);
+                          };
+                          reader.readAsDataURL(file);
+                        } else {
+                          setProductFormImageFile(null);
+                          setProductFormImagePreview(null);
+                        }
+                      }}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                    />
+                    {productFormImagePreview && (
+                      <div className="relative w-full max-w-md">
+                        <img
+                          src={productFormImagePreview}
+                          alt="Preview Bukti Faktur"
+                          className="w-full h-48 object-contain border rounded-lg p-1 bg-gray-50"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setProductFormImageFile(null);
+                            setProductFormImagePreview(null);
+                          }}
+                          className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full hover:bg-red-600 transition-colors"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
@@ -1720,25 +1755,54 @@ export default function ProductsPage() {
                 </div>
                 <div className="col-span-2 md:col-span-1">
                   <label className="block text-sm font-medium text-gray-700 mb-1">Bukti Faktur</label>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => {
-                      if (e.target.files && e.target.files[0]) {
-                        setFakturImageFile(e.target.files[0]);
-                      }
-                    }}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                  />
-                  {selectedFaktur?.image_url && (
-                    <div className="mt-2">
-                      <img
-                        src={`http://localhost:5000${selectedFaktur.image_url}`}
-                        alt="Bukti Faktur"
-                        className="max-h-32 rounded"
-                      />
-                    </div>
-                  )}
+                  <div className="flex flex-col gap-2">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => {
+                        if (e.target.files && e.target.files[0]) {
+                          const file = e.target.files[0];
+                          setFakturImageFile(file);
+                          const reader = new FileReader();
+                          reader.onload = (event) => {
+                            setFakturImagePreview(event.target?.result as string);
+                          };
+                          reader.readAsDataURL(file);
+                        } else {
+                          setFakturImageFile(null);
+                          if (selectedFaktur?.image_url) {
+                            setFakturImagePreview(`http://localhost:5000${selectedFaktur.image_url}`);
+                          } else {
+                            setFakturImagePreview(null);
+                          }
+                        }
+                      }}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                    />
+                    {fakturImagePreview && (
+                      <div className="relative w-full max-w-md">
+                        <img
+                          src={fakturImagePreview}
+                          alt="Preview Bukti Faktur"
+                          className="w-full h-48 object-contain border rounded-lg p-1 bg-gray-50"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setFakturImageFile(null);
+                            if (selectedFaktur?.image_url) {
+                              setFakturImagePreview(`http://localhost:5000${selectedFaktur.image_url}`);
+                            } else {
+                              setFakturImagePreview(null);
+                            }
+                          }}
+                          className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full hover:bg-red-600 transition-colors"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Supplier</label>
