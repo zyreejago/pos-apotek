@@ -19,25 +19,39 @@ function registerInventoryRoutes(app, pool, authenticate, checkPermission, uploa
   });
 
   // Create a new batch
-  app.post('/api/inventory/batches', authenticate, checkPermission('Management Product', 'create'), async (req, res) => {
+  app.post('/api/inventory/batches', authenticate, checkPermission('Management Product', 'create'), upload.single('image'), async (req, res) => {
     try {
       const { product_id, supplier_id, batch_number, stock_type, purchase_date, initial_quantity, cost_price, expired_date, dp_amount, due_date } = req.body;
+      const image_url = req.file ? `/uploads/${req.file.filename}` : null;
       
       const formattedPurchaseDate = purchase_date ? purchase_date.substring(0, 10) : null;
       const formattedExpiredDate = expired_date ? expired_date.substring(0, 10) : null;
       const formattedDueDate = due_date ? due_date.substring(0, 10) : null;
 
       const [result] = await pool.query(`
-        INSERT INTO batches (product_id, supplier_id, batch_number, stock_type, purchase_date, initial_quantity, remaining_quantity, cost_price, expired_date, dp_amount, due_date)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `, [product_id, supplier_id, batch_number, stock_type, formattedPurchaseDate, initial_quantity, initial_quantity, cost_price, formattedExpiredDate, dp_amount ? Number(dp_amount) : null, formattedDueDate]);
+        INSERT INTO batches (product_id, supplier_id, batch_number, stock_type, purchase_date, initial_quantity, remaining_quantity, cost_price, expired_date, dp_amount, due_date, image_url)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `, [
+        product_id, 
+        supplier_id && supplier_id !== '' ? Number(supplier_id) : null, 
+        batch_number || null, 
+        stock_type, 
+        formattedPurchaseDate, 
+        Number(initial_quantity), 
+        Number(initial_quantity), 
+        Number(cost_price), 
+        formattedExpiredDate, 
+        dp_amount && dp_amount !== '' ? Number(dp_amount) : null, 
+        formattedDueDate, 
+        image_url
+      ]);
       
       // Update product's total stock by adding the new batch's remaining quantity
       await pool.query(`
         UPDATE products 
         SET stock = stock + ?
         WHERE id = ?
-      `, [initial_quantity, product_id]);
+      `, [Number(initial_quantity), product_id]);
 
       await createAuditTrail({
         user_id: req.user.id,
@@ -56,18 +70,21 @@ function registerInventoryRoutes(app, pool, authenticate, checkPermission, uploa
   });
 
   // Update a batch
-  app.put('/api/inventory/batches/:id', authenticate, checkPermission('Management Product', 'edit'), async (req, res) => {
+  app.put('/api/inventory/batches/:id', authenticate, checkPermission('Management Product', 'edit'), upload.single('image'), async (req, res) => {
     try {
       const { id } = req.params;
       const { supplier_id, batch_number, stock_type, purchase_date, initial_quantity, remaining_quantity, cost_price, expired_date, dp_amount, due_date } = req.body;
       
       // Get the old remaining_quantity first to calculate the difference
-      const [oldBatch] = await pool.query('SELECT remaining_quantity, product_id FROM batches WHERE id = ?', [id]);
+      const [oldBatch] = await pool.query('SELECT remaining_quantity, product_id, image_url FROM batches WHERE id = ?', [id]);
       if (oldBatch.length === 0) {
         return res.status(404).json({ success: false, message: 'Batch not found' });
       }
       const oldQty = oldBatch[0].remaining_quantity;
       const product_id = oldBatch[0].product_id;
+      const current_image_url = oldBatch[0].image_url;
+      const new_image_url = req.file ? `/uploads/${req.file.filename}` : null;
+      const image_url = new_image_url || current_image_url;
 
       const formattedPurchaseDate = purchase_date ? purchase_date.substring(0, 10) : null;
       const formattedExpiredDate = expired_date ? expired_date.substring(0, 10) : null;
@@ -75,11 +92,24 @@ function registerInventoryRoutes(app, pool, authenticate, checkPermission, uploa
 
       await pool.query(`
         UPDATE batches 
-        SET supplier_id = ?, batch_number = ?, stock_type = ?, purchase_date = ?, initial_quantity = ?, remaining_quantity = ?, cost_price = ?, expired_date = ?, dp_amount = ?, due_date = ?
+        SET supplier_id = ?, batch_number = ?, stock_type = ?, purchase_date = ?, initial_quantity = ?, remaining_quantity = ?, cost_price = ?, expired_date = ?, dp_amount = ?, due_date = ?, image_url = ?
         WHERE id = ?
-      `, [supplier_id, batch_number, stock_type, formattedPurchaseDate, initial_quantity, remaining_quantity, cost_price, formattedExpiredDate, dp_amount ? Number(dp_amount) : null, formattedDueDate, id]);
+      `, [
+        supplier_id && supplier_id !== '' ? Number(supplier_id) : null, 
+        batch_number || null, 
+        stock_type, 
+        formattedPurchaseDate, 
+        Number(initial_quantity), 
+        Number(remaining_quantity), 
+        Number(cost_price), 
+        formattedExpiredDate, 
+        dp_amount && dp_amount !== '' ? Number(dp_amount) : null, 
+        formattedDueDate, 
+        image_url, 
+        id
+      ]);
       
-      const diff = remaining_quantity - oldQty;
+      const diff = Number(remaining_quantity) - oldQty;
       await pool.query(`
         UPDATE products 
         SET stock = GREATEST(stock + ?, 0)

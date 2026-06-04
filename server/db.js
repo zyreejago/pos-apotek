@@ -273,11 +273,17 @@ const initDB = async () => {
         expired_date DATE NULL,
         dp_amount DECIMAL(10, 2) NULL,
         due_date DATE NULL,
+        image_url VARCHAR(255) NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
         FOREIGN KEY (supplier_id) REFERENCES suppliers(id) ON DELETE SET NULL
       )
     `);
+    
+    try {
+      await connection.query(`ALTER TABLE batches ADD COLUMN image_url VARCHAR(255) NULL`);
+    } catch (e) {}
+
 
     // Prescriptions table
     await connection.query(`

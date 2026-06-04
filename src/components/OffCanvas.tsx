@@ -35,7 +35,28 @@ export default function OffCanvas({
   useEffect(() => {
     setMounted(true);
   }, []);
+  useEffect(() => {
+  console.log('OFFCANVAS EFFECT', {
+    title,
+    isOpen,
+    width
+  });
 
+  if (isOpen) {
+    setIsAnyOffCanvasOpen(true);
+    setOffCanvasWidth(width);
+  } else if (prevIsOpen.current) {
+    console.log('CLOSING', title);
+    closeOffCanvas();
+  }
+
+  prevIsOpen.current = isOpen;
+}, [isOpen]);
+useEffect(() => {
+  return () => {
+    closeOffCanvas();
+  };
+}, [closeOffCanvas]);
   useEffect(() => {
     if (isOpen) {
       setIsAnyOffCanvasOpen(true);
@@ -45,8 +66,7 @@ export default function OffCanvas({
       closeOffCanvas();
     }
     prevIsOpen.current = isOpen;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, width]);
+  }, [isOpen, width, setIsAnyOffCanvasOpen, setOffCanvasWidth, closeOffCanvas]);
 
   // Simpan scroll position sebelum re-render
   useEffect(() => {

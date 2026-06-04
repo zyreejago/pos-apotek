@@ -43,6 +43,7 @@ interface Faktur {
   dp_amount: number | null;
   due_date: string | null;
   notes: string | null;
+  image_url: string | null;
   created_at: string;
 }
 
@@ -60,6 +61,7 @@ interface DbBatch {
   dp_amount: number | null;
   due_date: string | null;
   expired_date: string | null;
+  image_url: string | null;
   created_at: string;
 }
 
@@ -168,6 +170,8 @@ export default function ProductsPage() {
     due_date: '',
     notes: ''
   });
+  const [fakturImageFile, setFakturImageFile] = useState<File | null>(null);
+  const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
 
   // Form State
   const [isMultipleProducts, setIsMultipleProducts] = useState(false);
@@ -188,6 +192,7 @@ export default function ProductsPage() {
     purchase_unit: 'Box',
     unit_multiplier: '1'
   });
+  const [productFormImageFile, setProductFormImageFile] = useState<File | null>(null);
   const [multipleProducts, setMultipleProducts] = useState<ProductItem[]>([]);
 
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
@@ -253,7 +258,8 @@ export default function ProductsPage() {
           invoice_number: batch.batch_number,
           quantity: batch.initial_quantity,
           total_amount: batch.cost_price * batch.initial_quantity,
-          product_id: productId
+          product_id: productId,
+          image_url: batch.image_url
         }));
         setFakturs(mappedFakturs);
       }
@@ -271,6 +277,7 @@ export default function ProductsPage() {
   const handleOpenFakturOffCanvas = (product: Product) => {
     setSelectedProduct(product);
     fetchFakturs(product.id);
+    setIsProductOffCanvasOpen(false); // Close product offcanvas first
     setIsFakturOffCanvasOpen(true);
     setShowFakturForm(false);
   };
@@ -289,6 +296,7 @@ export default function ProductsPage() {
       due_date: '',
       notes: ''
     });
+    setFakturImageFile(null);
   };
 
   const handleOpenEditFakturModal = (faktur: Faktur) => {
@@ -312,6 +320,7 @@ export default function ProductsPage() {
       due_date: formatDateForInput(faktur.due_date),
       notes: faktur.notes || ''
     });
+    setFakturImageFile(null);
   };
 
   const handleFakturInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
@@ -333,27 +342,34 @@ export default function ProductsPage() {
       const multiplier = selectedProduct.unit_multiplier || 1;
       const qtyInBaseUnit = (Number(fakturFormData.quantity) || 0) * multiplier;
 
-      const payload = {
-        product_id: selectedProduct.id,
-        supplier_id: fakturFormData.supplier_id ? Number(fakturFormData.supplier_id) : null,
-        batch_number: fakturFormData.invoice_number || null,
-        stock_type: fakturFormData.stock_type,
-        purchase_date: fakturFormData.purchase_date || null,
-        initial_quantity: qtyInBaseUnit,
-        remaining_quantity: qtyInBaseUnit,
-        cost_price: Number(fakturFormData.cost_price) || 0,
-        expired_date: null,
-        dp_amount: fakturFormData.stock_type === 'dp' && fakturFormData.dp_amount ? Number(fakturFormData.dp_amount) : null,
-        due_date: fakturFormData.stock_type === 'dp' && fakturFormData.due_date ? fakturFormData.due_date : null
+      const formData = new FormData();
+      formData.append('product_id', selectedProduct.id.toString());
+      formData.append('supplier_id', fakturFormData.supplier_id ? fakturFormData.supplier_id : '');
+      formData.append('batch_number', fakturFormData.invoice_number || '');
+      formData.append('stock_type', fakturFormData.stock_type);
+      formData.append('purchase_date', fakturFormData.purchase_date || '');
+      formData.append('initial_quantity', qtyInBaseUnit.toString());
+      formData.append('remaining_quantity', qtyInBaseUnit.toString());
+      formData.append('cost_price', (Number(fakturFormData.cost_price) || 0).toString());
+      formData.append('expired_date', '');
+      if (fakturFormData.stock_type === 'dp' && fakturFormData.dp_amount) {
+        formData.append('dp_amount', fakturFormData.dp_amount);
+      }
+      if (fakturFormData.stock_type === 'dp' && fakturFormData.due_date) {
+        formData.append('due_date', fakturFormData.due_date);
+      }
+      if (fakturImageFile) {
+        formData.append('image', fakturImageFile);
+      }
+
+      const headers = {
+        ...authHeaders
       };
 
       const res = await fetch(url, {
         method,
-        headers: {
-          'Content-Type': 'application/json',
-          ...authHeaders
-        },
-        body: JSON.stringify(payload)
+        headers,
+        body: formData
       });
 
       if (res.ok) {
@@ -371,6 +387,7 @@ export default function ProductsPage() {
           due_date: '',
           notes: ''
         });
+        setFakturImageFile(null);
         setSelectedFaktur(null);
         setFakturModalMode('add');
         setShowFakturForm(false);
@@ -518,12 +535,57 @@ export default function ProductsPage() {
   const handleCloseProductOffCanvas = () => {
     setIsProductOffCanvasOpen(false);
     setSelectedProduct(null);
+    setProductFormImageFile(null);
+    setFormData({
+      name: '',
+      cost_price: '',
+      selling_price: '',
+      stock: '',
+      unit: 'Tablet',
+      expired_date: '',
+      location_code: '',
+      supplier_id: '',
+      stock_type: 'belum_bayar',
+      purchase_date: new Date().toISOString().split('T')[0],
+      invoice_number: '',
+      dp_amount: '',
+      due_date: '',
+      purchase_unit: 'Box',
+      unit_multiplier: '1'
+    });
+    setIsMultipleProducts(false);
+    setMultipleProducts([]);
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData(prev => {
-      const updated = { ...prev, [name]: value };
+      let updated = { ...prev, [name]: value };
+      
+      // Auto-fill fields if name matches existing product
+      if (name === 'name') {
+        if (value.trim() === '') {
+          // Reset auto-filled fields if name is deleted
+          updated.unit = 'Tablet';
+          updated.purchase_unit = 'Box';
+          updated.unit_multiplier = '1';
+          updated.selling_price = '';
+          updated.location_code = '';
+        } else {
+          const matchedProduct = allProducts.find(
+            p => p.name.trim().toLowerCase() === value.trim().toLowerCase()
+          );
+          if (matchedProduct) {
+            updated.unit = matchedProduct.unit;
+            updated.purchase_unit = matchedProduct.purchase_unit || 'Box';
+            updated.unit_multiplier = (matchedProduct.unit_multiplier || 1).toString();
+            updated.selling_price = matchedProduct.selling_price.toString();
+            updated.location_code = matchedProduct.location_code || '';
+            updated.cost_price = prev.cost_price; // Keep manual cost price
+          }
+        }
+      }
+
       if (name === 'purchase_unit_stock') {
         const pStock = Number(value) || 0;
         const mult = Number(updated.unit_multiplier) || 1;
@@ -589,7 +651,7 @@ export default function ProductsPage() {
     } else {
       // Add mode
       try {
-        const saveProductAndBatch = async (item: ProductFormData) => {
+        const saveProductAndBatch = async (item: ProductFormData, imageFile: File | null = null) => {
           // Check if product with same name exists in database
           const existingProduct = allProducts.find(
             p => p.name.trim().toLowerCase() === item.name.trim().toLowerCase()
@@ -642,20 +704,24 @@ export default function ProductsPage() {
 
           // Create batch/faktur if supplier info is present
           if (productId && item.supplier_id) {
-            const batchPayload = {
-              product_id: productId,
-              supplier_id: Number(item.supplier_id),
-              batch_number: item.invoice_number || null,
-              stock_type: item.stock_type || 'belum_bayar',
-              purchase_date: item.purchase_date || null,
-              initial_quantity: calculatedStock,
-              cost_price: Number(item.cost_price) || 0,
-              expired_date: item.expired_date || null
-            };
+            const batchFormData = new FormData();
+            batchFormData.append('product_id', productId.toString());
+            batchFormData.append('supplier_id', item.supplier_id.toString());
+            if (item.invoice_number) batchFormData.append('batch_number', item.invoice_number);
+            batchFormData.append('stock_type', item.stock_type || 'belum_bayar');
+            if (item.purchase_date) batchFormData.append('purchase_date', item.purchase_date);
+            batchFormData.append('initial_quantity', calculatedStock.toString());
+            batchFormData.append('remaining_quantity', calculatedStock.toString());
+            batchFormData.append('cost_price', (Number(item.cost_price) || 0).toString());
+            if (item.expired_date) batchFormData.append('expired_date', item.expired_date);
+            if (imageFile) batchFormData.append('image', imageFile);
+
             await fetch(`http://localhost:5000/api/inventory/batches`, {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json', ...authHeaders },
-              body: JSON.stringify(batchPayload)
+              headers: {
+                ...authHeaders
+              },
+              body: batchFormData
             });
           }
         };
@@ -666,11 +732,11 @@ export default function ProductsPage() {
             return;
           }
           for (const item of multipleProducts) {
-            await saveProductAndBatch(item);
+            await saveProductAndBatch(item, null);
           }
         } else {
           // Single product add
-          await saveProductAndBatch(formData);
+          await saveProductAndBatch(formData, productFormImageFile);
         }
         
         handleCloseProductOffCanvas();
@@ -950,19 +1016,34 @@ export default function ProductsPage() {
               </div>
             )}
 
-            {/* Invoice Number */}
+            {/* Invoice Number and Bukti Faktur */}
             {productOffCanvasMode === 'add' && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Nomor Faktur</label>
-                <input
-                  type="text"
-                  name="invoice_number"
-                  value={formData.invoice_number ?? ''}
-                  onChange={handleInputChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                  placeholder="FKT-001"
-                />
-              </div>
+              <>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Nomor Faktur</label>
+                  <input
+                    type="text"
+                    name="invoice_number"
+                    value={formData.invoice_number ?? ''}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                    placeholder="FKT-001"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Bukti Faktur</label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      if (e.target.files && e.target.files[0]) {
+                        setProductFormImageFile(e.target.files[0]);
+                      }
+                    }}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  />
+                </div>
+              </>
             )}
 
             {/* Render form based on single/multiple */}
@@ -1549,7 +1630,23 @@ export default function ProductsPage() {
       {isFakturOffCanvasOpen && selectedProduct && (
         <OffCanvas
           isOpen={isFakturOffCanvasOpen}
-          onClose={() => setIsFakturOffCanvasOpen(false)}
+          onClose={() => {
+            setIsFakturOffCanvasOpen(false);
+            setShowFakturForm(false);
+            setSelectedFaktur(null);
+            setFakturFormData({
+              invoice_number: '',
+              supplier_id: '',
+              purchase_date: new Date().toISOString().split('T')[0],
+              quantity: '',
+              cost_price: '',
+              stock_type: 'belum_bayar',
+              dp_amount: '',
+              due_date: '',
+              notes: ''
+            });
+            setFakturImageFile(null);
+          }}
           title={`Faktur - ${selectedProduct.name}`}
           width="800px"
         >
@@ -1629,6 +1726,15 @@ export default function ProductsPage() {
                       <td className="px-4 py-3 font-medium">{formatCurrency(faktur.total_amount)}</td>
                       <td className="px-4 py-3 text-right">
                         <div className="flex justify-end gap-2">
+                          {faktur.image_url && (
+                            <button
+                              onClick={() => setPreviewImageUrl(`http://localhost:5000${faktur.image_url}`)}
+                              className="p-1 text-green-600 hover:bg-green-50 rounded"
+                              title="Lihat Bukti"
+                            >
+                              <FileText size={14} />
+                            </button>
+                          )}
                           <button
                             onClick={() => handleOpenEditFakturModal(faktur)}
                             className="p-1 text-blue-600 hover:bg-blue-50 rounded"
@@ -1669,6 +1775,28 @@ export default function ProductsPage() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                     placeholder="FKT-001"
                   />
+                </div>
+                <div className="col-span-2 md:col-span-1">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Bukti Faktur</label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      if (e.target.files && e.target.files[0]) {
+                        setFakturImageFile(e.target.files[0]);
+                      }
+                    }}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  />
+                  {selectedFaktur?.image_url && (
+                    <div className="mt-2">
+                      <img
+                        src={`http://localhost:5000${selectedFaktur.image_url}`}
+                        alt="Bukti Faktur"
+                        className="max-h-32 rounded"
+                      />
+                    </div>
+                  )}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Supplier</label>
@@ -1813,6 +1941,23 @@ export default function ProductsPage() {
         message={confirmModal.message}
         variant={confirmModal.variant}
       />
+
+      {/* Image Preview Modal */}
+      {previewImageUrl && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={() => setPreviewImageUrl(null)}>
+          <div className="bg-white rounded-lg p-4 max-w-[90vw] max-h-[90vh] overflow-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="font-semibold text-gray-800">Bukti Faktur</h3>
+              <button onClick={() => setPreviewImageUrl(null)} className="text-gray-500 hover:text-gray-700">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <img src={previewImageUrl} alt="Bukti Faktur" className="max-w-full max-h-[80vh] mx-auto" />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
