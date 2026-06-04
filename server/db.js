@@ -71,6 +71,7 @@ const initDB = async () => {
         id INT AUTO_INCREMENT PRIMARY KEY,
         name VARCHAR(255) NOT NULL,
         stock INT DEFAULT 0,
+        status ENUM('active', 'pending') DEFAULT 'active',
         price DECIMAL(10, 2) DEFAULT 0,
         unit VARCHAR(50),
         expired_date DATE,
@@ -274,11 +275,20 @@ const initDB = async () => {
         dp_amount DECIMAL(10, 2) NULL,
         due_date DATE NULL,
         image_url VARCHAR(255) NULL,
+        status ENUM('approved', 'pending', 'rejected', 'revision') DEFAULT 'approved',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
         FOREIGN KEY (supplier_id) REFERENCES suppliers(id) ON DELETE SET NULL
       )
     `);
+    
+    try {
+      await connection.query(`ALTER TABLE products ADD COLUMN status ENUM('active', 'pending') DEFAULT 'active'`);
+    } catch (e) {}
+
+    try {
+      await connection.query(`ALTER TABLE batches ADD COLUMN status ENUM('approved', 'pending', 'rejected', 'revision') DEFAULT 'approved'`);
+    } catch (e) {}
     
     try {
       await connection.query(`ALTER TABLE batches ADD COLUMN image_url VARCHAR(255) NULL`);

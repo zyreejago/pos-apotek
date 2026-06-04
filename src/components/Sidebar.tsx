@@ -16,7 +16,9 @@ import {
   Repeat,
   ChevronLeft,
   ChevronRight,
-  Activity
+  Activity,
+  Search,
+  CheckCircle
 } from 'lucide-react';
 import { useSidebar } from '@/context/SidebarContext';
 import { useOffCanvas } from '@/context/OffCanvasContext';
@@ -239,6 +241,10 @@ export default function Sidebar() {
         
         {canShow('Transactions') && (
           <NavItem href="/transactions" icon={<ShoppingCart size={20} />} label="Transactions" active={isActive('/transactions')} isCollapsed={isCollapsed} />
+        )}
+
+        {canShow('Approval Faktur') && (
+          <NavItem href="/approvals" icon={<CheckCircle size={20} />} label="Approval Faktur" active={isActive('/approvals')} isCollapsed={isCollapsed} />
         )}
         
         {canShow('Management Pengguna') && (

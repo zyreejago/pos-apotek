@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { Search, Plus, Edit, Trash2, FileText, Info, UploadCloud, Camera, X } from 'lucide-react';
+import Link from 'next/link';
+import { Search, Plus, Edit, Trash2, FileText, Info, UploadCloud, Camera, X, Check, AlertCircle, CheckCircle, Package, Users, Calendar } from 'lucide-react';
 import { goeyToast } from "@/components/ui/goey-toaster";
 import ConfirmModal from '@/components/ConfirmModal';
 import PageHeader from '@/components/PageHeader';
@@ -32,6 +33,11 @@ interface Product {
 interface Faktur {
   id: number;
   product_id: number;
+  product_name?: string;
+  product_status?: 'active' | 'pending';
+  product_unit?: string;
+  product_purchase_unit?: string;
+  product_unit_multiplier?: number;
   invoice_number: string;
   supplier_id: number | null;
   supplier_name: string | null;
@@ -44,6 +50,7 @@ interface Faktur {
   due_date: string | null;
   notes: string | null;
   image_url: string | null;
+  status: 'approved' | 'pending' | 'rejected' | 'revision';
   created_at: string;
 }
 
@@ -62,6 +69,7 @@ interface DbBatch {
   due_date: string | null;
   expired_date: string | null;
   image_url: string | null;
+  status: 'approved' | 'pending' | 'rejected' | 'revision';
   created_at: string;
 }
 
@@ -124,6 +132,7 @@ export default function ProductsPage() {
   }, [setSearchInputRef]);
   // Permission Check
   const { checkActionPermission } = useRequirePermission('Management Product');
+  const { checkActionPermission: checkApprovalPermission } = useRequirePermission('Approval Faktur');
 
   // Local product state (to add new products without server)
   const [allProducts, setAllProducts] = useState<Product[]>([]);
@@ -150,6 +159,11 @@ export default function ProductsPage() {
   const [selectedFaktur, setSelectedFaktur] = useState<Faktur | null>(null);
   const [fakturs, setFakturs] = useState<Faktur[]>([]);
   const [showFakturForm, setShowFakturForm] = useState(false);
+  
+  // Approval Modal States
+  const [isApprovalModalOpen, setIsApprovalModalOpen] = useState(false);
+  const [pendingFakturs, setPendingFakturs] = useState<Faktur[]>([]);
+  const [isFetchingPending, setIsFetchingPending] = useState(false);
 
   // Confirm Modal State
   const [confirmModal, setConfirmModal] = useState({
@@ -275,6 +289,30 @@ export default function ProductsPage() {
     }
   }, [authHeaders]);
 
+  const fetchGlobalPendingFakturs = useCallback(async () => {
+    setIsFetchingPending(true);
+    try {
+      const res = await fetch('http://localhost:5000/api/inventory/pending-batches', {
+        headers: authHeaders
+      });
+      if (res.ok) {
+        const json = await res.json();
+        const mapped = (json.data || []).map((batch: any) => ({
+          ...batch,
+          invoice_number: batch.batch_number,
+          quantity: batch.initial_quantity,
+          total_amount: batch.cost_price * batch.initial_quantity
+        }));
+        setPendingFakturs(mapped);
+      }
+    } catch (error) {
+      console.error('Error fetching pending fakturs:', error);
+      goeyToast.error('Gagal memuat data approval');
+    } finally {
+      setIsFetchingPending(false);
+    }
+  }, [authHeaders]);
+
   useEffect(() => {
     fetchProducts();
     fetchSuppliers();
@@ -311,6 +349,7 @@ export default function ProductsPage() {
     setFakturModalMode('edit');
     setSelectedFaktur(faktur);
     setShowFakturForm(true);
+    setIsFakturOffCanvasOpen(true);
 
     const formatDateForInput = (dateStr: string | null) => {
       if (!dateStr) return '';
@@ -361,6 +400,64 @@ export default function ProductsPage() {
     }
   };
 
+  const handleApproveFaktur = async (fakturId: number) => {
+    try {
+      const res = await fetch(`http://localhost:5000/api/inventory/batches/${fakturId}/approve`, {
+        method: 'PUT',
+        headers: authHeaders
+      });
+      if (res.ok) {
+        goeyToast.success('Faktur disetujui!');
+        if (selectedProduct) fetchFakturs(selectedProduct.id);
+        if (isApprovalModalOpen) fetchGlobalPendingFakturs();
+        fetchProducts();
+      } else {
+        goeyToast.error('Gagal menyetujui faktur');
+      }
+    } catch (error) {
+      console.error(error);
+      goeyToast.error('Terjadi kesalahan');
+    }
+  };
+
+  const handleRejectFaktur = async (fakturId: number) => {
+    try {
+      const res = await fetch(`http://localhost:5000/api/inventory/batches/${fakturId}/reject`, {
+        method: 'PUT',
+        headers: authHeaders
+      });
+      if (res.ok) {
+        goeyToast.success('Faktur ditolak');
+        if (selectedProduct) fetchFakturs(selectedProduct.id);
+        if (isApprovalModalOpen) fetchGlobalPendingFakturs();
+      } else {
+        goeyToast.error('Gagal menolak faktur');
+      }
+    } catch (error) {
+      console.error(error);
+      goeyToast.error('Terjadi kesalahan');
+    }
+  };
+
+  const handleRequestRevision = async (fakturId: number) => {
+    try {
+      const res = await fetch(`http://localhost:5000/api/inventory/batches/${fakturId}/revision`, {
+        method: 'PUT',
+        headers: authHeaders
+      });
+      if (res.ok) {
+        goeyToast.success('Permintaan perbaikan dikirim');
+        if (selectedProduct) fetchFakturs(selectedProduct.id);
+        if (isApprovalModalOpen) fetchGlobalPendingFakturs();
+      } else {
+        goeyToast.error('Gagal mengirim permintaan perbaikan');
+      }
+    } catch (error) {
+      console.error(error);
+      goeyToast.error('Terjadi kesalahan');
+    }
+  };
+
   const handleSaveFaktur = async () => {
     if (!selectedProduct) return;
 
@@ -391,6 +488,7 @@ export default function ProductsPage() {
       if (fakturFormData.stock_type === 'dp' && fakturFormData.due_date) {
         formData.append('due_date', fakturFormData.due_date);
       }
+      formData.append('notes', fakturFormData.notes || '');
       if (fakturImageFile) {
         formData.append('image', fakturImageFile);
       }
@@ -406,8 +504,16 @@ export default function ProductsPage() {
       });
 
       if (res.ok) {
-        goeyToast.success(`Faktur ${fakturModalMode === 'add' ? 'ditambahkan' : 'diperbarui'}!`);
+        const json = await res.json();
+        if (json.status === 'pending') {
+          goeyToast.info('Persetujuan Diperlukan', {
+            description: 'Faktur memerlukan persetujuan karena nominal > Rp 2.000.000. Stok belum akan bertambah sampai disetujui.'
+          });
+        } else {
+          goeyToast.success(`Faktur ${fakturModalMode === 'add' ? 'ditambahkan' : 'diperbarui'}!`);
+        }
         fetchFakturs(selectedProduct.id);
+        if (isApprovalModalOpen) fetchGlobalPendingFakturs();
         fetchProducts(); // refresh product stock
         setFakturFormData({
           invoice_number: '',
@@ -715,6 +821,11 @@ export default function ProductsPage() {
             });
           } else {
             // Create new product
+            const multiplier = Number(item.unit_multiplier) || 1;
+            const calculatedStock = Number(item.stock);
+            const totalAmount = (Number(item.cost_price) || 0) * calculatedStock;
+            const needsApproval = totalAmount > 2000000;
+
             const payload = {
               name: item.name,
               cost_price: Number(item.cost_price),
@@ -724,7 +835,8 @@ export default function ProductsPage() {
               expired_date: formatDate(item.expired_date),
               location_code: item.location_code || null,
               purchase_unit: item.purchase_unit || 'Box',
-              unit_multiplier: multiplier
+              unit_multiplier: multiplier,
+              needsApproval: needsApproval // Pass flag to backend
             };
             const res = await fetch(`http://localhost:5000/api/products`, {
               method: 'POST',
@@ -751,13 +863,22 @@ export default function ProductsPage() {
             if (item.due_date) batchFormData.append('due_date', item.due_date);
             if (imageFile) batchFormData.append('image', imageFile);
 
-            await fetch(`http://localhost:5000/api/inventory/batches`, {
+            const res = await fetch(`http://localhost:5000/api/inventory/batches`, {
               method: 'POST',
               headers: {
                 ...authHeaders
               },
               body: batchFormData
             });
+
+            if (res.ok) {
+              const batchJson = await res.json();
+              if (batchJson.data.status === 'pending') {
+                goeyToast.info('Persetujuan Diperlukan', {
+                  description: `Faktur untuk ${item.name} memerlukan persetujuan karena nominal > Rp 2.000.000.`
+                });
+              }
+            }
           }
         };
 
@@ -977,22 +1098,36 @@ export default function ProductsPage() {
         </div>
 
         {/* Pagination */}
-        <div className="p-4 flex flex-col sm:flex-row justify-between items-center gap-4 text-sm text-gray-500">
-          <div className="flex items-center gap-2">
-            <span>Show</span>
-            <select
-              className="border border-gray-200 rounded px-2 py-1 focus:outline-none focus:border-blue-500"
-              value={itemsPerPage}
-              onChange={(e) => {
-                setItemsPerPage(Number(e.target.value));
-                setCurrentPage(1);
+        <div className="p-4 flex flex-col sm:flex-row justify-between items-center gap-4 text-sm text-gray-500 border-t border-gray-100">
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <span>Show</span>
+              <select
+                className="border border-gray-200 rounded px-2 py-1 focus:outline-none focus:border-blue-500"
+                value={itemsPerPage}
+                onChange={(e) => {
+                  setItemsPerPage(Number(e.target.value));
+                  setCurrentPage(1);
+                }}
+              >
+                <option value={5}>5</option>
+                <option value={10}>10</option>
+                <option value={20}>20</option>
+              </select>
+              <span>per page</span>
+            </div>
+
+            {/* View Pending Approvals Button */}
+            <button 
+              onClick={() => {
+                setIsApprovalModalOpen(true);
+                fetchGlobalPendingFakturs();
               }}
+              className="flex items-center gap-2 px-3 py-1.5 bg-yellow-50 text-yellow-700 border border-yellow-200 rounded-lg hover:bg-yellow-100 transition-colors font-medium"
             >
-              <option value={5}>5</option>
-              <option value={10}>10</option>
-              <option value={20}>20</option>
-            </select>
-            <span>per page</span>
+              <CheckCircle size={14} />
+              Lihat Approval Tertunda
+            </button>
           </div>
           
           <div className="flex items-center gap-2">
@@ -1714,6 +1849,7 @@ export default function ProductsPage() {
                     <th className="px-4 py-3">Supplier</th>
                     <th className="px-4 py-3">Tipe Stok</th>
                     <th className="px-4 py-3">Tgl Pembelian</th>
+                    <th className="px-4 py-3">Status</th>
                     <th className="px-4 py-3">Baru Bayar</th>
                     <th className="px-4 py-3">Jatuh Tempo</th>
                     <th className="px-4 py-3">Jumlah</th>
@@ -1747,6 +1883,21 @@ export default function ProductsPage() {
                       </td>
                       <td className="px-4 py-3">{faktur.purchase_date ? new Date(faktur.purchase_date).toLocaleDateString('id-ID') : '-'}</td>
                       <td className="px-4 py-3">
+                        <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                          faktur.status === 'approved' 
+                            ? 'bg-green-100 text-green-700' 
+                            : faktur.status === 'pending'
+                            ? 'bg-yellow-100 text-yellow-700 animate-pulse'
+                            : faktur.status === 'rejected'
+                            ? 'bg-red-100 text-red-700'
+                            : 'bg-orange-100 text-orange-700'
+                        }`}>
+                          {faktur.status === 'pending' ? 'Pending Approval' : 
+                           faktur.status === 'rejected' ? 'Ditolak' :
+                           faktur.status === 'revision' ? 'Perlu Perbaikan' : 'Approved'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
                         {faktur.stock_type === 'dp' && faktur.dp_amount 
                           ? formatCurrency(faktur.dp_amount) 
                           : '-'}
@@ -1774,8 +1925,8 @@ export default function ProductsPage() {
                           )}
                           <button
                             onClick={() => handleOpenEditFakturModal(faktur)}
-                            className="p-1 text-blue-600 hover:bg-blue-50 rounded"
-                            title="Edit"
+                            className={`p-1 rounded ${faktur.status === 'revision' || faktur.status === 'rejected' ? 'text-orange-600 bg-orange-50 border border-orange-200' : 'text-blue-600 hover:bg-blue-50'}`}
+                            title={faktur.status === 'revision' || faktur.status === 'rejected' ? 'Perbaiki' : 'Edit'}
                           >
                             <Edit size={14} />
                           </button>
@@ -1907,6 +2058,17 @@ export default function ProductsPage() {
                     </div>
                   </>
                 )}
+                <div className="col-span-2 md:col-span-3">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Catatan Perbaikan / Tambahan</label>
+                  <textarea
+                    name="notes"
+                    value={fakturFormData.notes}
+                    onChange={handleFakturInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                    placeholder="Masukkan alasan perbaikan atau catatan tambahan..."
+                    rows={2}
+                  />
+                </div>
                 <div className="col-span-2 md:col-span-3 mt-2">
                   <label className="block text-sm font-medium text-gray-700 mb-2">Bukti Faktur</label>
                   <div className="flex flex-col gap-4 items-start">
@@ -2019,6 +2181,189 @@ export default function ProductsPage() {
         message={confirmModal.message}
         variant={confirmModal.variant}
       />
+
+      {/* Approval Modal */}
+      {isApprovalModalOpen && (
+        <div 
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[9999] p-4" 
+          onClick={() => setIsApprovalModalOpen(false)}
+        >
+          <div 
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col overflow-hidden" 
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-center px-6 py-4 border-b border-gray-100 bg-gray-50/50 shrink-0">
+              <div>
+                <h3 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+                  <CheckCircle className="text-yellow-600" size={24} />
+                  Approval Faktur Pembelian
+                </h3>
+                <p className="text-sm text-gray-500 mt-1">Daftar faktur yang memerlukan persetujuan nominal {'>'} Rp 2.000.000</p>
+              </div>
+              <button 
+                onClick={() => setIsApprovalModalOpen(false)} 
+                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-white rounded-full transition-all border border-transparent hover:border-gray-200"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="p-6 flex-1 overflow-auto custom-scrollbar">
+              {isFetchingPending ? (
+                <div className="flex flex-col items-center justify-center py-20 gap-4">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+                  <p className="text-gray-500 font-medium">Memuat data approval...</p>
+                </div>
+              ) : pendingFakturs.length === 0 ? (
+                <div className="bg-gray-50 rounded-2xl p-16 text-center border-2 border-dashed border-gray-200">
+                  <div className="bg-green-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <Check className="text-green-600" size={32} />
+                  </div>
+                  <h3 className="text-lg font-bold text-gray-800">Semua Beres!</h3>
+                  <p className="text-gray-500 max-w-xs mx-auto">Tidak ada faktur yang menunggu persetujuan saat ini.</p>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-4 min-w-[800px]">
+                  {pendingFakturs.map((faktur) => (
+                    <div key={faktur.id} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-all group">
+                      <div className="p-5">
+                        <div className="flex flex-row justify-between items-center gap-5">
+                          {/* Product Info */}
+                          <div className="flex-1 space-y-3">
+                            <div className="flex items-start gap-4">
+                              <div className="bg-blue-50 p-2.5 rounded-xl text-blue-600 shrink-0 group-hover:bg-blue-100 transition-colors">
+                                <Package size={22} />
+                              </div>
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <h4 className="text-base font-bold text-gray-900">{faktur.product_name}</h4>
+                                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider border ${
+                                    faktur.status === 'pending' 
+                                      ? 'bg-yellow-100 text-yellow-700 border-yellow-200 animate-pulse' 
+                                      : faktur.status === 'rejected'
+                                      ? 'bg-red-100 text-red-700 border-red-200'
+                                      : 'bg-orange-100 text-orange-700 border-orange-200'
+                                  }`}>
+                                    {faktur.status === 'pending' ? 'Pending Approval' : 'Menunggu Perbaikan'}
+                                  </span>
+                                  {faktur.product_status === 'pending' && (
+                                    <span className="bg-purple-100 text-purple-700 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider border border-purple-200">
+                                      Produk Baru
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-xs text-gray-500 mt-0.5 font-medium">ID: #{faktur.product_id} | Batch: {faktur.invoice_number || '-'}</p>
+                              </div>
+                            </div>
+
+                            {faktur.notes && (
+                              <div className="bg-orange-50 border border-orange-100 p-3 rounded-xl flex items-start gap-3">
+                                <AlertCircle size={16} className="text-orange-500 shrink-0 mt-0.5" />
+                                <div>
+                                  <p className="text-[11px] font-bold text-orange-800 uppercase tracking-wider">Catatan Perbaikan:</p>
+                                  <p className="text-sm text-orange-700 mt-0.5 leading-relaxed">{faktur.notes}</p>
+                                </div>
+                              </div>
+                            )}
+
+                            <div className="grid grid-cols-3 gap-3 text-[13px]">
+                              <div className="flex items-center gap-2 text-gray-600 bg-gray-50 px-2 py-1 rounded-lg">
+                                <Users size={14} className="text-gray-400" />
+                                <span className="truncate">{faktur.supplier_name || 'Tanpa Supplier'}</span>
+                              </div>
+                              <div className="flex items-center gap-2 text-gray-600 bg-gray-50 px-2 py-1 rounded-lg">
+                                <Calendar size={14} className="text-gray-400" />
+                                <span>{faktur.purchase_date ? new Date(faktur.purchase_date).toLocaleDateString('id-ID') : '-'}</span>
+                              </div>
+                              <div className="flex items-center gap-2 text-gray-600 bg-gray-50 px-2 py-1 rounded-lg">
+                                <Info size={14} className="text-gray-400" />
+                                <span className="capitalize">{faktur.stock_type.replace('_', ' ')}</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Financial Info */}
+                          <div className="w-56 bg-blue-50/50 p-4 rounded-xl border border-blue-100/50 flex flex-col justify-center gap-1.5 shrink-0">
+                            <div className="flex justify-between text-[13px]">
+                              <span className="text-gray-500">Jumlah:</span>
+                              <span className="font-bold text-gray-900">
+                                {faktur.quantity / (faktur.product_unit_multiplier || 1)} {faktur.product_purchase_unit}
+                              </span>
+                            </div>
+                            <div className="flex justify-between text-[13px]">
+                              <span className="text-gray-500">Harga:</span>
+                              <span className="font-bold text-gray-900">{formatCurrency(faktur.cost_price)}</span>
+                            </div>
+                            <div className="pt-2 mt-1 border-t border-blue-200/50 flex justify-between items-center">
+                              <span className="text-[10px] font-extrabold text-blue-400 uppercase tracking-widest">Total</span>
+                              <span className="text-lg font-black text-blue-700">{formatCurrency(faktur.cost_price * faktur.quantity)}</span>
+                            </div>
+                          </div>
+
+                          {/* Bukti & Edit Button */}
+                          <div className="flex flex-col gap-2 shrink-0">
+                            {faktur.image_url && (
+                              <button 
+                                onClick={() => setPreviewImageUrl(`http://localhost:5000${faktur.image_url}`)}
+                                className="flex items-center gap-2 px-4 py-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-all text-xs font-bold border border-blue-100"
+                              >
+                                <FileText size={18} />
+                                Lihat Bukti
+                              </button>
+                            )}
+                            {(faktur.status === 'revision' || faktur.status === 'rejected') && (
+                              <button 
+                                onClick={() => {
+                                  // Mock a product object for handleOpenEditFakturModal
+                                  const mockProduct = allProducts.find(p => p.id === faktur.product_id) || {
+                                    id: faktur.product_id,
+                                    name: faktur.product_name || '',
+                                    unit_multiplier: faktur.product_unit_multiplier || 1,
+                                    purchase_unit: faktur.product_purchase_unit || 'Box',
+                                    unit: faktur.product_unit || 'Tablet',
+                                    cost_price: faktur.cost_price,
+                                    stock_type: faktur.stock_type
+                                  } as Product;
+                                  
+                                  setSelectedProduct(mockProduct);
+                                  handleOpenEditFakturModal(faktur);
+                                  setIsApprovalModalOpen(false);
+                                }}
+                                className="flex items-center gap-2 px-4 py-2 text-orange-600 hover:bg-orange-50 rounded-lg transition-all text-xs font-bold border border-orange-100"
+                              >
+                                <Edit size={18} />
+                                Perbaiki Data
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            
+            <div className="px-6 py-4 border-t border-gray-100 bg-gray-50/50 shrink-0 flex justify-between items-center">
+              <p className="text-xs text-gray-400 italic font-medium">*Approval hanya dapat dilakukan di halaman khusus Approval Faktur.</p>
+              <div className="flex gap-3">
+                <Link 
+                  href="/approvals"
+                  className="px-6 py-2 bg-blue-600 text-white rounded-xl text-sm font-bold hover:bg-blue-700 transition-all shadow-sm"
+                >
+                  Ke Halaman Approval
+                </Link>
+                <button 
+                  onClick={() => setIsApprovalModalOpen(false)}
+                  className="px-6 py-2 bg-white border border-gray-300 rounded-xl text-sm font-bold text-gray-700 hover:bg-gray-50 transition-all shadow-sm"
+                >
+                  Tutup
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Image Preview Modal */}
       {previewImageUrl && (

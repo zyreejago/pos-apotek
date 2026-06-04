@@ -1,26 +1,6 @@
+const { createJournalEntry } = require('../utils/journal');
+
 module.exports = function registerProductRoutes(app, pool, authenticate, checkPermission, createAuditTrail) {
-  // Helper function to create journal entry
-  const createJournalEntry = async (connection, transactionId, date, description, items) => {
-    // Create journal entry header
-    const [journalResult] = await connection.query(
-      'INSERT INTO journal_entries (transaction_id, date, description) VALUES (?, ?, ?)',
-      [transactionId, date, description]
-    );
-    const journalId = journalResult.insertId;
-
-    // Insert journal items
-    for (const item of items) {
-      const [accResult] = await connection.query('SELECT id FROM accounts WHERE code = ?', [item.accountCode]);
-      if (accResult.length > 0) {
-        await connection.query(
-          'INSERT INTO journal_items (journal_entry_id, account_id, debit, credit) VALUES (?, ?, ?, ?)',
-          [journalId, accResult[0].id, item.debit || 0, item.credit || 0]
-        );
-      }
-    }
-
-    return journalId;
-  };
 
   app.get(
     '/api/products',
@@ -54,9 +34,12 @@ module.exports = function registerProductRoutes(app, pool, authenticate, checkPe
       let params = [];
 
       if (search) {
-        query += ' WHERE p.name LIKE ?';
-        countQuery += ' WHERE name LIKE ?';
+        query += ' WHERE p.status = "active" AND p.name LIKE ?';
+        countQuery += ' WHERE status = "active" AND name LIKE ?';
         params.push(`%${search}%`);
+      } else {
+        query += ' WHERE p.status = "active"';
+        countQuery += ' WHERE status = "active"';
       }
 
       query += ' ORDER BY p.created_at DESC LIMIT ? OFFSET ?';
@@ -103,9 +86,13 @@ module.exports = function registerProductRoutes(app, pool, authenticate, checkPe
     }
 
     try {
+      // Check if this product is being created via "Add to List" with a high value
+      // We'll pass a flag from the frontend if it needs approval
+      const status = req.body.needsApproval ? 'pending' : 'active';
+
       const connection = await pool.getConnection();
       const [result] = await connection.query(
-        'INSERT INTO products (name, cost_price, selling_price, stock, category, unit, expired_date, location_code, purchase_unit, unit_multiplier) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        'INSERT INTO products (name, cost_price, selling_price, stock, category, unit, expired_date, location_code, purchase_unit, unit_multiplier, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
         [
           name,
           cost_price,
@@ -117,6 +104,7 @@ module.exports = function registerProductRoutes(app, pool, authenticate, checkPe
           location_code || null,
           purchase_unit || 'Box',
           unit_multiplier || 1,
+          status
         ]
       );
       connection.release();
@@ -127,7 +115,7 @@ module.exports = function registerProductRoutes(app, pool, authenticate, checkPe
         role: req.user.role,
         module: 'Management Product',
         action: 'create',
-        description: `Membuat produk baru: ${name}`,
+        description: `Membuat produk baru: ${name} (Status: ${status})`,
       });
 
       res.status(201).json({
@@ -142,6 +130,7 @@ module.exports = function registerProductRoutes(app, pool, authenticate, checkPe
         location_code,
         purchase_unit: purchase_unit || 'Box',
         unit_multiplier: unit_multiplier || 1,
+        status
       });
     } catch (error) {
       console.error('Error adding product:', error);

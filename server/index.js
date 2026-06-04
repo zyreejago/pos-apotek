@@ -240,7 +240,8 @@ const RBAC_MODULES = [
   'Stock Opname',
   'Resep Dokter',
   'System Settings',
-  'Audit Trail'
+  'Audit Trail',
+  'Approval Faktur'
 ];
 
 app.get('/api/rbac/modules', authenticate, (req, res) => {

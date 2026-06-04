@@ -1,4 +1,5 @@
 const midtransClient = require('midtrans-client');
+const { createJournalEntry } = require('../utils/journal');
 
 module.exports = function registerTransactionRoutes(app, pool, authenticate, checkPermission, createAuditTrail) {
   const snap = new midtransClient.Snap({
@@ -6,29 +7,6 @@ module.exports = function registerTransactionRoutes(app, pool, authenticate, che
     serverKey: process.env.MIDTRANS_SERVER_KEY,
     clientKey: process.env.MIDTRANS_CLIENT_KEY
   });
-
-  // Helper function to create journal entry
-  const createJournalEntry = async (connection, transactionId, date, description, items) => {
-    // Create journal entry header
-    const [journalResult] = await connection.query(
-      'INSERT INTO journal_entries (transaction_id, date, description) VALUES (?, ?, ?)',
-      [transactionId, date, description]
-    );
-    const journalId = journalResult.insertId;
-
-    // Insert journal items
-    for (const item of items) {
-      const [accResult] = await connection.query('SELECT id FROM accounts WHERE code = ?', [item.accountCode]);
-      if (accResult.length > 0) {
-        await connection.query(
-          'INSERT INTO journal_items (journal_entry_id, account_id, debit, credit) VALUES (?, ?, ?, ?)',
-          [journalId, accResult[0].id, item.debit || 0, item.credit || 0]
-        );
-      }
-    }
-
-    return journalId;
-  };
 
   app.post(
     '/api/transactions',
