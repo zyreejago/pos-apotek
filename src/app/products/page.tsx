@@ -94,6 +94,7 @@ interface ProductFormData {
 // For multiple products
 interface ProductItem extends ProductFormData {
   id: string;
+  imageFile: File | null;
 }
 
 
@@ -564,25 +565,16 @@ export default function ProductsPage() {
       
       // Auto-fill fields if name matches existing product
       if (name === 'name') {
-        if (value.trim() === '') {
-          // Reset auto-filled fields if name is deleted
-          updated.unit = 'Tablet';
-          updated.purchase_unit = 'Box';
-          updated.unit_multiplier = '1';
-          updated.selling_price = '';
-          updated.location_code = '';
-        } else {
-          const matchedProduct = allProducts.find(
-            p => p.name.trim().toLowerCase() === value.trim().toLowerCase()
-          );
-          if (matchedProduct) {
-            updated.unit = matchedProduct.unit;
-            updated.purchase_unit = matchedProduct.purchase_unit || 'Box';
-            updated.unit_multiplier = (matchedProduct.unit_multiplier || 1).toString();
-            updated.selling_price = matchedProduct.selling_price.toString();
-            updated.location_code = matchedProduct.location_code || '';
-            updated.cost_price = prev.cost_price; // Keep manual cost price
-          }
+        const matchedProduct = allProducts.find(
+          p => p.name.trim().toLowerCase() === value.trim().toLowerCase()
+        );
+        if (matchedProduct) {
+          updated.unit = matchedProduct.unit;
+          updated.purchase_unit = matchedProduct.purchase_unit || 'Box';
+          updated.unit_multiplier = (matchedProduct.unit_multiplier || 1).toString();
+          updated.selling_price = matchedProduct.selling_price.toString();
+          updated.location_code = matchedProduct.location_code || '';
+          updated.cost_price = prev.cost_price; // Keep manual cost price
         }
       }
 
@@ -623,13 +615,17 @@ export default function ProductsPage() {
     if (productOffCanvasMode === 'edit' && selectedProduct) {
       try {
         const multiplier = Number(formData.unit_multiplier) || 1;
+        const formatDate = (date: string) => {
+          if (!date) return null;
+          return date.split('T')[0];
+        };
         const payload = {
           name: formData.name,
           cost_price: Number(formData.cost_price),
           selling_price: Number(formData.selling_price) || 0,
           stock: Number(formData.stock),
           unit: formData.unit || 'Tablet',
-          expired_date: formData.expired_date || null,
+          expired_date: formatDate(formData.expired_date),
           location_code: formData.location_code || null,
           purchase_unit: formData.purchase_unit || 'Box',
           unit_multiplier: multiplier
@@ -659,6 +655,10 @@ export default function ProductsPage() {
 
           const multiplier = Number(item.unit_multiplier) || 1;
           const calculatedStock = Number(item.stock);
+          const formatDate = (date: string | null | undefined) => {
+            if (!date) return null;
+            return date.split('T')[0];
+          };
 
           let productId = null;
           if (existingProduct) {
@@ -670,7 +670,7 @@ export default function ProductsPage() {
               selling_price: Number(item.selling_price) || existingProduct.selling_price || 0,
               stock: item.supplier_id ? Number(existingProduct.stock) : Number(existingProduct.stock) + calculatedStock,
               unit: item.unit || existingProduct.unit || 'Tablet',
-              expired_date: item.expired_date || existingProduct.expired_date || null,
+              expired_date: formatDate(item.expired_date) || formatDate(existingProduct.expired_date),
               location_code: item.location_code || existingProduct.location_code || null,
               purchase_unit: item.purchase_unit || existingProduct.purchase_unit || 'Box',
               unit_multiplier: multiplier
@@ -688,7 +688,7 @@ export default function ProductsPage() {
               selling_price: Number(item.selling_price) || 0,
               stock: item.supplier_id ? 0 : calculatedStock,
               unit: item.unit || 'Tablet',
-              expired_date: item.expired_date || null,
+              expired_date: formatDate(item.expired_date),
               location_code: item.location_code || null,
               purchase_unit: item.purchase_unit || 'Box',
               unit_multiplier: multiplier
@@ -714,6 +714,8 @@ export default function ProductsPage() {
             batchFormData.append('remaining_quantity', calculatedStock.toString());
             batchFormData.append('cost_price', (Number(item.cost_price) || 0).toString());
             if (item.expired_date) batchFormData.append('expired_date', item.expired_date);
+            if (item.dp_amount) batchFormData.append('dp_amount', item.dp_amount);
+            if (item.due_date) batchFormData.append('due_date', item.due_date);
             if (imageFile) batchFormData.append('image', imageFile);
 
             await fetch(`http://localhost:5000/api/inventory/batches`, {
@@ -732,7 +734,7 @@ export default function ProductsPage() {
             return;
           }
           for (const item of multipleProducts) {
-            await saveProductAndBatch(item, null);
+            await saveProductAndBatch(item, item.imageFile);
           }
         } else {
           // Single product add
@@ -1019,18 +1021,34 @@ export default function ProductsPage() {
             {/* Invoice Number and Bukti Faktur */}
             {productOffCanvasMode === 'add' && (
               <>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Nomor Faktur</label>
-                  <input
-                    type="text"
-                    name="invoice_number"
-                    value={formData.invoice_number ?? ''}
-                    onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                    placeholder="FKT-001"
-                  />
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Supplier</label>
+                    <select
+                      name="supplier_id"
+                      value={formData.supplier_id}
+                      onChange={handleInputChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                    >
+                      <option value="">Pilih Supplier</option>
+                      {suppliers.map((s) => (
+                        <option key={s.id} value={s.id}>{s.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Nomor Faktur</label>
+                    <input
+                      type="text"
+                      name="invoice_number"
+                      value={formData.invoice_number ?? ''}
+                      onChange={handleInputChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                      placeholder="FKT-001"
+                    />
+                  </div>
                 </div>
-                <div>
+                <div className="mb-4">
                   <label className="block text-sm font-medium text-gray-700 mb-1">Bukti Faktur</label>
                   <input
                     type="file"
@@ -1043,6 +1061,59 @@ export default function ProductsPage() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                   />
                 </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Stock Type</label>
+                    <select
+                      name="stock_type"
+                      value={formData.stock_type}
+                      onChange={handleInputChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                    >
+                      <option value="belum_bayar">Belum Bayar</option>
+                      <option value="konsinyasi">Konsinyasi</option>
+                      <option value="dp">DP</option>
+                      <option value="lunas">Lunas</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Purchase Date</label>
+                    <input
+                      type="date"
+                      name="purchase_date"
+                      value={formData.purchase_date}
+                      onChange={handleInputChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                    />
+                  </div>
+                </div>
+                {/* DP Fields (only show if stock type is DP) */}
+                {formData.stock_type === 'dp' && (
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">DP Amount (IDR)</label>
+                      <input
+                        type="number"
+                        name="dp_amount"
+                        min="0"
+                        value={formData.dp_amount ?? ''}
+                        onChange={handleInputChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                        placeholder="0"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Due Date</label>
+                      <input
+                        type="date"
+                        name="due_date"
+                        value={formData.due_date ?? ''}
+                        onChange={handleInputChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                      />
+                    </div>
+                  </div>
+                )}
               </>
             )}
 
@@ -1226,52 +1297,6 @@ export default function ProductsPage() {
                   </select>
                 </div>
 
-                {productOffCanvasMode === 'add' && (
-                  <React.Fragment>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Supplier</label>
-                        <select
-                          name="supplier_id"
-                          value={formData.supplier_id}
-                          onChange={handleInputChange}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                        >
-                          <option value="">Select Supplier</option>
-                          {suppliers.map((s) => (
-                            <option key={s.id} value={s.id}>{s.name}</option>
-                          ))}
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Stock Type</label>
-                        <select
-                          name="stock_type"
-                          value={formData.stock_type}
-                          onChange={handleInputChange}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                        >
-                          <option value="belum_bayar">Belum Bayar</option>
-                          <option value="konsinyasi">Konsinyasi</option>
-                          <option value="dp">DP</option>
-                          <option value="lunas">Lunas</option>
-                        </select>
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Purchase Date</label>
-                      <input
-                        type="date"
-                        name="purchase_date"
-                        value={formData.purchase_date}
-                        onChange={handleInputChange}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                      />
-                    </div>
-                  </React.Fragment>
-                )}
-
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Expired Date</label>
                   <input
@@ -1282,61 +1307,20 @@ export default function ProductsPage() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                   />
                 </div>
-
-                {/* DP Fields (only show if stock type is DP and in ADD mode) */}
-                {productOffCanvasMode === 'add' && formData.stock_type === 'dp' && (
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">DP Amount (IDR)</label>
-                      <input
-                        type="number"
-                        name="dp_amount"
-                        min="0"
-                        value={formData.dp_amount ?? ''}
-                        onChange={handleInputChange}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                        placeholder="0"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Due Date</label>
-                      <input
-                        type="date"
-                        name="due_date"
-                        value={formData.due_date ?? ''}
-                        onChange={handleInputChange}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                      />
-                    </div>
-                  </div>
-                )}
               </React.Fragment>
             ) : (
               // Multiple Products Section
               <div className="space-y-4">
                 <div className="border border-gray-200 rounded-lg p-4">
-                  <div className="mb-4">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Supplier</label>
-                    <select
-                      value={formData.supplier_id}
-                      onChange={(e) => setFormData({ ...formData, supplier_id: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                    >
-                      <option value="">Pilih Supplier</option>
-                      {suppliers.map((s) => (
-                        <option key={s.id} value={s.id}>{s.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                  
                   <h3 className="font-medium text-gray-700 mb-3">Tambahkan Produk</h3>
                   <div className="grid grid-cols-2 gap-4 mb-3">
                     <div>
                       <label className="block text-xs text-gray-600 mb-1">Nama Produk</label>
                       <input
                         type="text"
+                        name="name"
                         value={formData.name}
-                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                        onChange={handleInputChange}
                         className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm"
                         placeholder="Nama Produk"
                       />
@@ -1344,8 +1328,9 @@ export default function ProductsPage() {
                     <div>
                       <label className="block text-xs text-gray-600 mb-1">Kode Lokasi</label>
                       <select
+                        name="location_code"
                         value={formData.location_code}
-                        onChange={(e) => setFormData({ ...formData, location_code: e.target.value })}
+                        onChange={handleInputChange}
                         className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm"
                       >
                         <option value="">Pilih Lokasi</option>
@@ -1363,8 +1348,9 @@ export default function ProductsPage() {
                       <label className="block text-xs text-gray-600 mb-1">Harga Beli</label>
                       <input
                         type="number"
+                        name="cost_price"
                         value={formData.cost_price}
-                        onChange={(e) => setFormData({ ...formData, cost_price: e.target.value })}
+                        onChange={handleInputChange}
                         className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm"
                         placeholder="0"
                       />
@@ -1373,8 +1359,9 @@ export default function ProductsPage() {
                       <label className="block text-xs text-gray-600 mb-1">Harga Jual</label>
                       <input
                         type="number"
+                        name="selling_price"
                         value={formData.selling_price}
-                        onChange={(e) => setFormData({ ...formData, selling_price: e.target.value })}
+                        onChange={handleInputChange}
                         className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm"
                         placeholder="0"
                       />
@@ -1382,8 +1369,9 @@ export default function ProductsPage() {
                     <div>
                       <label className="block text-xs text-gray-600 mb-1">Unit Pembelian</label>
                       <select
+                        name="purchase_unit"
                         value={formData.purchase_unit}
-                        onChange={(e) => setFormData({ ...formData, purchase_unit: e.target.value })}
+                        onChange={handleInputChange}
                         className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm"
                       >
                         <option value="Box">Box</option>
@@ -1396,8 +1384,9 @@ export default function ProductsPage() {
                     <div>
                       <label className="block text-xs text-gray-600 mb-1">Unit Dasar</label>
                       <select
+                        name="unit"
                         value={formData.unit}
-                        onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
+                        onChange={handleInputChange}
                         className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm"
                       >
                         <option value="Tablet">Tablet</option>
@@ -1415,6 +1404,7 @@ export default function ProductsPage() {
                       <label className="block text-xs text-gray-600 mb-1">Isi per Unit Pembelian</label>
                       <input
                         type="number"
+                        name="unit_multiplier"
                         min="1"
                         value={formData.unit_multiplier}
                         onChange={(e) => {
@@ -1435,17 +1425,9 @@ export default function ProductsPage() {
                       <label className="block text-xs text-gray-600 mb-1">Stock ({formData.purchase_unit || 'Box'})</label>
                       <input
                         type="number"
+                        name="purchase_unit_stock"
                         value={formData.purchase_unit_stock || ''}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          const pStock = Number(val) || 0;
-                          const mult = Number(formData.unit_multiplier) || 1;
-                          setFormData({
-                            ...formData,
-                            purchase_unit_stock: val,
-                            stock: val === '' ? '' : Math.round(pStock * mult).toString()
-                          });
-                        }}
+                        onChange={handleInputChange}
                         className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm"
                         placeholder="0"
                       />
@@ -1454,17 +1436,9 @@ export default function ProductsPage() {
                       <label className="block text-xs text-gray-600 mb-1">Stock ({formData.unit || 'Tablet'}) <span className="text-[10px] text-gray-400 font-normal">(Unit Dasar)</span></label>
                       <input
                         type="number"
+                        name="stock"
                         value={formData.stock || ''}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          const bStock = Number(val) || 0;
-                          const mult = Number(formData.unit_multiplier) || 1;
-                          setFormData({
-                            ...formData,
-                            stock: val,
-                            purchase_unit_stock: val === '' ? '' : (bStock / mult).toString()
-                          });
-                        }}
+                        onChange={handleInputChange}
                         className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm"
                         placeholder="0"
                       />
@@ -1473,50 +1447,16 @@ export default function ProductsPage() {
                       <label className="block text-xs text-gray-600 mb-1">Tgl Kadaluarsa</label>
                       <input
                         type="date"
+                        name="expired_date"
                         value={formData.expired_date}
-                        onChange={(e) => setFormData({ ...formData, expired_date: e.target.value })}
+                        onChange={handleInputChange}
                         className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm"
                       />
                     </div>
-                    <div>
-                      <label className="block text-xs text-gray-600 mb-1">Stock Type</label>
-                      <select
-                        value={formData.stock_type}
-                        onChange={(e) => setFormData({ ...formData, stock_type: e.target.value as ProductFormData['stock_type'] })}
-                        className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm"
-                      >
-                        <option value="belum_bayar">Belum Bayar</option>
-                        <option value="konsinyasi">Konsinyasi</option>
-                        <option value="dp">DP</option>
-                        <option value="lunas">Lunas</option>
-                      </select>
-                    </div>
+                    
                   </div>
                   {/* DP Fields for multiple products */}
-                  {formData.stock_type === 'dp' && (
-                    <div className="grid grid-cols-2 gap-4 mb-3">
-                      <div>
-                        <label className="block text-xs text-gray-600 mb-1">DP Amount (IDR)</label>
-                        <input
-                          type="number"
-                          min="0"
-                          value={formData.dp_amount ?? ''}
-                          onChange={(e) => setFormData({ ...formData, dp_amount: e.target.value })}
-                          className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm"
-                          placeholder="0"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs text-gray-600 mb-1">Due Date</label>
-                        <input
-                          type="date"
-                          value={formData.due_date ?? ''}
-                          onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
-                          className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm"
-                        />
-                      </div>
-                    </div>
-                  )}
+                
                   <button
                     type="button"
                     onClick={() => {
@@ -1534,7 +1474,8 @@ export default function ProductsPage() {
                           ...existingItem,
                           stock: (Number(existingItem.stock) + Number(formData.stock)).toString(),
                           cost_price: formData.cost_price, // Update with the latest cost price
-                          selling_price: formData.selling_price || existingItem.selling_price // Update with latest selling price
+                          selling_price: formData.selling_price || existingItem.selling_price, // Update with latest selling price
+                          imageFile: productFormImageFile
                         };
                         setMultipleProducts(updatedList);
                       } else {
@@ -1542,7 +1483,8 @@ export default function ProductsPage() {
                           ...multipleProducts,
                           {
                             ...formData,
-                            id: Date.now().toString()
+                            id: Date.now().toString(),
+                            imageFile: productFormImageFile
                           }
                         ]);
                       }
