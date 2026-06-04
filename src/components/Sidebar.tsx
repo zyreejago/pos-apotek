@@ -40,6 +40,7 @@ export default function Sidebar() {
   const [loading, setLoading] = useState(true);
   const pathname = usePathname();
   const lastRoleRef = useRef<string>('');
+  const hasSavedStateRef = useRef(false); // To track if we already saved the userCollapsedState
   const isAuthPage = pathname === '/login' || pathname === '/register' || pathname === '/forgot-password';
 
   const fetchPermissions = useCallback(async (role: string) => {
@@ -158,13 +159,23 @@ export default function Sidebar() {
 
   // Auto collapse sidebar when any offcanvas opens
   useEffect(() => {
+    console.log("Sidebar useEffect triggered!");
+    console.log("isAnyOffCanvasOpen:", isAnyOffCanvasOpen);
+    console.log("userCollapsedState:", userCollapsedState);
+    console.log("isCollapsed:", isCollapsed);
     if (isAnyOffCanvasOpen) {
-      setUserCollapsedState(isCollapsed);
+      if (!hasSavedStateRef.current) {
+        console.log("Collapsing sidebar and saving userCollapsedState:", isCollapsed);
+        setUserCollapsedState(isCollapsed);
+        hasSavedStateRef.current = true;
+      }
       setIsCollapsed(true);
     } else {
+      console.log("Restoring sidebar to userCollapsedState:", userCollapsedState);
       setIsCollapsed(userCollapsedState);
+      hasSavedStateRef.current = false; // Reset the ref when offcanvas closes
     }
-  }, [isAnyOffCanvasOpen, isCollapsed, setIsCollapsed, setUserCollapsedState, userCollapsedState]);
+  }, [isAnyOffCanvasOpen, setIsCollapsed, setUserCollapsedState, userCollapsedState]);
 
   // Update userCollapsedState when user manually toggles
   const handleToggleCollapse = () => {
