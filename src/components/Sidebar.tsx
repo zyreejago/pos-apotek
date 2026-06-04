@@ -43,11 +43,6 @@ export default function Sidebar() {
   const isAuthPage = pathname === '/login' || pathname === '/register' || pathname === '/forgot-password';
 
   const fetchPermissions = useCallback(async (role: string) => {
-    if (role === 'superadmin') {
-      setPermissions([]);
-      setLoading(false);
-      return;
-    }
     try {
       const token = localStorage.getItem('token');
       if (!token) {
@@ -164,9 +159,19 @@ export default function Sidebar() {
 
   const canShow = (module: string) => {
     if (loading) return false;
-    if (userRole === 'superadmin') return true;
+    // Dashboard is usually visible to everyone once logged in
+    if (module === 'Dashboards') return true;
+    
+    // Superadmin bypass for critical settings access
+    if (userRole === 'superadmin' && module === 'System Settings') return true;
+    
     const perm = permissions.find(p => p.module === module);
-    return perm ? (perm.show || perm.create || perm.edit || perm.delete) : false;
+    const hasPerm = perm ? (perm.show || perm.create || perm.edit || perm.delete) : false;
+
+    // Fallback: If superadmin has no permissions set in DB yet, show everything
+    if (userRole === 'superadmin' && permissions.length === 0) return true;
+    
+    return hasPerm;
   };
 
   // Auto-collapse sidebar when offcanvas opens
@@ -213,162 +218,120 @@ export default function Sidebar() {
       {/* Menu Items */}
       <div className="flex-1 overflow-y-auto py-2 px-3 space-y-1 custom-scrollbar">
         
-        {userRole === 'superadmin' ? (
-          <>
-            {canShow('Management Pengguna') && (
-              <NavItem href="/users" icon={<UserCheck size={20} />} label="Management Pengguna" active={isActive('/users')} isCollapsed={isCollapsed} />
-            )}
-            <div className={`pt-4 pb-2 px-3 ${isCollapsed ? 'text-center' : ''}`}>
-              <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">{isCollapsed ? '...' : 'Others'}</span>
-            </div>
-            {canShow('System Settings') && (
-              <div>
-                <button
-                  onClick={() => {
-                    if (isCollapsed) toggleSidebar();
-                    setIsSettingsOpen(!isSettingsOpen);
-                  }}
-                  className={`w-full flex items-center ${isCollapsed ? 'justify-center' : 'justify-between'} px-3 py-2.5 rounded-lg transition-colors group ${pathname.startsWith('/settings') ? 'bg-gray-50' : 'hover:bg-gray-50'}`}
-                  title={isCollapsed ? "System Settings" : ""}
-                >
-                  <div className="flex items-center gap-3">
-                    <span className={`group-hover:text-slate-600 ${pathname.startsWith('/settings') ? 'text-slate-600' : 'text-slate-400'}`}>
-                      <Settings size={20} />
-                    </span>
-                    {!isCollapsed && <span className={`font-medium ${pathname.startsWith('/settings') ? 'text-slate-800' : 'text-slate-600'}`}>System Settings</span>}
-                  </div>
-                  {!isCollapsed && <span className="text-slate-400 text-lg leading-none">{isSettingsOpen ? '−' : '+'}</span>}
-                </button>
+        <NavItem href="/dashboard" icon={<LayoutDashboard size={20} />} label="Dashboards" active={isActive('/dashboard') || isActive('/')} isCollapsed={isCollapsed} />
+        
 
-                {isSettingsOpen && !isCollapsed && (
-                  <div className="ml-4 mt-1 space-y-1 border-l border-gray-100 pl-2">
-                    <Link href="/settings/role-permissions" className={`flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer ${isActive('/settings/role-permissions') ? 'bg-blue-50 text-blue-600' : 'text-slate-500 hover:text-slate-700 hover:bg-gray-50'}`}>
-                      <div className={`w-1.5 h-1.5 rounded-full ${isActive('/settings/role-permissions') ? 'bg-blue-600' : 'bg-transparent border border-slate-400'}`}></div>
-                      <span className="font-medium text-sm">Role & Permissions</span>
-                    </Link>
-                  </div>
-                )}
+        {canShow('Management Product') && (
+          <NavItem href="/products" icon={<Package size={20} />} label="Products" active={isActive('/products')} isCollapsed={isCollapsed} />
+        )}
+        
+        {canShow('Stock Opname') && (
+          <NavItem href="/stock-opname" icon={<ClipboardCheck size={20} />} label="Stock Opname" active={isActive('/stock-opname')} isCollapsed={isCollapsed} />
+        )}
+        
+        {canShow('Suppliers') && (
+          <NavItem href="/suppliers" icon={<Users size={20} />} label="Suppliers" active={isActive('/suppliers')} isCollapsed={isCollapsed} />
+        )}
+
+        {canShow('Resep Dokter') && (
+          <NavItem href="/prescriptions" icon={<FileText size={20} />} label="Resep Dokter" active={isActive('/prescriptions')} isCollapsed={isCollapsed} />
+        )}
+        
+        {canShow('Transactions') && (
+          <NavItem href="/transactions" icon={<ShoppingCart size={20} />} label="Transactions" active={isActive('/transactions')} isCollapsed={isCollapsed} />
+        )}
+        
+        {canShow('Management Pengguna') && (
+          <NavItem href="/users" icon={<UserCheck size={20} />} label="Management Pengguna" active={isActive('/users')} isCollapsed={isCollapsed} />
+        )}
+        
+        {/* Expandable Menu */}
+        {canShow('Sales Report') && (
+          <div>
+            <button
+              onClick={() => {
+                if (isCollapsed) toggleSidebar();
+                setIsReportOpen(!isReportOpen);
+              }}
+              className={`w-full flex items-center ${isCollapsed ? 'justify-center' : 'justify-between'} px-3 py-2.5 rounded-lg transition-colors group ${pathname.startsWith('/reports') ? 'bg-gray-50' : 'hover:bg-gray-50'}`}
+              title={isCollapsed ? "Sales Report" : ""}
+            >
+              <div className="flex items-center gap-3">
+                <span className={`group-hover:text-slate-600 ${pathname.startsWith('/reports') ? 'text-slate-600' : 'text-slate-400'}`}>
+                  <FileText size={20} />
+                </span>
+                {!isCollapsed && <span className={`font-medium ${pathname.startsWith('/reports') ? 'text-slate-800' : 'text-slate-600'}`}>Sales Report</span>}
+              </div>
+              {!isCollapsed && <span className="text-slate-400 text-lg leading-none">{isReportOpen ? '−' : '+'}</span>}
+            </button>
+            
+            {isReportOpen && !isCollapsed && (
+              <div className="ml-4 mt-1 space-y-1 border-l border-gray-100 pl-2">
+                <Link href="/reports/financial" className={`flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer ${isActive('/reports/financial') ? 'bg-blue-50 text-blue-600' : 'text-slate-500 hover:text-slate-700 hover:bg-gray-50'}`}>
+                  <div className={`w-1.5 h-1.5 rounded-full ${isActive('/reports/financial') ? 'bg-blue-600' : 'bg-transparent border border-slate-400'}`}></div>
+                  <span className="font-medium text-sm">Laporan Keuangan</span>
+                </Link>
+                <Link href="/reports/balance" className={`flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer ${isActive('/reports/balance') ? 'bg-blue-50 text-blue-600' : 'text-slate-500 hover:text-slate-700 hover:bg-gray-50'}`}>
+                  <div className={`w-1.5 h-1.5 rounded-full ${isActive('/reports/balance') ? 'bg-blue-600' : 'bg-transparent border border-slate-400'}`}></div>
+                  <span className="font-medium text-sm">Neraca Keuangan</span>
+                </Link>
+                <Link href="/reports/transactions" className={`flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer ${isActive('/reports/transactions') ? 'bg-blue-50 text-blue-600' : 'text-slate-500 hover:text-slate-700 hover:bg-gray-50'}`}>
+                  <div className={`w-1.5 h-1.5 rounded-full ${isActive('/reports/transactions') ? 'bg-blue-600' : 'bg-transparent border border-slate-400'}`}></div>
+                  <span className="font-medium text-sm">Laporan Transaksi</span>
+                </Link>
+                <Link href="/reports/general-ledger" className={`flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer ${isActive('/reports/general-ledger') ? 'bg-blue-50 text-blue-600' : 'text-slate-500 hover:text-slate-700 hover:bg-gray-50'}`}>
+                  <div className={`w-1.5 h-1.5 rounded-full ${isActive('/reports/general-ledger') ? 'bg-blue-600' : 'bg-transparent border border-slate-400'}`}></div>
+                  <span className="font-medium text-sm">Buku Besar</span>
+                </Link>
               </div>
             )}
-          </>
-        ) : (
-          <>
-            <NavItem href="/dashboard" icon={<LayoutDashboard size={20} />} label="Dashboards" active={isActive('/dashboard') || isActive('/')} isCollapsed={isCollapsed} />
-            
+          </div>
+        )}
 
-            {canShow('Management Product') && (
-              <NavItem href="/products" icon={<Package size={20} />} label="Products" active={isActive('/products')} isCollapsed={isCollapsed} />
-            )}
-            
-            {canShow('Stock Opname') && (
-              <NavItem href="/stock-opname" icon={<ClipboardCheck size={20} />} label="Stock Opname" active={isActive('/stock-opname')} isCollapsed={isCollapsed} />
-            )}
-            
-            {canShow('Suppliers') && (
-              <NavItem href="/suppliers" icon={<Users size={20} />} label="Suppliers" active={isActive('/suppliers')} isCollapsed={isCollapsed} />
-            )}
+        {canShow('Peramalan Stok') && (
+          <NavItem href="/recommendations" icon={<Rocket size={20} />} label="Peramalan Stok" active={isActive('/recommendations')} isCollapsed={isCollapsed} />
+        )}
+        
+        {canShow('Audit Trail') && (
+          <NavItem href="/audit-trails" icon={<Activity size={20} />} label="Audit Trail" active={isActive('/audit-trails')} isCollapsed={isCollapsed} />
+        )}
+        
+        <div className={`pt-4 pb-2 px-3 ${isCollapsed ? 'text-center' : ''}`}>
+          <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">{isCollapsed ? '...' : 'Others'}</span>
+        </div>
+        
+        {canShow('System Settings') && (
+          <div>
+            <button
+              onClick={() => {
+                if (isCollapsed) toggleSidebar();
+                setIsSettingsOpen(!isSettingsOpen);
+              }}
+              className={`w-full flex items-center ${isCollapsed ? 'justify-center' : 'justify-between'} px-3 py-2.5 rounded-lg transition-colors group ${pathname.startsWith('/settings') ? 'bg-gray-50' : 'hover:bg-gray-50'}`}
+              title={isCollapsed ? "System Settings" : ""}
+            >
+              <div className="flex items-center gap-3">
+                <span className={`group-hover:text-slate-600 ${pathname.startsWith('/settings') ? 'text-slate-600' : 'text-slate-400'}`}>
+                  <Settings size={20} />
+                </span>
+                {!isCollapsed && <span className={`font-medium ${pathname.startsWith('/settings') ? 'text-slate-800' : 'text-slate-600'}`}>System Settings</span>}
+              </div>
+              {!isCollapsed && <span className="text-slate-400 text-lg leading-none">{isSettingsOpen ? '−' : '+'}</span>}
+            </button>
 
-            {canShow('Resep Dokter') && (
-              <NavItem href="/prescriptions" icon={<FileText size={20} />} label="Resep Dokter" active={isActive('/prescriptions')} isCollapsed={isCollapsed} />
-            )}
-            
-            {canShow('Transactions') && (
-              <NavItem href="/transactions" icon={<ShoppingCart size={20} />} label="Transactions" active={isActive('/transactions')} isCollapsed={isCollapsed} />
-            )}
-            
-            {canShow('Management Pengguna') && (
-              <NavItem href="/users" icon={<UserCheck size={20} />} label="Management Pengguna" active={isActive('/users')} isCollapsed={isCollapsed} />
-            )}
-            
-            {/* Expandable Menu */}
-            {canShow('Sales Report') && (
-              <div>
-                <button
-                  onClick={() => {
-                    if (isCollapsed) toggleSidebar();
-                    setIsReportOpen(!isReportOpen);
-                  }}
-                  className={`w-full flex items-center ${isCollapsed ? 'justify-center' : 'justify-between'} px-3 py-2.5 rounded-lg transition-colors group ${pathname.startsWith('/reports') ? 'bg-gray-50' : 'hover:bg-gray-50'}`}
-                  title={isCollapsed ? "Sales Report" : ""}
-                >
-                  <div className="flex items-center gap-3">
-                    <span className={`group-hover:text-slate-600 ${pathname.startsWith('/reports') ? 'text-slate-600' : 'text-slate-400'}`}>
-                      <FileText size={20} />
-                    </span>
-                    {!isCollapsed && <span className={`font-medium ${pathname.startsWith('/reports') ? 'text-slate-800' : 'text-slate-600'}`}>Sales Report</span>}
-                  </div>
-                  {!isCollapsed && <span className="text-slate-400 text-lg leading-none">{isReportOpen ? '−' : '+'}</span>}
-                </button>
-                
-                {isReportOpen && !isCollapsed && (
-                  <div className="ml-4 mt-1 space-y-1 border-l border-gray-100 pl-2">
-                    <Link href="/reports/financial" className={`flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer ${isActive('/reports/financial') ? 'bg-blue-50 text-blue-600' : 'text-slate-500 hover:text-slate-700 hover:bg-gray-50'}`}>
-                      <div className={`w-1.5 h-1.5 rounded-full ${isActive('/reports/financial') ? 'bg-blue-600' : 'bg-transparent border border-slate-400'}`}></div>
-                      <span className="font-medium text-sm">Laporan Keuangan</span>
-                    </Link>
-                    <Link href="/reports/balance" className={`flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer ${isActive('/reports/balance') ? 'bg-blue-50 text-blue-600' : 'text-slate-500 hover:text-slate-700 hover:bg-gray-50'}`}>
-                      <div className={`w-1.5 h-1.5 rounded-full ${isActive('/reports/balance') ? 'bg-blue-600' : 'bg-transparent border border-slate-400'}`}></div>
-                      <span className="font-medium text-sm">Neraca Keuangan</span>
-                    </Link>
-                    <Link href="/reports/transactions" className={`flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer ${isActive('/reports/transactions') ? 'bg-blue-50 text-blue-600' : 'text-slate-500 hover:text-slate-700 hover:bg-gray-50'}`}>
-                      <div className={`w-1.5 h-1.5 rounded-full ${isActive('/reports/transactions') ? 'bg-blue-600' : 'bg-transparent border border-slate-400'}`}></div>
-                      <span className="font-medium text-sm">Laporan Transaksi</span>
-                    </Link>
-                    <Link href="/reports/general-ledger" className={`flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer ${isActive('/reports/general-ledger') ? 'bg-blue-50 text-blue-600' : 'text-slate-500 hover:text-slate-700 hover:bg-gray-50'}`}>
-                      <div className={`w-1.5 h-1.5 rounded-full ${isActive('/reports/general-ledger') ? 'bg-blue-600' : 'bg-transparent border border-slate-400'}`}></div>
-                      <span className="font-medium text-sm">Buku Besar</span>
-                    </Link>
-                  </div>
-                )}
+            {isSettingsOpen && !isCollapsed && (
+              <div className="ml-4 mt-1 space-y-1 border-l border-gray-100 pl-2">
+                <Link href="/settings/role-permissions" className={`flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer ${isActive('/settings/role-permissions') ? 'bg-blue-50 text-blue-600' : 'text-slate-500 hover:text-slate-700 hover:bg-gray-50'}`}>
+                  <div className={`w-1.5 h-1.5 rounded-full ${isActive('/settings/role-permissions') ? 'bg-blue-600' : 'bg-transparent border border-slate-400'}`}></div>
+                  <span className="font-medium text-sm">Role & Permissions</span>
+                </Link>
+                <Link href="/settings/transaction-settings" className={`flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer ${isActive('/settings/transaction-settings') ? 'bg-blue-50 text-blue-600' : 'text-slate-500 hover:text-slate-700 hover:bg-gray-50'}`}>
+                  <div className={`w-1.5 h-1.5 rounded-full ${isActive('/settings/transaction-settings') ? 'bg-blue-600' : 'bg-transparent border border-slate-400'}`}></div>
+                  <span className="font-medium text-sm">Transactions Settings</span>
+                </Link>
               </div>
             )}
-
-            {canShow('Peramalan Stok') && (
-              <NavItem href="/recommendations" icon={<Rocket size={20} />} label="Peramalan Stok" active={isActive('/recommendations')} isCollapsed={isCollapsed} />
-            )}
-            
-            {canShow('Audit Trail') && (
-              <NavItem href="/audit-trails" icon={<Activity size={20} />} label="Audit Trail" active={isActive('/audit-trails')} isCollapsed={isCollapsed} />
-            )}
-            
-            <div className={`pt-4 pb-2 px-3 ${isCollapsed ? 'text-center' : ''}`}>
-              <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">{isCollapsed ? '...' : 'Others'}</span>
-            </div>
-            
-            {canShow('System Settings') && (
-              <div>
-                <button
-                  onClick={() => {
-                    if (isCollapsed) toggleSidebar();
-                    setIsSettingsOpen(!isSettingsOpen);
-                  }}
-                  className={`w-full flex items-center ${isCollapsed ? 'justify-center' : 'justify-between'} px-3 py-2.5 rounded-lg transition-colors group ${pathname.startsWith('/settings') ? 'bg-gray-50' : 'hover:bg-gray-50'}`}
-                  title={isCollapsed ? "System Settings" : ""}
-                >
-                  <div className="flex items-center gap-3">
-                    <span className={`group-hover:text-slate-600 ${pathname.startsWith('/settings') ? 'text-slate-600' : 'text-slate-400'}`}>
-                      <Settings size={20} />
-                    </span>
-                    {!isCollapsed && <span className={`font-medium ${pathname.startsWith('/settings') ? 'text-slate-800' : 'text-slate-600'}`}>System Settings</span>}
-                  </div>
-                  {!isCollapsed && <span className="text-slate-400 text-lg leading-none">{isSettingsOpen ? '−' : '+'}</span>}
-                </button>
-
-                {isSettingsOpen && !isCollapsed && (
-                  <div className="ml-4 mt-1 space-y-1 border-l border-gray-100 pl-2">
-                    <Link href="/settings/role-permissions" className={`flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer ${isActive('/settings/role-permissions') ? 'bg-blue-50 text-blue-600' : 'text-slate-500 hover:text-slate-700 hover:bg-gray-50'}`}>
-                      <div className={`w-1.5 h-1.5 rounded-full ${isActive('/settings/role-permissions') ? 'bg-blue-600' : 'bg-transparent border border-slate-400'}`}></div>
-                      <span className="font-medium text-sm">Role & Permissions</span>
-                    </Link>
-                    <Link href="/settings/transaction-settings" className={`flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer ${isActive('/settings/transaction-settings') ? 'bg-blue-50 text-blue-600' : 'text-slate-500 hover:text-slate-700 hover:bg-gray-50'}`}>
-                      <div className={`w-1.5 h-1.5 rounded-full ${isActive('/settings/transaction-settings') ? 'bg-blue-600' : 'bg-transparent border border-slate-400'}`}></div>
-                      <span className="font-medium text-sm">Transactions Settings</span>
-                    </Link>
-                  </div>
-                )}
-              </div>
-            )}
-          </>
+          </div>
         )}
 
       </div>

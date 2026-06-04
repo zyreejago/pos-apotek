@@ -196,11 +196,17 @@ const requireSuperadmin = (req, res, next) => {
 
 const checkPermission = (moduleName, action) => {
   return async (req, res, next) => {
-    if (req.user.role === 'superadmin') return next();
+    // Superadmin bypass for critical settings access to prevent lockout
+    if (req.user.role === 'superadmin' && moduleName === 'System Settings') return next();
     
     try {
       const [roles] = await pool.query('SELECT id FROM roles WHERE name = ?', [req.user.role]);
-      if (roles.length === 0) return res.status(403).json({ message: 'Forbidden' });
+      
+      // If role not found but user is superadmin, allow as fallback
+      if (roles.length === 0) {
+        if (req.user.role === 'superadmin') return next();
+        return res.status(403).json({ message: 'Forbidden' });
+      }
       
       const roleId = roles[0].id;
       const [perms] = await pool.query(
@@ -209,6 +215,9 @@ const checkPermission = (moduleName, action) => {
       );
       
       if (perms.length > 0 && perms[0].allowed) {
+        next();
+      } else if (req.user.role === 'superadmin') {
+        // Fallback for superadmin if no specific permission record exists
         next();
       } else {
         res.status(403).json({ message: 'Forbidden' });
