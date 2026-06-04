@@ -413,68 +413,50 @@ export default function PrescriptionsPage() {
   };
 
   const handlePaymentAndCreatePrescription = async () => {
-    if (cart.length === 0) {
-      goeyToast.error('Keranjang Kosong', { description: 'Silakan pilih obat terlebih dahulu sebelum menyimpan dan memproses transaksi.' });
-      return;
-    }
-
     setProcessing(true);
     try {
-      // First create the transaction
-      const transactionPayload = {
-        items: cart.map(item => ({
-          id: item.id,
-          quantity: item.quantity,
-          price: item.selling_price
-        })),
-        total_amount: total,
-        subtotal: subtotal,
-        tax_amount: ppn,
-        discount_amount: discount,
-        payment_method: paymentMethod
-      };
+      let transactionId: number | null = null;
 
-      const transactionRes = await fetch('http://localhost:5000/api/transactions', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json', 
-          ...(token ? { Authorization: `Bearer ${token}` } : {}) 
-        },
-        body: JSON.stringify(transactionPayload)
-      });
+      // Only create transaction if there are items in the cart
+      if (cart.length > 0) {
+        const transactionPayload = {
+          items: cart.map(item => ({
+            id: item.id,
+            quantity: item.quantity,
+            price: item.selling_price
+          })),
+          total_amount: total,
+          subtotal: subtotal,
+          tax_amount: ppn,
+          discount_amount: discount,
+          payment_method: paymentMethod
+        };
 
-      if (transactionRes.status === 401) {
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-        router.push('/login');
-        return;
-      }
+        const transactionRes = await fetch('http://localhost:5000/api/transactions', {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json', 
+            ...(token ? { Authorization: `Bearer ${token}` } : {}) 
+          },
+          body: JSON.stringify(transactionPayload)
+        });
 
-      const transactionData = await transactionRes.json();
-      if (!transactionRes.ok) {
-        goeyToast.error('Transaksi gagal', { description: transactionData.message || 'Terjadi kesalahan saat memproses transaksi.' });
-        return;
-      }
+        if (transactionRes.status === 401) {
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+          router.push('/login');
+          return;
+        }
 
-      // Now create the prescription linked to the transaction
-      const prescriptionFormData = new FormData();
-      prescriptionFormData.append('prescription_code', formData.prescription_code);
-      prescriptionFormData.append('prescription_date', formData.prescription_date);
-      prescriptionFormData.append('notes', formData.notes);
-      prescriptionFormData.append('entered_by', currentUser?.id || '');
-      prescriptionFormData.append('transaction_id', transactionData.id.toString());
-      if (formData.image) {
-        prescriptionFormData.append('image', formData.image);
-      }
+        const transactionData = await transactionRes.json();
+        if (!transactionRes.ok) {
+          goeyToast.error('Transaksi gagal', { description: transactionData.message || 'Terjadi kesalahan saat memproses transaksi.' });
+          return;
+        }
 
-      const prescriptionRes = await fetch('http://localhost:5000/api/inventory/prescriptions', {
-        method: 'POST',
-        headers: authHeaders,
-        body: prescriptionFormData
-      });
+        transactionId = transactionData.id;
 
-      if (prescriptionRes.ok) {
-        // Handle Midtrans if needed
+        // If using Midtrans, handle payment flow
         if (paymentMethod === 'midtrans' && transactionData.redirect_url) {
           const snapToken = transactionData.redirect_url.split('/').pop();
           ((window as unknown) as Window & { snap: { pay: (token: string, options: Record<string, unknown>) => void } }).snap.pay(snapToken || '', {
@@ -502,23 +484,49 @@ export default function PrescriptionsPage() {
               fetchPrescriptions();
             }
           });
+          return; // Stop here to wait for Midtrans callback
         } else {
           goeyToast.success('Resep & Transaksi Berhasil', { description: `Pembayaran senilai ${formatCurrency(total)} berhasil diproses.` });
           printReceiptFunction({ id: transactionData.id, items: cart, subtotal, ppn, discount, total });
-          setIsOffCanvasOpen(false);
-          setCart([]);
-          fetchPrescriptions();
-          fetchProductsAndSettings();
         }
-      } else {
-        goeyToast.error('Gagal Membuat Resep', { description: 'Transaksi berhasil dibuat, tetapi gagal menyimpan data resep.' });
+      }
+
+      // Now create the prescription (with or without transaction)
+      const prescriptionFormData = new FormData();
+      prescriptionFormData.append('prescription_code', formData.prescription_code);
+      prescriptionFormData.append('prescription_date', formData.prescription_date);
+      prescriptionFormData.append('notes', formData.notes);
+      prescriptionFormData.append('entered_by', currentUser?.id || '');
+      if (transactionId) {
+        prescriptionFormData.append('transaction_id', transactionId.toString());
+      }
+      if (formData.image) {
+        prescriptionFormData.append('image', formData.image);
+      }
+
+      const prescriptionRes = await fetch('http://localhost:5000/api/inventory/prescriptions', {
+        method: 'POST',
+        headers: authHeaders,
+        body: prescriptionFormData
+      });
+
+      if (prescriptionRes.ok) {
+        // If no transaction was needed, just show success message
+        if (!transactionId) {
+          goeyToast.success('Resep Berhasil Disimpan', { description: 'Resep dokter telah berhasil disimpan.' });
+        }
         setIsOffCanvasOpen(false);
         setCart([]);
         fetchPrescriptions();
+        if (transactionId) {
+          fetchProductsAndSettings();
+        }
+      } else {
+        goeyToast.error('Gagal Membuat Resep', { description: 'Terjadi kesalahan saat menyimpan data resep.' });
       }
     } catch (error) {
-      console.error('Payment error:', error);
-      goeyToast.error('Gagal memproses pembayaran', { description: 'Periksa koneksi internet Anda dan coba lagi.' });
+      console.error('Error:', error);
+      goeyToast.error('Gagal memproses', { description: 'Periksa koneksi internet Anda dan coba lagi.' });
     } finally {
       setProcessing(false);
     }
@@ -1003,10 +1011,12 @@ export default function PrescriptionsPage() {
               {processing ? 'Memproses...' : (
                 <>
                   {offCanvasMode === 'add' ? (
-                    <>
-                      <CreditCard size={18} />
-                      Proses Transaksi & Resep
-                    </>
+                    cart.length > 0 ? (
+                      <>
+                        <CreditCard size={18} />
+                        Proses Transaksi & Resep
+                      </>
+                    ) : 'Simpan Resep'
                   ) : 'Simpan Perubahan'}
                 </>
               )}
