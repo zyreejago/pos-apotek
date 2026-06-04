@@ -1,4 +1,4 @@
-module.exports = function registerProductRoutes(app, pool, authenticate, checkPermission) {
+module.exports = function registerProductRoutes(app, pool, authenticate, checkPermission, createAuditTrail) {
   // Helper function to create journal entry
   const createJournalEntry = async (connection, transactionId, date, description, items) => {
     // Create journal entry header
@@ -121,6 +121,15 @@ module.exports = function registerProductRoutes(app, pool, authenticate, checkPe
       );
       connection.release();
 
+      await createAuditTrail({
+        user_id: req.user.id,
+        username: req.user.username,
+        role: req.user.role,
+        module: 'Management Product',
+        action: 'create',
+        description: `Membuat produk baru: ${name}`,
+      });
+
       res.status(201).json({
         id: result.insertId,
         name,
@@ -152,11 +161,24 @@ module.exports = function registerProductRoutes(app, pool, authenticate, checkPe
 
     try {
       const connection = await pool.getConnection();
+      
+      // Get current product name
+      const [currentProduct] = await connection.query('SELECT name FROM products WHERE id = ?', [id]);
+      
       await connection.query(
         'UPDATE products SET name = ?, cost_price = ?, selling_price = ?, stock = ?, category = ?, unit = ?, expired_date = ?, location_code = ?, purchase_unit = ?, unit_multiplier = ? WHERE id = ?',
         [name, cost_price, selling_price, stock, category, unit, expired_date, location_code || null, purchase_unit || 'Box', unit_multiplier || 1, id]
       );
       connection.release();
+
+      await createAuditTrail({
+        user_id: req.user.id,
+        username: req.user.username,
+        role: req.user.role,
+        module: 'Management Product',
+        action: 'edit',
+        description: `Memperbarui produk: ${currentProduct[0]?.name || id} -> ${name}`,
+      });
 
       res.json({ message: 'Product updated successfully' });
     } catch (error) {
@@ -177,13 +199,15 @@ module.exports = function registerProductRoutes(app, pool, authenticate, checkPe
       const connection = await pool.getConnection();
 
       const [rows] = await connection.query(
-        'SELECT id FROM products WHERE id = ?',
+        'SELECT id, name FROM products WHERE id = ?',
         [id]
       );
       if (rows.length === 0) {
         connection.release();
         return res.status(404).json({ message: 'Product not found' });
       }
+
+      const productName = rows[0].name;
 
       await connection.query('DELETE FROM products WHERE id = ?', [id]);
 
@@ -198,6 +222,15 @@ module.exports = function registerProductRoutes(app, pool, authenticate, checkPe
       await connection.query(`ALTER TABLE products AUTO_INCREMENT = ${nextId}`);
 
       connection.release();
+
+      await createAuditTrail({
+        user_id: req.user.id,
+        username: req.user.username,
+        role: req.user.role,
+        module: 'Management Product',
+        action: 'delete',
+        description: `Menghapus produk: ${productName}`,
+      });
 
       res.json({ message: 'Product deleted and IDs reordered successfully' });
     } catch (error) {

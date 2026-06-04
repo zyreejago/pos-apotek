@@ -1,5 +1,5 @@
 
-function registerInventoryRoutes(app, pool, authenticate, checkPermission, upload) {
+function registerInventoryRoutes(app, pool, authenticate, checkPermission, upload, createAuditTrail) {
   // Get all batches for a product
   app.get('/api/inventory/batches/:productId', authenticate, async (req, res) => {
     try {
@@ -39,6 +39,15 @@ function registerInventoryRoutes(app, pool, authenticate, checkPermission, uploa
         WHERE id = ?
       `, [initial_quantity, product_id]);
 
+      await createAuditTrail({
+        user_id: req.user.id,
+        username: req.user.username,
+        role: req.user.role,
+        module: 'Management Product',
+        action: 'create',
+        description: `Membuat batch baru untuk produk #${product_id}`,
+      });
+
       res.json({ success: true, data: { id: result.insertId, ...req.body } });
     } catch (err) {
       console.error('Error creating batch:', err);
@@ -77,6 +86,15 @@ function registerInventoryRoutes(app, pool, authenticate, checkPermission, uploa
         WHERE id = ?
       `, [diff, product_id]);
 
+      await createAuditTrail({
+        user_id: req.user.id,
+        username: req.user.username,
+        role: req.user.role,
+        module: 'Management Product',
+        action: 'edit',
+        description: `Memperbarui batch #${id} untuk produk #${product_id}`,
+      });
+
       res.json({ success: true });
     } catch (err) {
       console.error('Error updating batch:', err);
@@ -98,6 +116,15 @@ function registerInventoryRoutes(app, pool, authenticate, checkPermission, uploa
           SET stock = GREATEST(stock - ?, 0)
           WHERE id = ?
         `, [qty, product_id]);
+
+        await createAuditTrail({
+          user_id: req.user.id,
+          username: req.user.username,
+          role: req.user.role,
+          module: 'Management Product',
+          action: 'delete',
+          description: `Menghapus batch #${id} untuk produk #${product_id}`,
+        });
       } else {
         await pool.query('DELETE FROM batches WHERE id = ?', [id]);
       }
@@ -135,6 +162,16 @@ function registerInventoryRoutes(app, pool, authenticate, checkPermission, uploa
         INSERT INTO prescriptions (prescription_code, image_url, prescription_date, entered_by, transaction_id, notes)
         VALUES (?, ?, ?, ?, ?, ?)
       `, [prescription_code, image_url, prescription_date, entered_by, transaction_id, notes]);
+
+      await createAuditTrail({
+        user_id: req.user.id,
+        username: req.user.username,
+        role: req.user.role,
+        module: 'Resep Dokter',
+        action: 'create',
+        description: `Membuat resep baru: ${prescription_code || result.insertId}`,
+      });
+
       res.json({ success: true, data: { id: result.insertId, prescription_code, image_url, prescription_date, entered_by, transaction_id, notes } });
     } catch (err) {
       console.error('Error creating prescription:', err);
@@ -161,6 +198,16 @@ function registerInventoryRoutes(app, pool, authenticate, checkPermission, uploa
         SET prescription_code = ?, image_url = ?, prescription_date = ?, entered_by = ?, transaction_id = ?, notes = ?
         WHERE id = ?
       `, [prescription_code, image_url, prescription_date, entered_by, transaction_id, notes, id]);
+
+      await createAuditTrail({
+        user_id: req.user.id,
+        username: req.user.username,
+        role: req.user.role,
+        module: 'Resep Dokter',
+        action: 'edit',
+        description: `Memperbarui resep: ${prescription_code || id}`,
+      });
+
       res.json({ success: true });
     } catch (err) {
       console.error('Error updating prescription:', err);
@@ -173,6 +220,16 @@ function registerInventoryRoutes(app, pool, authenticate, checkPermission, uploa
     try {
       const { id } = req.params;
       await pool.query('DELETE FROM prescriptions WHERE id = ?', [id]);
+
+      await createAuditTrail({
+        user_id: req.user.id,
+        username: req.user.username,
+        role: req.user.role,
+        module: 'Resep Dokter',
+        action: 'delete',
+        description: `Menghapus resep: ${id}`,
+      });
+
       res.json({ success: true });
     } catch (err) {
       console.error('Error deleting prescription:', err);

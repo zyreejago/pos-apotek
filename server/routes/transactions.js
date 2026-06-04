@@ -1,6 +1,6 @@
 const midtransClient = require('midtrans-client');
 
-module.exports = function registerTransactionRoutes(app, pool, authenticate, checkPermission) {
+module.exports = function registerTransactionRoutes(app, pool, authenticate, checkPermission, createAuditTrail) {
   const snap = new midtransClient.Snap({
     isProduction: process.env.MIDTRANS_IS_PRODUCTION === 'true',
     serverKey: process.env.MIDTRANS_SERVER_KEY,
@@ -108,9 +108,29 @@ module.exports = function registerTransactionRoutes(app, pool, authenticate, che
         const redirectUrl = transaction.redirect_url;
 
         await connection.commit();
+        
+        await createAuditTrail({
+          user_id: req.user.id,
+          username: req.user.username,
+          role: req.user.role,
+          module: 'Transactions',
+          action: 'create',
+          description: `Membuat transaksi Midtrans #${transactionId} sebesar ${total_amount}`,
+        });
+
         res.status(201).json({ message: 'Transaction created', id: transactionId, redirect_url: redirectUrl, order_id: orderId });
       } else {
         await connection.commit();
+
+        await createAuditTrail({
+          user_id: req.user.id,
+          username: req.user.username,
+          role: req.user.role,
+          module: 'Transactions',
+          action: 'create',
+          description: `Membuat transaksi tunai #${transactionId} sebesar ${total_amount}`,
+        });
+
         res.status(201).json({ message: 'Transaction successful', id: transactionId });
       }
     } catch (error) {

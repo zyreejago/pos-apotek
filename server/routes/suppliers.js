@@ -1,4 +1,4 @@
-module.exports = function registerSupplierRoutes(app, pool, authenticate, checkPermission) {
+module.exports = function registerSupplierRoutes(app, pool, authenticate, checkPermission, createAuditTrail) {
   app.get(
     '/api/suppliers',
     authenticate,
@@ -62,6 +62,16 @@ module.exports = function registerSupplierRoutes(app, pool, authenticate, checkP
         'INSERT INTO suppliers (name, contact_person, phone, address) VALUES (?, ?, ?, ?)',
         [name, contact_person, phone, address]
       );
+
+      await createAuditTrail({
+        user_id: req.user.id,
+        username: req.user.username,
+        role: req.user.role,
+        module: 'Suppliers',
+        action: 'create',
+        description: `Membuat supplier baru: ${name}`,
+      });
+
       res
         .status(201)
         .json({ id: result.insertId, name, contact_person, phone, address });
@@ -81,10 +91,23 @@ module.exports = function registerSupplierRoutes(app, pool, authenticate, checkP
     const { name, contact_person, phone, address } = req.body;
 
     try {
+      // Get current supplier name
+      const [currentSupplier] = await pool.query('SELECT name FROM suppliers WHERE id = ?', [id]);
+      
       await pool.query(
         'UPDATE suppliers SET name = ?, contact_person = ?, phone = ?, address = ? WHERE id = ?',
         [name, contact_person, phone, address, id]
       );
+
+      await createAuditTrail({
+        user_id: req.user.id,
+        username: req.user.username,
+        role: req.user.role,
+        module: 'Suppliers',
+        action: 'edit',
+        description: `Memperbarui supplier: ${currentSupplier[0]?.name || id} -> ${name}`,
+      });
+
       res.json({ message: 'Supplier updated successfully' });
     } catch (error) {
       console.error('Error updating supplier:', error);
@@ -101,7 +124,20 @@ module.exports = function registerSupplierRoutes(app, pool, authenticate, checkP
     const { id } = req.params;
 
     try {
+      // Get current supplier name
+      const [currentSupplier] = await pool.query('SELECT name FROM suppliers WHERE id = ?', [id]);
+      
       await pool.query('DELETE FROM suppliers WHERE id = ?', [id]);
+
+      await createAuditTrail({
+        user_id: req.user.id,
+        username: req.user.username,
+        role: req.user.role,
+        module: 'Suppliers',
+        action: 'delete',
+        description: `Menghapus supplier: ${currentSupplier[0]?.name || id}`,
+      });
+
       res.json({ message: 'Supplier deleted successfully' });
     } catch (error) {
       console.error('Error deleting supplier:', error);

@@ -221,7 +221,6 @@ export default function AuditTrailsPage() {
                   <th className="px-6 py-4">Modul</th>
                   <th className="px-6 py-4">Aksi</th>
                   <th className="px-6 py-4">Deskripsi</th>
-                  <th className="px-6 py-4">IP Address</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -271,9 +270,7 @@ export default function AuditTrailsPage() {
                       <td className="px-6 py-4 text-gray-600 max-w-md truncate">
                         {trail.description}
                       </td>
-                      <td className="px-6 py-4 text-gray-500 font-mono text-xs">
-                        {trail.ip_address || '-'}
-                      </td>
+                     
                     </tr>
                   ))
                 )}
