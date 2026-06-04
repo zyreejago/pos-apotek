@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { Search, Plus, Edit, Trash2, FileText, Info, UploadCloud, Camera } from 'lucide-react';
+import { Search, Plus, Edit, Trash2, FileText, Info, UploadCloud, Camera, X } from 'lucide-react';
 import { goeyToast } from "@/components/ui/goey-toaster";
 import ConfirmModal from '@/components/ConfirmModal';
 import PageHeader from '@/components/PageHeader';
@@ -2022,17 +2022,30 @@ export default function ProductsPage() {
 
       {/* Image Preview Modal */}
       {previewImageUrl && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={() => setPreviewImageUrl(null)}>
-          <div className="bg-white rounded-lg p-4 max-w-[90vw] max-h-[90vh] overflow-auto" onClick={(e) => e.stopPropagation()}>
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="font-semibold text-gray-800">Bukti Faktur</h3>
-              <button onClick={() => setPreviewImageUrl(null)} className="text-gray-500 hover:text-gray-700">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
+        <div 
+          className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[9999] p-4 md:p-8" 
+          onClick={() => setPreviewImageUrl(null)}
+        >
+          <div 
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-full overflow-hidden flex flex-col" 
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-center px-6 py-4 border-b border-gray-100 shrink-0">
+              <h3 className="text-lg font-semibold text-gray-800">Bukti Faktur</h3>
+              <button 
+                 onClick={() => setPreviewImageUrl(null)} 
+                 className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-all"
+               >
+                 <X size={20} />
+               </button>
             </div>
-            <img src={previewImageUrl} alt="Bukti Faktur" className="max-w-full max-h-[80vh] mx-auto" />
+            <div className="p-4 flex-1 overflow-auto bg-gray-50 flex items-center justify-center min-h-0">
+              <img 
+                src={previewImageUrl} 
+                alt="Bukti Faktur" 
+                className="max-w-full max-h-full object-contain rounded-lg shadow-sm" 
+              />
+            </div>
           </div>
         </div>
       )}
