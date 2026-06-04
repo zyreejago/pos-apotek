@@ -252,12 +252,7 @@ export default function SuppliersPage() {
         title="Supplier"
         subtitle="Management Supplier"
         breadcrumbs={[{ label: 'Supplier' }, { label: 'Management Supplier' }]}
-        rightContent={
-          <button className="bg-white border border-gray-200 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 flex items-center gap-2">
-            <Filter size={16} />
-            Select Outlets
-          </button>
-        }
+       
       />
 
       <div className="p-8 pt-0">

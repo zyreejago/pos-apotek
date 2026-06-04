@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { useOffCanvas } from '@/context/OffCanvasContext';
 
@@ -21,42 +22,74 @@ export default function OffCanvas({
 }: OffCanvasProps) {
   const { 
     setIsAnyOffCanvasOpen, 
-    setOffCanvasContent, 
     setOffCanvasWidth,
     closeOffCanvas 
   } = useOffCanvas();
 
+  const [mounted, setMounted] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const scrollPositionRef = useRef<number>(0);
+
+  const prevIsOpen = useRef(isOpen);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   useEffect(() => {
     if (isOpen) {
-      setOffCanvasWidth(width);
-      setOffCanvasContent(
-        <div className="flex flex-col h-full">
-          {/* Header */}
-          <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between shrink-0">
-            <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
-            <button 
-              onClick={onClose}
-              className="p-2 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-gray-700"
-            >
-              <X size={20} />
-            </button>
-          </div>
-          
-          {/* Body */}
-          <div className="flex-1 overflow-y-auto p-6">
-            {children}
-          </div>
-        </div>
-      );
       setIsAnyOffCanvasOpen(true);
-    } else {
+      setOffCanvasWidth(width);
+    } else if (prevIsOpen.current) {
+      // Only call closeOffCanvas() when isOpen transitions from true to false
       closeOffCanvas();
     }
+    prevIsOpen.current = isOpen;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, width]);
 
-    return () => {
-      closeOffCanvas();
+  // Simpan scroll position sebelum re-render
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+
+    // Restore scroll setelah render
+    el.scrollTop = scrollPositionRef.current;
+
+    const handleScroll = () => {
+      scrollPositionRef.current = el.scrollTop;
     };
-  }, [isOpen, title, children, width, onClose, setIsAnyOffCanvasOpen, setOffCanvasContent, setOffCanvasWidth, closeOffCanvas]);
 
-  return null;
+    el.addEventListener('scroll', handleScroll, { passive: true });
+    return () => el.removeEventListener('scroll', handleScroll);
+  });
+
+  if (!isOpen || !mounted) return null;
+
+  const root = document.getElementById('offcanvas-root');
+  if (!root) return null;
+
+  return createPortal(
+    <div className="flex flex-col h-full w-full bg-white">
+      {/* Header */}
+      <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between shrink-0">
+        <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
+        <button 
+          onClick={onClose}
+          className="p-2 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-gray-700 transition-colors"
+        >
+          <X size={20} />
+        </button>
+      </div>
+      
+      {/* Body */}
+      <div 
+        ref={scrollRef}
+        className="flex-1 overflow-y-auto p-6"
+      >
+        {children}
+      </div>
+    </div>,
+    root
+  );
 }

@@ -1,38 +1,41 @@
-"use client";
+'use client';
 
-import { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useCallback } from 'react';
 
 interface OffCanvasContextType {
   isAnyOffCanvasOpen: boolean;
-  setIsAnyOffCanvasOpen: (open: boolean) => void;
-  offCanvasContent: ReactNode | null;
-  setOffCanvasContent: (content: ReactNode | null) => void;
   offCanvasWidth: string;
+  setIsAnyOffCanvasOpen: (val: boolean) => void;
   setOffCanvasWidth: (width: string) => void;
   closeOffCanvas: () => void;
 }
 
 const OffCanvasContext = createContext<OffCanvasContextType | undefined>(undefined);
 
-export function OffCanvasProvider({ children }: { children: ReactNode }) {
-  const [isAnyOffCanvasOpen, setIsAnyOffCanvasOpen] = useState(false);
-  const [offCanvasContent, setOffCanvasContent] = useState<ReactNode | null>(null);
-  const [offCanvasWidth, setOffCanvasWidth] = useState("400px");
+export function OffCanvasProvider({ children }: { children: React.ReactNode }) {
+  const [isAnyOffCanvasOpen, setIsAnyOffCanvasOpenState] = useState(false);
+  const [offCanvasWidth, setOffCanvasWidthState] = useState('400px');
 
-  const closeOffCanvas = () => {
-    setIsAnyOffCanvasOpen(false);
-    setOffCanvasContent(null);
-  };
+  const setIsAnyOffCanvasOpen = useCallback((val: boolean) => {
+    setIsAnyOffCanvasOpenState(val);
+  }, []);
+
+  const setOffCanvasWidth = useCallback((width: string) => {
+    setOffCanvasWidthState(width);
+  }, []);
+
+  const closeOffCanvas = useCallback(() => {
+    setIsAnyOffCanvasOpenState(false);
+    setOffCanvasWidthState('400px');
+  }, []);
 
   return (
-    <OffCanvasContext.Provider value={{ 
-      isAnyOffCanvasOpen, 
-      setIsAnyOffCanvasOpen, 
-      offCanvasContent, 
-      setOffCanvasContent,
+    <OffCanvasContext.Provider value={{
+      isAnyOffCanvasOpen,
       offCanvasWidth,
+      setIsAnyOffCanvasOpen,
       setOffCanvasWidth,
-      closeOffCanvas
+      closeOffCanvas,
     }}>
       {children}
     </OffCanvasContext.Provider>
@@ -41,7 +44,7 @@ export function OffCanvasProvider({ children }: { children: ReactNode }) {
 
 export function useOffCanvas() {
   const context = useContext(OffCanvasContext);
-  if (context === undefined) {
+  if (!context) {
     throw new Error('useOffCanvas must be used within an OffCanvasProvider');
   }
   return context;

@@ -177,7 +177,7 @@ describe('suppliers module', () => {
 
     expect(await screen.findByTestId('header')).toHaveTextContent('Supplier');
     expect(screen.getByText('Management Supplier')).toBeInTheDocument();
-    expect(screen.getByText('Select Outlets')).toBeInTheDocument();
+    
   });
 
   test('fetches suppliers on load with token', async () => {

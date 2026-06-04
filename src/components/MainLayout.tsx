@@ -41,6 +41,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
 
         {/* Offcanvas — absolute di kanan, slide dari luar */}
         <div
+          id="offcanvas-root"
           style={{
             position: 'absolute',
             top: 0,
