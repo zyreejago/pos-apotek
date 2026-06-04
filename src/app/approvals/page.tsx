@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Check, X, AlertCircle, FileText, Info, Package, Users, Calendar } from 'lucide-react';
+import { Check, X, AlertCircle, FileText, Info, Package, Users, Calendar, Trash2 } from 'lucide-react';
 import { goeyToast } from "@/components/ui/goey-toaster";
 import PageHeader from '@/components/PageHeader';
 import { useRequirePermission } from '@/hooks/useRequirePermission';
@@ -104,6 +104,28 @@ export default function ApprovalsPage() {
     }
   };
 
+  const handleDelete = async (id: number) => {
+    if (!window.confirm('Apakah Anda yakin ingin menghapus faktur ini? Tindakan ini tidak dapat dibatalkan.')) {
+      return;
+    }
+    try {
+      const res = await fetch(`http://localhost:5000/api/inventory/batches/${id}`, {
+        method: 'DELETE',
+        headers: authHeaders
+      });
+      if (res.ok) {
+        goeyToast.success('Faktur berhasil dihapus');
+        fetchPendingFakturs();
+      } else {
+        const data = await res.json();
+        goeyToast.error(data.message || 'Gagal menghapus faktur');
+      }
+    } catch (error) {
+      console.error(error);
+      goeyToast.error('Terjadi kesalahan saat menghapus faktur');
+    }
+  };
+
   const handleRevision = (id: number) => {
     setRevisionFakturId(id);
     setRevisionNotes('');
@@ -174,7 +196,16 @@ export default function ApprovalsPage() {
         ) : (
           <div className="grid gap-6">
             {pendingFakturs.map((faktur) => (
-              <div key={faktur.id} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow">
+              <div key={faktur.id} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow relative">
+                {faktur.status === 'rejected' && (
+                  <button 
+                    onClick={() => handleDelete(faktur.id)}
+                    className="absolute top-4 right-4 p-2 text-red-500 hover:text-white bg-red-50 hover:bg-red-600 rounded-lg border border-red-200 hover:border-red-600 transition-all shadow-sm hover:scale-105 duration-200 z-10"
+                    title="Hapus Faktur Ditolak"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                )}
                 <div className="p-6">
                   <div className="flex flex-col lg:flex-row justify-between gap-6">
                     {/* Left: Product & Supplier Info */}
@@ -189,9 +220,15 @@ export default function ApprovalsPage() {
                             <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider border ${
                               faktur.status === 'pending' 
                                 ? 'bg-yellow-100 text-yellow-700 border-yellow-200 animate-pulse' 
+                                : faktur.status === 'rejected'
+                                ? 'bg-red-100 text-red-700 border-red-200'
                                 : 'bg-orange-100 text-orange-700 border-orange-200'
                             }`}>
-                              {faktur.status === 'pending' ? 'Pending Approval' : 'Menunggu Perbaikan'}
+                              {faktur.status === 'pending' 
+                                ? 'Pending Approval' 
+                                : faktur.status === 'rejected'
+                                ? 'Ditolak'
+                                : 'Menunggu Perbaikan'}
                             </span>
                             {faktur.product_status === 'pending' && (
                               <span className="bg-purple-100 text-purple-700 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase">
@@ -258,29 +295,35 @@ export default function ApprovalsPage() {
                           Lihat Bukti
                         </button>
                       )}
-                      <div className="flex gap-2 w-full">
-                        <button 
-                          onClick={() => handleApprove(faktur.id)}
-                          className="flex-1 bg-green-600 hover:bg-green-700 text-white p-2 rounded-lg transition-colors flex items-center justify-center gap-1 text-sm font-bold"
-                          title="Setujui"
-                        >
-                          <Check size={18} /> Setujui
-                        </button>
-                        <button 
-                          onClick={() => handleRevision(faktur.id)}
-                          className="flex-1 bg-orange-500 hover:bg-orange-600 text-white p-2 rounded-lg transition-colors flex items-center justify-center gap-1 text-sm font-bold"
-                          title="Perlu Perbaikan"
-                        >
-                          <AlertCircle size={18} /> Perbaiki
-                        </button>
-                        <button 
-                          onClick={() => handleReject(faktur.id)}
-                          className="flex-1 bg-red-600 hover:bg-red-700 text-white p-2 rounded-lg transition-colors flex items-center justify-center gap-1 text-sm font-bold"
-                          title="Tolak"
-                        >
-                          <X size={18} /> Tolak
-                        </button>
-                      </div>
+                      {faktur.status === 'pending' ? (
+                        <div className="flex gap-2 w-full">
+                          <button 
+                            onClick={() => handleApprove(faktur.id)}
+                            className="flex-1 bg-green-600 hover:bg-green-700 text-white p-2 rounded-lg transition-colors flex items-center justify-center gap-1 text-sm font-bold"
+                            title="Setujui"
+                          >
+                            <Check size={18} /> Setujui
+                          </button>
+                          <button 
+                            onClick={() => handleRevision(faktur.id)}
+                            className="flex-1 bg-orange-500 hover:bg-orange-600 text-white p-2 rounded-lg transition-colors flex items-center justify-center gap-1 text-sm font-bold"
+                            title="Perlu Perbaikan"
+                          >
+                            <AlertCircle size={18} /> Perbaiki
+                          </button>
+                          <button 
+                            onClick={() => handleReject(faktur.id)}
+                            className="flex-1 bg-red-600 hover:bg-red-700 text-white p-2 rounded-lg transition-colors flex items-center justify-center gap-1 text-sm font-bold"
+                            title="Tolak"
+                          >
+                            <X size={18} /> Tolak
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="text-center py-2 px-4 bg-gray-100 rounded-lg text-xs font-bold text-gray-500 w-full border border-gray-200">
+                          {faktur.status === 'rejected' ? 'Telah Ditolak' : 'Menunggu Perbaikan Kasir'}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -361,7 +404,7 @@ export default function ApprovalsPage() {
                 {isSubmittingRevision ? (
                   <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
                 ) : (
-                  <>Kirim Instruksi</>
+                  <>Perbarui</>
                 )}
               </button>
             </div>

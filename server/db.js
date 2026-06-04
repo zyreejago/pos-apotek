@@ -276,6 +276,7 @@ const initDB = async () => {
         due_date DATE NULL,
         image_url VARCHAR(255) NULL,
         status ENUM('approved', 'pending', 'rejected', 'revision') DEFAULT 'approved',
+        notes TEXT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
         FOREIGN KEY (supplier_id) REFERENCES suppliers(id) ON DELETE SET NULL
@@ -292,6 +293,10 @@ const initDB = async () => {
     
     try {
       await connection.query(`ALTER TABLE batches ADD COLUMN image_url VARCHAR(255) NULL`);
+    } catch (e) {}
+    
+    try {
+      await connection.query(`ALTER TABLE batches ADD COLUMN notes TEXT NULL`);
     } catch (e) {}
 
 

@@ -345,24 +345,31 @@ export default function ProductsPage() {
     setFakturImagePreview(null);
   };
 
-  const handleOpenEditFakturModal = (faktur: Faktur) => {
+  const handleOpenEditFakturModal = (faktur: Faktur, customProduct?: Product) => {
     setFakturModalMode('edit');
     setSelectedFaktur(faktur);
     setShowFakturForm(true);
     setIsFakturOffCanvasOpen(true);
+
+    const activeProduct = customProduct || selectedProduct;
+    if (activeProduct) {
+      fetchFakturs(activeProduct.id);
+    }
 
     const formatDateForInput = (dateStr: string | null) => {
       if (!dateStr) return '';
       return dateStr.substring(0, 10);
     };
 
+    const multiplier = activeProduct?.unit_multiplier || 1;
+
     setFakturFormData({
       invoice_number: faktur.invoice_number || '',
       supplier_id: faktur.supplier_id?.toString() || '',
       purchase_date: formatDateForInput(faktur.purchase_date),
-      quantity: (faktur.quantity / (selectedProduct?.unit_multiplier || 1)).toString(),
+      quantity: (faktur.quantity / multiplier).toString(),
       cost_price: faktur.cost_price.toString(),
-      stock_type: faktur.stock_type,
+      stock_type: faktur.stock_type as any,
       dp_amount: faktur.dp_amount?.toString() || '',
       due_date: formatDateForInput(faktur.due_date),
       notes: faktur.notes || ''
@@ -543,7 +550,7 @@ export default function ProductsPage() {
     setConfirmModal({
       isOpen: true,
       title: 'Hapus Faktur',
-      message: `Anda yakin ingin menghapus faktur ${faktur.invoice_number}?`,
+      message: `Anda yakin ingin menghapus faktur ${faktur.invoice_number || ''}?`,
       variant: 'danger',
       onConfirm: async () => {
         try {
@@ -555,8 +562,9 @@ export default function ProductsPage() {
             goeyToast.success('Faktur berhasil dihapus!');
             if (selectedProduct) {
               fetchFakturs(selectedProduct.id);
-              fetchProducts(); // refresh product stock
             }
+            fetchProducts(); // refresh product stock
+            fetchGlobalPendingFakturs(); // refresh global pending/rejected list modal
           } else {
             goeyToast.error('Gagal menghapus faktur');
           }
@@ -1890,11 +1898,11 @@ export default function ProductsPage() {
                             ? 'bg-yellow-100 text-yellow-700 animate-pulse'
                             : faktur.status === 'rejected'
                             ? 'bg-red-100 text-red-700'
-                            : 'bg-orange-100 text-orange-700'
+                            : 'bg-orange-100 text-orange-700 border border-orange-200'
                         }`}>
                           {faktur.status === 'pending' ? 'Pending Approval' : 
                            faktur.status === 'rejected' ? 'Ditolak' :
-                           faktur.status === 'revision' ? 'Perlu Perbaikan' : 'Approved'}
+                           faktur.status === 'revision' ? 'Menunggu Perbaikan' : 'Approved'}
                         </span>
                       </td>
                       <td className="px-4 py-3">
@@ -2058,17 +2066,15 @@ export default function ProductsPage() {
                     </div>
                   </>
                 )}
-                <div className="col-span-2 md:col-span-3">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Catatan Perbaikan / Tambahan</label>
-                  <textarea
-                    name="notes"
-                    value={fakturFormData.notes}
-                    onChange={handleFakturInputChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                    placeholder="Masukkan alasan perbaikan atau catatan tambahan..."
-                    rows={2}
-                  />
-                </div>
+                {fakturFormData.notes && (
+                  <div className="col-span-2 md:col-span-3 bg-orange-50 border border-orange-200 p-4 rounded-xl flex items-start gap-3">
+                    <AlertCircle className="text-orange-500 shrink-0 mt-0.5" size={18} />
+                    <div>
+                      <h4 className="text-xs font-extrabold text-orange-800 uppercase tracking-wider">Catatan Perbaikan dari Approver</h4>
+                      <p className="text-sm text-orange-700 mt-1 leading-relaxed">{fakturFormData.notes}</p>
+                    </div>
+                  </div>
+                )}
                 <div className="col-span-2 md:col-span-3 mt-2">
                   <label className="block text-sm font-medium text-gray-700 mb-2">Bukti Faktur</label>
                   <div className="flex flex-col gap-4 items-start">
@@ -2225,7 +2231,16 @@ export default function ProductsPage() {
               ) : (
                 <div className="flex flex-col gap-4 min-w-[800px]">
                   {pendingFakturs.map((faktur) => (
-                    <div key={faktur.id} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-all group">
+                    <div key={faktur.id} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-all group relative">
+                      {faktur.status === 'rejected' && (
+                        <button 
+                          onClick={() => handleDeleteFaktur(faktur)}
+                          className="absolute top-4 right-4 p-2 text-red-500 hover:text-white bg-red-50 hover:bg-red-600 rounded-lg border border-red-200 hover:border-red-600 transition-all shadow-sm hover:scale-105 duration-200 z-10"
+                          title="Hapus Faktur Ditolak"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      )}
                       <div className="p-5">
                         <div className="flex flex-row justify-between items-center gap-5">
                           {/* Product Info */}
@@ -2244,7 +2259,7 @@ export default function ProductsPage() {
                                       ? 'bg-red-100 text-red-700 border-red-200'
                                       : 'bg-orange-100 text-orange-700 border-orange-200'
                                   }`}>
-                                    {faktur.status === 'pending' ? 'Pending Approval' : 'Menunggu Perbaikan'}
+                                    {faktur.status === 'pending' ? 'Pending Approval' : faktur.status === 'rejected' ? 'Ditolak' : 'Menunggu Perbaikan'}
                                   </span>
                                   {faktur.product_status === 'pending' && (
                                     <span className="bg-purple-100 text-purple-700 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider border border-purple-200">
@@ -2301,7 +2316,7 @@ export default function ProductsPage() {
                           </div>
 
                           {/* Bukti & Edit Button */}
-                          <div className="flex flex-col gap-2 shrink-0">
+                          <div className={`flex flex-col gap-2 shrink-0 ${faktur.status === 'rejected' ? 'pr-8' : ''}`}>
                             {faktur.image_url && (
                               <button 
                                 onClick={() => setPreviewImageUrl(`http://localhost:5000${faktur.image_url}`)}
@@ -2311,22 +2326,30 @@ export default function ProductsPage() {
                                 Lihat Bukti
                               </button>
                             )}
-                            {(faktur.status === 'revision' || faktur.status === 'rejected') && (
+                            {faktur.status === 'revision' && (
                               <button 
                                 onClick={() => {
                                   // Mock a product object for handleOpenEditFakturModal
                                   const mockProduct = allProducts.find(p => p.id === faktur.product_id) || {
                                     id: faktur.product_id,
                                     name: faktur.product_name || '',
-                                    unit_multiplier: faktur.product_unit_multiplier || 1,
-                                    purchase_unit: faktur.product_purchase_unit || 'Box',
+                                    cost_price: faktur.cost_price || 0,
+                                    selling_price: 0,
+                                    stock: 0,
                                     unit: faktur.product_unit || 'Tablet',
-                                    cost_price: faktur.cost_price,
-                                    stock_type: faktur.stock_type
+                                    expired_date: null,
+                                    location_code: '',
+                                    supplier_id: faktur.supplier_id || null,
+                                    supplier_name: faktur.supplier_name || null,
+                                    stock_type: faktur.stock_type as any || 'belum_bayar',
+                                    purchase_date: faktur.purchase_date || null,
+                                    purchase_unit: faktur.product_purchase_unit || 'Box',
+                                    unit_multiplier: faktur.product_unit_multiplier || 1
                                   } as Product;
                                   
                                   setSelectedProduct(mockProduct);
-                                  handleOpenEditFakturModal(faktur);
+                                  fetchFakturs(mockProduct.id);
+                                  handleOpenEditFakturModal(faktur, mockProduct);
                                   setIsApprovalModalOpen(false);
                                 }}
                                 className="flex items-center gap-2 px-4 py-2 text-orange-600 hover:bg-orange-50 rounded-lg transition-all text-xs font-bold border border-orange-100"

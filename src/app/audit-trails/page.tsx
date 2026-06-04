@@ -88,7 +88,7 @@ export default function AuditTrailsPage() {
       });
       
       // Extract unique modules
-      const uniqueModules = Array.from(new Set((json.data || []).map((at: AuditTrail) => at.module)));
+      const uniqueModules = Array.from(new Set((json.data || []).map((at: AuditTrail) => at.module))) as string[];
       setModules(uniqueModules);
     } catch (error) {
       console.error('Error fetching audit trails:', error);

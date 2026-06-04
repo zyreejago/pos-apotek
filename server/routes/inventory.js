@@ -44,9 +44,9 @@ function registerInventoryRoutes(app, pool, authenticate, checkPermission, uploa
       const { product_id, supplier_id, batch_number, stock_type, purchase_date, initial_quantity, cost_price, expired_date, dp_amount, due_date, notes } = req.body;
       const image_url = req.file ? `/uploads/${req.file.filename}` : null;
 
-      const formattedPurchaseDate = purchase_date ? purchase_date.substring(0, 10) : null;
-      const formattedExpiredDate = expired_date ? expired_date.substring(0, 10) : null;
-      const formattedDueDate = due_date ? due_date.substring(0, 10) : null;
+      const formattedPurchaseDate = purchase_date && purchase_date !== '' ? purchase_date.substring(0, 10) : null;
+      const formattedExpiredDate = expired_date && expired_date !== '' ? expired_date.substring(0, 10) : null;
+      const formattedDueDate = due_date && due_date !== '' ? due_date.substring(0, 10) : null;
 
       // Approval Logic: Check if total amount > 2,000,000
       const totalAmount = Number(initial_quantity) * Number(cost_price);
@@ -155,9 +155,9 @@ function registerInventoryRoutes(app, pool, authenticate, checkPermission, uploa
       const new_image_url = req.file ? `/uploads/${req.file.filename}` : null;
       const image_url = new_image_url || current_image_url;
 
-      const formattedPurchaseDate = purchase_date ? purchase_date.substring(0, 10) : null;
-      const formattedExpiredDate = expired_date ? expired_date.substring(0, 10) : null;
-      const formattedDueDate = due_date ? due_date.substring(0, 10) : null;
+      const formattedPurchaseDate = purchase_date && purchase_date !== '' ? purchase_date.substring(0, 10) : null;
+      const formattedExpiredDate = expired_date && expired_date !== '' ? expired_date.substring(0, 10) : null;
+      const formattedDueDate = due_date && due_date !== '' ? due_date.substring(0, 10) : null;
 
       // Re-evaluate approval
       const totalAmount = Number(initial_quantity) * Number(cost_price);
@@ -173,6 +173,10 @@ function registerInventoryRoutes(app, pool, authenticate, checkPermission, uploa
         // If it's under 2M, it can be approved automatically
         status = 'approved';
       }
+
+      // If status becomes pending or approved, the cashier has updated/corrected the invoice, 
+      // so we should clear the old revision notes.
+      const finalNotes = (status === 'pending' || status === 'approved') ? null : (notes || null);
 
       await pool.query(`
         UPDATE batches 
@@ -191,7 +195,7 @@ function registerInventoryRoutes(app, pool, authenticate, checkPermission, uploa
         formattedDueDate, 
         image_url, 
         status,
-        notes || null,
+        finalNotes,
         id
       ]);
       
