@@ -1813,72 +1813,6 @@ export default function ProductsPage() {
                     placeholder="Masukkan nomor batch"
                   />
                 </div>
-                <div className="col-span-2 md:col-span-1">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Bukti Faktur</label>
-                  <div className="flex flex-col gap-4 items-start">
-                    {/* Image Input UI */}
-                    <div className="w-full flex flex-col gap-3">
-                      <div className="flex gap-2">
-                        <button
-                          type="button"
-                          onClick={() => fakturFileInputRef.current?.click()}
-                          className="flex-1 flex items-center justify-center gap-2 py-3 px-4 border-2 border-dashed border-gray-300 rounded-xl hover:border-blue-500 hover:bg-blue-50 transition-colors text-sm font-medium text-gray-600"
-                        >
-                          <UploadCloud size={20} className="text-gray-400" />
-                          Pilih File
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => fakturCameraInputRef.current?.click()}
-                          className="flex-1 flex items-center justify-center gap-2 py-3 px-4 border-2 border-dashed border-gray-300 rounded-xl hover:border-blue-500 hover:bg-blue-50 transition-colors text-sm font-medium text-gray-600"
-                        >
-                          <Camera size={20} className="text-gray-400" />
-                          Ambil Foto
-                        </button>
-                      </div>
-
-                      {/* Hidden File Inputs */}
-                      <input
-                        type="file"
-                        ref={fakturFileInputRef}
-                        accept="image/*"
-                        className="hidden"
-                        onChange={handleFakturImageChange}
-                      />
-                      <input
-                        type="file"
-                        ref={fakturCameraInputRef}
-                        accept="image/*"
-                        capture="environment"
-                        className="hidden"
-                        onChange={handleFakturImageChange}
-                      />
-                    </div>
-
-                    {/* Preview */}
-                    {fakturImagePreview && (
-                      <div className="relative w-full max-w-sm h-48 shrink-0 rounded-xl overflow-hidden border-2 border-gray-200 group">
-                        <img src={fakturImagePreview} alt="Preview Bukti Faktur" className="w-full h-full object-cover" />
-                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setFakturImageFile(null);
-                              if (selectedFaktur?.image_url) {
-                                setFakturImagePreview(`http://localhost:5000${selectedFaktur.image_url}`);
-                              } else {
-                                setFakturImagePreview(null);
-                              }
-                            }}
-                            className="p-2 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors"
-                          >
-                            <Trash2 size={16} />
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Supplier</label>
                   <select
@@ -1973,8 +1907,71 @@ export default function ProductsPage() {
                     </div>
                   </>
                 )}
-                <div className="col-span-2 md:col-span-3">
-                  
+                <div className="col-span-2 md:col-span-3 mt-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Bukti Faktur</label>
+                  <div className="flex flex-col gap-4 items-start">
+                    {/* Image Input UI */}
+                    <div className="w-full flex flex-col gap-3">
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => fakturFileInputRef.current?.click()}
+                          className="flex-1 flex items-center justify-center gap-2 py-3 px-4 border-2 border-dashed border-gray-300 rounded-xl hover:border-blue-500 hover:bg-blue-50 transition-colors text-sm font-medium text-gray-600"
+                        >
+                          <UploadCloud size={20} className="text-gray-400" />
+                          Pilih File
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => fakturCameraInputRef.current?.click()}
+                          className="flex-1 flex items-center justify-center gap-2 py-3 px-4 border-2 border-dashed border-gray-300 rounded-xl hover:border-blue-500 hover:bg-blue-50 transition-colors text-sm font-medium text-gray-600"
+                        >
+                          <Camera size={20} className="text-gray-400" />
+                          Ambil Foto
+                        </button>
+                      </div>
+
+                      {/* Hidden File Inputs */}
+                      <input
+                        type="file"
+                        ref={fakturFileInputRef}
+                        accept="image/*"
+                        className="hidden"
+                        onChange={handleFakturImageChange}
+                      />
+                      <input
+                        type="file"
+                        ref={fakturCameraInputRef}
+                        accept="image/*"
+                        capture="environment"
+                        className="hidden"
+                        onChange={handleFakturImageChange}
+                      />
+                    </div>
+
+                    {/* Preview */}
+                    {fakturImagePreview && (
+                      <div className="relative w-full max-w-sm h-48 shrink-0 rounded-xl overflow-hidden border-2 border-gray-200 group">
+                        <img src={fakturImagePreview} alt="Preview Bukti Faktur" className="w-full h-full object-cover" />
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setFakturImageFile(null);
+                              if (selectedFaktur?.image_url) {
+                                setFakturImagePreview(`http://localhost:5000${selectedFaktur.image_url}`);
+                              } else {
+                                setFakturImagePreview(null);
+                              }
+                            }}
+                            className="p-2 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
               <div className="flex justify-end gap-3 mt-6">
