@@ -495,22 +495,38 @@ export default function ProductsPage() {
   const handleDeleteDP = async (paymentId: number) => {
     if (!selectedFaktur?.id) return;
 
-    try {
-      const res = await fetch(`http://localhost:5000/api/inventory/batches/${selectedFaktur.id}/dp-payments/${paymentId}`, {
-        method: 'DELETE',
-        headers: authHeaders
-      });
+    // Find the DP amount for the message
+    const dpItem = selectedFaktur.dp_payments?.find((dp: any) => dp.id === paymentId);
+    const dpAmount = dpItem ? new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format(Number(dpItem.amount)) : '';
 
-      if (res.ok) {
-        goeyToast.success('DP berhasil dihapus!');
-        if (selectedProduct) fetchFakturs(selectedProduct.id);
-      } else {
-        goeyToast.error('Gagal menghapus DP');
-      }
-    } catch (error) {
-      console.error(error);
-      goeyToast.error('Terjadi kesalahan');
-    }
+    setConfirmModal({
+      isOpen: true,
+      title: 'Hapus DP',
+      message: `Yakin ingin menghapus DP ${dpAmount}? Data yang sudah dihapus tidak dapat dikembalikan.`,
+      confirmText: 'Ya, Hapus',
+      cancelText: 'Batal',
+      variant: 'danger',
+      onConfirm: async () => {
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        try {
+          const res = await fetch(`http://localhost:5000/api/inventory/batches/${selectedFaktur.id}/dp-payments/${paymentId}`, {
+            method: 'DELETE',
+            headers: authHeaders
+          });
+
+          if (res.ok) {
+            goeyToast.success('DP berhasil dihapus!');
+            if (selectedProduct) fetchFakturs(selectedProduct.id);
+          } else {
+            goeyToast.error('Gagal menghapus DP');
+          }
+        } catch (error) {
+          console.error(error);
+          goeyToast.error('Terjadi kesalahan');
+        }
+      },
+      onClose: () => setConfirmModal(prev => ({ ...prev, isOpen: false })),
+    });
   };
 
   const handleApproveFaktur = async (fakturId: number) => {
