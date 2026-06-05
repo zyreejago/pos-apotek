@@ -46,6 +46,7 @@ export default function POSTransactionsPage() {
   const [processing, setProcessing] = useState(false);
   const [settings, setSettings] = useState({ ppn_rate: 0, discount_rate: 0 });
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'midtrans'>('cash');
+  const [highlightedProductId, setHighlightedProductId] = useState<number | null>(null);
 
   // Fetch Data
   useEffect(() => {
@@ -116,6 +117,9 @@ export default function POSTransactionsPage() {
             : item
         );
       }
+      // Highlight when new product is added
+      setHighlightedProductId(product.id);
+      setTimeout(() => setHighlightedProductId(null), 800);
       return [...prev, { ...product, quantity: 1 }];
     });
   };
@@ -209,7 +213,7 @@ export default function POSTransactionsPage() {
           const snapToken = urlParts[urlParts.length - 1];
           const orderId = data.order_id || `POS-${Date.now()}`; // Wait, we need backend to return order_id! Let's update backend first!
           
-          (window as Window & { snap: { pay: (token: string, options: Record<string, unknown>) => void } }).snap.pay(snapToken, {
+          (window as any).snap.pay(snapToken, {
             onSuccess: async () => {
               try {
                 const statusRes = await fetch(`http://localhost:5000/api/midtrans/status/${orderId}`, {
@@ -326,75 +330,93 @@ export default function POSTransactionsPage() {
             font-family: monospace;
             max-width: 300px;
             margin: 0 auto;
-            padding: 20px;
+            padding: 15px;
           }
           .header {
             text-align: center;
-            border-bottom: 1px dashed #000;
-            padding-bottom: 10px;
-            margin-bottom: 10px;
+            border-bottom: 1px solid #000;
+            padding-bottom: 12px;
+            margin-bottom: 12px;
           }
           .title {
             font-size: 18px;
             font-weight: bold;
-            margin-bottom: 5px;
+            margin-bottom: 4px;
           }
           .info {
             font-size: 12px;
             margin: 2px 0;
           }
+          .divider-dash {
+            border-bottom: 1px dashed #000;
+            margin: 10px 0;
+          }
           .items {
             margin: 10px 0;
-            border-bottom: 1px dashed #000;
           }
           .item {
+            margin: 12px 0;
+          }
+          .item-name {
+            font-weight: 500;
+            margin-bottom: 2px;
+            word-wrap: break-word;
+          }
+          .item-qty-price {
             display: flex;
             justify-content: space-between;
-            margin: 5px 0;
+            font-size: 12px;
+            color: #444;
           }
           .summary {
             margin-top: 10px;
-            border-top: 1px dashed #000;
-            padding-top: 10px;
           }
           .summary-row {
             display: flex;
             justify-content: space-between;
-            margin: 3px 0;
+            margin: 4px 0;
+            font-size: 12px;
           }
-          .total {
+          .total-row {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 2px solid #000;
             font-weight: bold;
-            font-size: 14px;
-            margin-top: 5px;
-            border-top: 1px solid #000;
-            padding-top: 5px;
+            font-size: 15px;
           }
           .footer {
             margin-top: 20px;
             text-align: center;
-            font-size: 12px;
+            font-size: 11px;
           }
         </style>
       </head>
       <body>
         <div class="header">
           <div class="title">APOTEK SUMBER WARAS</div>
-          <div class="info">Jl. Kesehatan No. 123, Karangasem</div>
-          <div class="info">Telp: (021) 12345678</div>
         </div>
         
-        <div class="info">ID Transaksi: ${receiptData.id}</div>
-        <div class="info">Tanggal: ${new Date().toLocaleString('id-ID')}</div>
-        <div class="info">Kasir: ${receiptData.cashierName}</div>
+        <div class="info">ID Transaksi : ${receiptData.id}</div>
+        <div class="info">Tanggal      : ${new Date().toLocaleString('id-ID')}</div>
+        <div class="info">Kasir        : ${receiptData.cashierName}</div>
+        
+        <div class="divider-dash"></div>
         
         <div class="items">
           ${receiptData.items.map((item: CartItem) => `
             <div class="item">
-              <span>${item.name} x${item.quantity} ${item.unit}</span>
-              <span>${formatCurrency(item.selling_price * item.quantity)}</span>
+              <div class="item-name">${item.name}</div>
+              <div class="item-qty-price">
+                <span>${item.quantity} ${item.unit}</span>
+                <span>${formatCurrency(item.selling_price * item.quantity)}</span>
+              </div>
             </div>
           `).join('')}
         </div>
+        
+        <div class="divider-dash"></div>
         
         <div class="summary">
           <div class="summary-row">
@@ -403,24 +425,24 @@ export default function POSTransactionsPage() {
           </div>
           ${receiptData.ppn > 0 ? `
             <div class="summary-row">
-              <span>PPN</span>
+              <span>PPN (${settings.ppn_rate}%)</span>
               <span>${formatCurrency(receiptData.ppn)}</span>
             </div>
           ` : ''}
           ${receiptData.discount > 0 ? `
             <div class="summary-row">
-              <span>Diskon</span>
+              <span>Diskon (${settings.discount_rate}%)</span>
               <span>-${formatCurrency(receiptData.discount)}</span>
             </div>
           ` : ''}
-          <div class="summary-row total">
-            <span>Total</span>
+          <div class="total-row">
+            <span>TOTAL</span>
             <span>${formatCurrency(receiptData.total)}</span>
           </div>
         </div>
         
         <div class="footer">
-          <p>Terima kasih atas kunjungan Anda!</p>
+          <p>Terima kasih atas kunjungan Anda</p>
           <p>Semoga cepat sembuh</p>
         </div>
         
@@ -463,17 +485,55 @@ export default function POSTransactionsPage() {
           </div>
 
           {/* Grid */}
-          <div className="flex-1 overflow-y-auto pr-2">
+          <div className="flex-1 overflow-y-auto pr-6 pt-4">
+            {/* CSS Animations */}
+            <style jsx>{`
+              @keyframes highlightPulse {
+                0%, 100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4); }
+                50% { box-shadow: 0 0 0 8px rgba(59, 130, 246, 0); }
+              }
+              @keyframes badgeScaleIn {
+                0% { transform: scale(0); opacity: 0; }
+                50% { transform: scale(1.2); }
+                100% { transform: scale(1); opacity: 1; }
+              }
+              .product-highlight {
+                animation: highlightPulse 0.8s ease-out;
+              }
+              .badge-scale-in {
+                animation: badgeScaleIn 0.3s ease-out;
+              }
+            `}</style>
+            
             {loading ? (
                 <div className="flex justify-center items-center h-64">Loading products...</div>
             ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {filteredProducts.map(product => (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 pb-4">
+                {filteredProducts.map(product => {
+                    const cartItem = cart.find(item => item.id === product.id);
+                    const isActive = !!cartItem;
+                    const quantity = cartItem?.quantity || 0;
+                    const isHighlighted = highlightedProductId === product.id;
+                    
+                    return (
                     <div 
                     key={product.id} 
                     onClick={() => addToCart(product)}
-                    className="bg-white p-4 rounded-xl shadow-sm hover:shadow-md cursor-pointer transition-all group"
+                    className={`p-4 rounded-xl shadow-sm cursor-pointer transition-all duration-300 group relative ${
+                        isActive 
+                          ? 'bg-blue-50 border-2 border-blue-500 shadow-md' 
+                          : 'bg-white border-2 border-transparent hover:shadow-md hover:border-gray-200'
+                    } ${isHighlighted ? 'product-highlight' : ''}`}
                     >
+                    {/* Badge Quantity */}
+                    {isActive && (
+                        <div className={`absolute -top-3 -right-3 w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center text-xs font-bold shadow-md z-10 ${
+                            isHighlighted ? 'badge-scale-in' : ''
+                        }`}>
+                        {quantity}
+                        </div>
+                    )}
+                    
                     <div className="flex justify-between items-start mb-2">
                         <h3 className="font-semibold text-gray-800 line-clamp-2 h-12">{product.name}</h3>
                         <span className="text-xs font-medium bg-gray-100 text-gray-600 px-2 py-1 rounded-full">
@@ -482,94 +542,103 @@ export default function POSTransactionsPage() {
                     </div>
                     <div className="flex justify-between items-end">
                         <div>
-                            <p className="text-blue-600 font-bold">
+                            <p className={`font-bold ${
+                                isActive ? 'text-blue-700' : 'text-blue-600'
+                            }`}>
                                 {formatCurrency(product.selling_price)} 
                                 <span className="text-gray-400 text-sm font-normal"> / {product.unit.toLowerCase()}</span>
                             </p>
                         </div>
-                        <button className="w-8 h-8 flex items-center justify-center bg-blue-50 text-blue-600 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button className={`w-8 h-8 flex items-center justify-center rounded-lg transition-all ${
+                            isActive 
+                              ? 'bg-blue-600 text-white shadow-md' 
+                              : 'bg-blue-50 text-blue-600 opacity-0 group-hover:opacity-100'
+                        }`}>
                             <Plus size={16} />
                         </button>
                     </div>
                     </div>
-                ))}
+                    );
+                })}
                 </div>
             )}
           </div>
         </div>
 
         {/* Right: Cart */}
-        <div className="w-96 bg-white flex flex-col m-6 ml-0 rounded-2xl shadow-2xl z-20 overflow-hidden border border-gray-100">
-          <div className="p-6 shrink-0 bg-white border-b border-gray-100 z-10">
+        <div className="w-96 bg-white flex flex-col my-4 mr-6 ml-0 rounded-2xl shadow-2xl z-20 overflow-hidden border border-gray-100 h-[calc(100vh-8rem)]">
+          <div className="px-4 py-3 shrink-0 bg-white border-b border-gray-100 z-10">
             <h2 className="text-lg font-bold text-gray-800">Pesanan Saat Ini</h2>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-white">
+          <div className="flex-1 overflow-y-auto px-3 py-2 space-y-2 bg-white min-h-0">
             {cart.length === 0 ? (
-                <div className="text-center text-gray-400 mt-10 flex flex-col items-center">
-                    <ShoppingCart size={48} className="mb-4 opacity-20" />
-                    <p>No items in cart</p>
+                <div className="text-center text-gray-400 py-8 flex flex-col items-center justify-center">
+                    <ShoppingCart size={36} className="mb-2 opacity-20" />
+                    <p className="text-sm">No items in cart</p>
                 </div>
             ) : (
                 cart.map(item => (
-                <div key={item.id} className="flex gap-4 p-3 bg-white rounded-xl shadow-sm">
-                    <div className="flex-1">
-                        <h4 className="font-medium text-gray-800 text-sm mb-1">{item.name}</h4>
-                        <p className="text-blue-600 text-xs font-bold">{formatCurrency(item.selling_price)} <span className="text-gray-400 font-normal">/ {item.unit.toLowerCase()}</span></p>
+                <div key={item.id} className="relative flex gap-3 p-4 bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow">
+                    {/* Delete Button at Top Right (like badge) */}
+                    <button 
+                        onClick={(e) => { e.stopPropagation(); removeFromCart(item.id); }}
+                        className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center shadow-md hover:bg-red-600 transition-colors z-10"
+                    >
+                        <X size={12} />
+                    </button>
+                    
+                    <div className="flex-1 pr-8">
+                        <h4 className="font-semibold text-gray-800 text-sm mb-1">{item.name}</h4>
+                        <p className="text-blue-600 text-sm font-bold">{formatCurrency(item.selling_price)} <span className="text-gray-400 font-normal text-xs">/ {item.unit.toLowerCase()}</span></p>
                     </div>
-                    <div className="flex flex-col items-end gap-2">
-                        <div className="flex items-center gap-2 bg-gray-100 rounded-lg p-1">
+                    <div className="flex flex-col items-end justify-center">
+                        <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
                             <button 
                                 onClick={(e) => { e.stopPropagation(); updateQuantity(item.id, -1); }}
-                                className="w-6 h-6 flex items-center justify-center hover:bg-white rounded text-gray-600 shadow-sm transition-all"
+                                className="w-5 h-5 flex items-center justify-center hover:bg-white rounded-md text-gray-700 shadow-sm transition-all hover:shadow-md"
                             >
-                                <Minus size={14} />
+                                <Minus size={12} />
                             </button>
-                            <span className="text-sm font-medium px-2 text-center whitespace-nowrap">{item.quantity} {item.unit}</span>
+                            <span className="text-xs font-semibold px-1.5 text-center whitespace-nowrap min-w-[2.5rem]">{item.quantity} {item.unit}</span>
                             <button 
                                 onClick={(e) => { e.stopPropagation(); updateQuantity(item.id, 1); }}
-                                className="w-6 h-6 flex items-center justify-center hover:bg-white rounded text-gray-600 shadow-sm transition-all"
+                                className="w-5 h-5 flex items-center justify-center hover:bg-white rounded-md text-gray-700 shadow-sm transition-all hover:shadow-md"
                             >
-                                <Plus size={14} />
+                                <Plus size={12} />
                             </button>
                         </div>
-                        <button 
-                            onClick={(e) => { e.stopPropagation(); removeFromCart(item.id); }}
-                            className="text-red-400 hover:text-red-600"
-                        >
-                            <X size={16} />
-                        </button>
                     </div>
                 </div>
                 ))
             )}
           </div>
 
-          <div className="p-6 bg-gray-50 mt-auto">
-            <div className="space-y-2 mb-4 text-sm">
+          <div className="p-4 bg-gray-50 shrink-0 border-t border-gray-100">
+            <div className="space-y-2 mb-3 text-sm">
+              <div className="flex justify-between text-gray-600">
+                <span>Sub total</span>
+                <span className="font-medium">{formatCurrency(subtotal)}</span>
+              </div>
+              {settings.ppn_rate > 0 && (
                 <div className="flex justify-between text-gray-600">
-                    <span>Sub total</span>
-                    <span className="font-medium">{formatCurrency(subtotal)}</span>
+                  <span>PPN ({settings.ppn_rate}%)</span>
+                  <span className="font-medium text-orange-600">+{formatCurrency(ppn)}</span>
                 </div>
-                {settings.ppn_rate > 0 && (
-                    <div className="flex justify-between text-gray-600">
-                        <span>PPN ({settings.ppn_rate}%)</span>
-                        <span className="font-medium text-orange-600">+{formatCurrency(ppn)}</span>
-                    </div>
-                )}
-                {settings.discount_rate > 0 && (
-                    <div className="flex justify-between text-red-500">
-                        <span>Diskon ({settings.discount_rate}%)</span>
-                        <span className="font-medium">-{formatCurrency(discount)}</span>
-                    </div>
-                )}
-                <div className="flex justify-between text-gray-900 font-bold text-lg pt-2 border-t border-gray-100">
-                    <span>Total</span>
-                    <span>{formatCurrency(total)}</span>
+              )}
+              {settings.discount_rate > 0 && (
+                <div className="flex justify-between text-red-500">
+                  <span>Diskon ({settings.discount_rate}%)</span>
+                  <span className="font-medium">-{formatCurrency(discount)}</span>
                 </div>
+              )}
+              <div className="flex justify-between text-gray-900 font-bold text-base pt-2 border-t border-gray-100">
+                <span>Total</span>
+                <span>{formatCurrency(total)}</span>
+              </div>
             </div>
 
-            <div className="mb-4">
+            <div className="mb-3">
               <label className="text-sm font-medium text-gray-700 mb-2 block">Metode Pembayaran</label>
               <div className="grid grid-cols-2 gap-2">
                 <button
