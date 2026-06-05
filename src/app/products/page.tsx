@@ -49,6 +49,7 @@ interface Faktur {
   stock_type: 'belum_bayar' | 'konsinyasi' | 'dp' | 'lunas';
   dp_amount: number | null;
   due_date: string | null;
+  expired_date: string | null;
   notes: string | null;
   image_url: string | null;
   status: 'approved' | 'pending' | 'rejected' | 'revision';
@@ -117,6 +118,7 @@ interface FakturFormData {
   stock_type: 'belum_bayar' | 'konsinyasi' | 'dp' | 'lunas';
   dp_amount: string;
   due_date: string;
+  expired_date: string;
   notes: string;
 }
 
@@ -189,6 +191,7 @@ export default function ProductsPage() {
     stock_type: 'belum_bayar',
     dp_amount: '',
     due_date: '',
+      expired_date: '',
     notes: ''
   });
   const [fakturImageFile, setFakturImageFile] = useState<File | null>(null);
@@ -203,7 +206,7 @@ export default function ProductsPage() {
     selling_price: '',
     stock: '',
     unit: 'Tablet',
-    expired_date: '',
+      expired_date: '',
     location_code: '',
     supplier_id: '',
     stock_type: 'belum_bayar',
@@ -342,6 +345,7 @@ export default function ProductsPage() {
       stock_type: selectedProduct?.stock_type || 'belum_bayar',
       dp_amount: '',
       due_date: '',
+      expired_date: '',
       notes: ''
     });
     setFakturImageFile(null);
@@ -375,6 +379,7 @@ export default function ProductsPage() {
       stock_type: faktur.stock_type as any,
       dp_amount: faktur.dp_amount?.toString() || '',
       due_date: formatDateForInput(faktur.due_date),
+      expired_date: formatDateForInput(faktur.expired_date),
       notes: faktur.notes || ''
     });
     setFakturImageFile(null);
@@ -491,7 +496,7 @@ export default function ProductsPage() {
       formData.append('initial_quantity', qtyInBaseUnit.toString());
       formData.append('remaining_quantity', qtyInBaseUnit.toString());
       formData.append('cost_price', (Number(fakturFormData.cost_price) || 0).toString());
-      formData.append('expired_date', '');
+      formData.append('expired_date', fakturFormData.expired_date || '');
       if (fakturFormData.stock_type === 'dp' && fakturFormData.dp_amount) {
         formData.append('dp_amount', fakturFormData.dp_amount);
       }
@@ -534,6 +539,7 @@ export default function ProductsPage() {
           stock_type: 'belum_bayar',
           dp_amount: '',
           due_date: '',
+      expired_date: '',
           notes: ''
         });
         setFakturImageFile(null);
@@ -1849,10 +1855,10 @@ export default function ProductsPage() {
                         cost_price: '',
                         selling_price: '',
                         stock: '',
-                        expired_date: '',
                         invoice_number: '',
                         dp_amount: '',
                         due_date: '',
+      expired_date: '',
                         purchase_unit: 'Box',
                         unit_multiplier: '1',
                         purchase_unit_stock: ''
@@ -1938,6 +1944,7 @@ export default function ProductsPage() {
               stock_type: 'belum_bayar',
               dp_amount: '',
               due_date: '',
+      expired_date: '',
               notes: ''
             });
             setFakturImageFile(null);
@@ -1984,7 +1991,16 @@ export default function ProductsPage() {
                 <tbody>
                   {fakturs.map((faktur) => (
                     <tr key={faktur.id} className="border-b border-gray-100 hover:bg-gray-50">
-                      <td className="px-4 py-3 font-medium">{faktur.invoice_number}</td>
+                      <td className="px-4 py-3 font-medium">
+                        {faktur.invoice_number}
+                        {faktur.notes === 'Expired' && (
+                          <div className="mt-1">
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-700 border border-red-200">
+                              <AlertTriangle size={10} /> KADALUARSA
+                            </span>
+                          </div>
+                        )}
+                      </td>
                       <td className="px-4 py-3">{faktur.supplier_name || '-'}</td>
                       <td className="px-4 py-3">
                         <span className={`px-2 py-1 rounded-full text-xs font-medium ${
@@ -2068,13 +2084,6 @@ export default function ProductsPage() {
                             title="Arsipkan Faktur"
                           >
                             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="21 8 21 21 3 21 3 8"></polyline><rect x="1" y="3" width="22" height="5"></rect><line x1="10" y1="12" x2="14" y2="12"></line></svg>
-                          </button>
-                          <button
-                            onClick={() => handleDeleteFaktur(faktur)}
-                            className="p-1 text-red-600 hover:bg-red-50 rounded"
-                            title="Hapus"
-                          >
-                            <Trash2 size={14} />
                           </button>
                         </div>
                       </td>
@@ -2197,6 +2206,19 @@ export default function ProductsPage() {
                     </div>
                   </>
                 )}
+                
+                {/* EXPIRED DATE FOR FAKTUR */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Tgl Kadaluarsa</label>
+                  <input
+                    type="date"
+                    name="expired_date"
+                    value={fakturFormData.expired_date}
+                    onChange={handleFakturInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                  />
+                </div>
+
                 {fakturFormData.notes && (
                   <div className="col-span-2 md:col-span-3 bg-orange-50 border border-orange-200 p-4 rounded-xl flex items-start gap-3">
                     <AlertCircle className="text-orange-500 shrink-0 mt-0.5" size={18} />
@@ -2286,6 +2308,7 @@ export default function ProductsPage() {
                       stock_type: 'belum_bayar',
                       dp_amount: '',
                       due_date: '',
+      expired_date: '',
                       notes: ''
                     });
                     setSelectedFaktur(null);
