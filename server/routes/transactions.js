@@ -363,19 +363,33 @@ module.exports = function registerTransactionRoutes(app, pool, authenticate, che
       const orderId = notification.order_id;
       const transactionStatus = notification.transaction_status;
       const fraudStatus = notification.fraud_status;
+      const midtransTransactionId = notification.transaction_id;
+
+      if (!orderId) {
+        return res.status(400).json({ message: 'No order_id in notification' });
+      }
+
+      await connection.beginTransaction();
 
       const [transactionRows] = await connection.query(
-        'SELECT * FROM transactions WHERE midtrans_order_id = ?',
+        'SELECT * FROM transactions WHERE midtrans_order_id = ? FOR UPDATE',
         [orderId]
       );
 
       if (transactionRows.length === 0) {
-        return res.status(404).json({ message: 'Transaction not found' });
+        await connection.commit();
+        return res.status(200).json({ message: 'Transaction not found, skipping' });
       }
 
       const transaction = transactionRows[0];
-      let paymentStatus = transaction.payment_status;
 
+      // IDEMPOTENCY GUARD: if already completed/settlement, skip
+      if (transaction.payment_status === 'completed') {
+        await connection.commit();
+        return res.status(200).json({ message: 'Already processed, skipping' });
+      }
+
+      let paymentStatus = transaction.payment_status;
       if (transactionStatus === 'capture') {
         if (fraudStatus === 'challenge') {
           paymentStatus = 'pending';
@@ -392,14 +406,12 @@ module.exports = function registerTransactionRoutes(app, pool, authenticate, che
         paymentStatus = 'canceled';
       }
 
-      await connection.beginTransaction();
-
       await connection.query(
-        'UPDATE transactions SET payment_status = ? WHERE id = ?',
-        [paymentStatus, transaction.id]
+        'UPDATE transactions SET payment_status = ?, midtrans_transaction_id = ? WHERE id = ?',
+        [paymentStatus, midtransTransactionId || null, transaction.id]
       );
 
-      if (paymentStatus === 'completed' && transaction.payment_status !== 'completed') {
+      if (paymentStatus === 'completed') {
         const [items] = await connection.query(
           'SELECT ti.*, p.cost_price, p.product_category FROM transaction_items ti JOIN products p ON ti.product_id = p.id WHERE ti.transaction_id = ?',
           [transaction.id]
@@ -412,10 +424,8 @@ module.exports = function registerTransactionRoutes(app, pool, authenticate, che
         let nonObatCOGSTotal = 0;
 
         for (const item of items) {
-          // Implementasi FEFO untuk Midtrans juga!
           let remainingToReduce = item.quantity;
 
-          // Ambil batch yang masih ada stok, diurutkan by expired_date ASC
           const [batches] = await connection.query(
             'SELECT id, remaining_quantity FROM batches WHERE product_id = ? AND remaining_quantity > 0 AND is_archived = FALSE ORDER BY expired_date ASC, created_at ASC',
             [item.product_id]
@@ -426,7 +436,6 @@ module.exports = function registerTransactionRoutes(app, pool, authenticate, che
 
             const reduceAmount = Math.min(remainingToReduce, batch.remaining_quantity);
 
-            // Kurangi remaining_quantity batch
             await connection.query(
               'UPDATE batches SET remaining_quantity = remaining_quantity - ? WHERE id = ?',
               [reduceAmount, batch.id]
@@ -435,7 +444,6 @@ module.exports = function registerTransactionRoutes(app, pool, authenticate, che
             remainingToReduce -= reduceAmount;
           }
 
-          // Update total stok di products
           await connection.query(
             'UPDATE products SET stock = stock - ? WHERE id = ?',
             [item.quantity, item.product_id]
@@ -456,15 +464,12 @@ module.exports = function registerTransactionRoutes(app, pool, authenticate, che
           }
         }
 
-        // Calculate sales without PPN (for income accounts) and separate PPN for Hutang Pajak
         const salesTotalWithoutTax = transaction.subtotal || 0;
         const taxAmountValue = transaction.tax_amount || 0;
 
-        // Create journal entry for midtrans payment (bank)
         const today = new Date().toISOString().split('T')[0];
         const [accResult] = await connection.query('SELECT id FROM accounts WHERE code = ?', ['102']);
         if (accResult.length > 0) {
-          // Create journal entry header
           const [journalResult] = await connection.query(
             'INSERT INTO journal_entries (transaction_id, date, description) VALUES (?, ?, ?)',
             [transaction.id, today, `Penjualan non-tunai #${transaction.id}`]
@@ -475,7 +480,6 @@ module.exports = function registerTransactionRoutes(app, pool, authenticate, che
             { accountCode: '102', debit: transaction.total_amount }
           ];
 
-          // Split sales without tax proportionally between OBAT and NON_OBAT
           const totalSalesWithTax = obatSalesTotal + nonObatSalesTotal;
           let obatSalesWithoutTax = 0;
           let nonObatSalesWithoutTax = 0;

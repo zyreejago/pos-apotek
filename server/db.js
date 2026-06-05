@@ -593,6 +593,12 @@ const initDB = async () => {
     try {
       await connection.query(`ALTER TABLE transactions ADD COLUMN is_fully_returned BOOLEAN DEFAULT FALSE`);
     } catch (e) {}
+    try {
+      await connection.query(`ALTER TABLE transactions ADD COLUMN midtrans_transaction_id VARCHAR(255) NULL`);
+    } catch (e) {}
+    try {
+      await connection.query(`ALTER TABLE transactions ADD UNIQUE KEY uniq_midtrans_transaction (midtrans_transaction_id)`);
+    } catch (e) {}
 
     // Seed Chart of Accounts
     const accounts = [

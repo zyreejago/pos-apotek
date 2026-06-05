@@ -34,6 +34,15 @@ function registerInventoryRoutes(app, pool, authenticate, checkPermission, uploa
         } catch (retErr) {
           batch.qty_returned = 0;
         }
+        try {
+          const [restoreRows] = await pool.query(
+            'SELECT COALESCE(SUM(qty_returned), 0) as qty FROM sale_return_items WHERE batch_id = ?',
+            [batch.id]
+          );
+          batch.qty_restored = Number(restoreRows[0].qty);
+        } catch (restoreErr) {
+          batch.qty_restored = 0;
+        }
       }
 
       res.json({ success: true, data: rows });
