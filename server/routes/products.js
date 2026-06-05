@@ -76,7 +76,7 @@ module.exports = function registerProductRoutes(app, pool, authenticate, checkPe
     authenticate,
     checkPermission('Management Product', 'create'),
     async (req, res) => {
-    const { name, cost_price, selling_price, stock, category, unit, expired_date, location_code, purchase_unit, unit_multiplier } =
+    const { name, cost_price, selling_price, stock, category, product_category, unit, expired_date, location_code, purchase_unit, unit_multiplier } =
       req.body;
 
     if (!name || !cost_price) {
@@ -92,13 +92,14 @@ module.exports = function registerProductRoutes(app, pool, authenticate, checkPe
 
       const connection = await pool.getConnection();
       const [result] = await connection.query(
-        'INSERT INTO products (name, cost_price, selling_price, stock, category, unit, expired_date, location_code, purchase_unit, unit_multiplier, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        'INSERT INTO products (name, cost_price, selling_price, stock, category, product_category, unit, expired_date, location_code, purchase_unit, unit_multiplier, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
         [
           name,
           cost_price,
           selling_price || 0,
           stock || 0,
           category || 'General',
+          product_category || 'OBAT',
           unit || 'pcs',
           expired_date || null,
           location_code || null,
@@ -125,6 +126,7 @@ module.exports = function registerProductRoutes(app, pool, authenticate, checkPe
         selling_price,
         stock,
         category,
+        product_category: product_category || 'OBAT',
         unit,
         expired_date,
         location_code,
@@ -145,7 +147,7 @@ module.exports = function registerProductRoutes(app, pool, authenticate, checkPe
     checkPermission('Management Product', 'edit'),
     async (req, res) => {
     const { id } = req.params;
-    const { name, cost_price, selling_price, stock, category, unit, expired_date, location_code, purchase_unit, unit_multiplier } =
+    const { name, cost_price, selling_price, stock, category, product_category, unit, expired_date, location_code, purchase_unit, unit_multiplier } =
       req.body;
 
     try {
@@ -155,8 +157,8 @@ module.exports = function registerProductRoutes(app, pool, authenticate, checkPe
       const [currentProduct] = await connection.query('SELECT name FROM products WHERE id = ?', [id]);
       
       await connection.query(
-        'UPDATE products SET name = ?, cost_price = ?, selling_price = ?, stock = ?, category = ?, unit = ?, expired_date = ?, location_code = ?, purchase_unit = ?, unit_multiplier = ? WHERE id = ?',
-        [name, cost_price, selling_price, stock, category, unit, expired_date, location_code || null, purchase_unit || 'Box', unit_multiplier || 1, id]
+        'UPDATE products SET name = ?, cost_price = ?, selling_price = ?, stock = ?, category = ?, product_category = ?, unit = ?, expired_date = ?, location_code = ?, purchase_unit = ?, unit_multiplier = ? WHERE id = ?',
+        [name, cost_price, selling_price, stock, category, product_category || 'OBAT', unit, expired_date, location_code || null, purchase_unit || 'Box', unit_multiplier || 1, id]
       );
       connection.release();
 
@@ -327,30 +329,30 @@ module.exports = function registerProductRoutes(app, pool, authenticate, checkPe
           ]);
 
           // Get product cost price
-          const [productResult] = await connection.query('SELECT cost_price FROM products WHERE id = ?', [id]);
+          // Get product cost price, product_category, and name
+          const [productResult] = await connection.query('SELECT cost_price, product_category, name FROM products WHERE id = ?', [id]);
           const costPrice = productResult[0]?.cost_price || 0;
+          const isObat = productResult[0]?.product_category === 'OBAT';
+          const persediaanCode = isObat ? '103' : '104';
+          const productName = productResult[0]?.name || `Produk #${id}`;
           const differenceValue = difference * costPrice;
 
           // Create journal entry
           const journalItems = [];
           if (difference > 0) {
-            // Stock increased: Debit Persediaan, Credit Pendapatan Selisih Stok
+            // Stock increased: Debit Persediaan (Obat/Non-Obat), Credit Beban Selisih Stok (527) as negative expense
             journalItems.push(
-              { accountCode: '110', debit: differenceValue },
-              { accountCode: '410', credit: differenceValue }
+              { accountCode: persediaanCode, debit: differenceValue },
+              { accountCode: '527', credit: differenceValue }
             );
           } else {
-            // Stock decreased: Debit Beban Selisih Stok, Credit Persediaan
+            // Stock decreased: Debit Beban Selisih Stok (527), Credit Persediaan (Obat/Non-Obat)
             const absValue = Math.abs(differenceValue);
             journalItems.push(
-              { accountCode: '540', debit: absValue },
-              { accountCode: '110', credit: absValue }
+              { accountCode: '527', debit: absValue },
+              { accountCode: persediaanCode, credit: absValue }
             );
           }
-
-          // Get product name for description
-          const [productNameResult] = await connection.query('SELECT name FROM products WHERE id = ?', [id]);
-          const productName = productNameResult[0]?.name || `Produk #${id}`;
 
           await createJournalEntry(connection, null, today, 
             `Penyesuaian stok opname: ${productName} (${difference > 0 ? '+' : ''}${difference} pcs)`,

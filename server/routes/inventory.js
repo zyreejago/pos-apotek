@@ -227,24 +227,44 @@ function registerInventoryRoutes(app, pool, authenticate, checkPermission, uploa
         }
 
         // 2. Handle Journaling (only if it becomes approved now, or was approved and amount changed)
-        // This is a bit complex for a simple POS, usually we just log the change.
-        // But to follow the "Approved = Journal Created" rule:
-        if (status === 'approved' && (oldStatus !== 'approved' || totalAmount !== (oldQty * Number(oldBatch[0].cost_price)))) {
-           // Create journal for purchase (or adjustment if edited)
-           const [product] = await connection.query('SELECT name FROM products WHERE id = ?', [product_id]);
-           const productName = product[0]?.name || `Produk #${product_id}`;
-           
-           const journalItems = [{ accountCode: '110', debit: totalAmount }];
-           if (stock_type === 'lunas') journalItems.push({ accountCode: '101', credit: totalAmount });
-           else if (stock_type === 'dp' && dp_amount) {
-             journalItems.push({ accountCode: '101', credit: Number(dp_amount) });
-             journalItems.push({ accountCode: '201', credit: totalAmount - Number(dp_amount) });
-           } else journalItems.push({ accountCode: '201', credit: totalAmount });
+        if (status === 'approved') {
+          const [product] = await connection.query('SELECT name, product_category FROM products WHERE id = ?', [product_id]);
+          const productName = product[0]?.name || `Produk #${product_id}`;
+          const isObat = product[0]?.product_category === 'OBAT';
+          const persediaanCode = isObat ? '103' : '104';
 
-           await createJournalEntry(connection, null, formattedPurchaseDate || new Date().toISOString().split('T')[0], 
-             `Update/Pembelian stok: ${productName} (${initial_quantity} pcs)`,
-             journalItems
-           );
+          if (oldStatus !== 'approved' || totalAmount !== (oldQty * Number(oldBatch[0].cost_price))) {
+             // Create journal for purchase (or adjustment if edited)
+             const journalItems = [{ accountCode: persediaanCode, debit: totalAmount }];
+             if (stock_type === 'lunas') journalItems.push({ accountCode: '101', credit: totalAmount });
+             else if (stock_type === 'dp' && dp_amount) {
+               journalItems.push({ accountCode: '101', credit: Number(dp_amount) });
+               journalItems.push({ accountCode: '201', credit: totalAmount - Number(dp_amount) });
+             } else journalItems.push({ accountCode: '201', credit: totalAmount });
+
+             await createJournalEntry(connection, null, formattedPurchaseDate || new Date().toISOString().split('T')[0], 
+               `Update/Pembelian stok: ${productName} (${initial_quantity} pcs)`,
+               journalItems
+             );
+          } else if (oldStatus === 'approved') {
+            // Check if stock_type transitioned to 'lunas' (Debt Payment)
+            if ((oldBatch[0].stock_type === 'belum_bayar' || oldBatch[0].stock_type === 'dp') && stock_type === 'lunas') {
+              const debtPaid = oldBatch[0].stock_type === 'dp' 
+                ? (Number(oldBatch[0].initial_quantity) * Number(oldBatch[0].cost_price)) - Number(oldBatch[0].dp_amount || 0)
+                : (Number(oldBatch[0].initial_quantity) * Number(oldBatch[0].cost_price));
+              
+              if (debtPaid > 0) {
+                const journalItems = [
+                  { accountCode: '201', debit: debtPaid }, // Debit Hutang Usaha Supplier
+                  { accountCode: '101', credit: debtPaid }  // Credit Kas
+                ];
+                await createJournalEntry(connection, null, new Date().toISOString().split('T')[0], 
+                  `Pembayaran hutang untuk: ${productName} (Batch #${id})`,
+                  journalItems
+                );
+              }
+            }
+          }
         }
 
         await connection.commit();
@@ -304,6 +324,60 @@ function registerInventoryRoutes(app, pool, authenticate, checkPermission, uploa
     }
   });
 
+  // Mark batch as expired and record journaling
+  app.put('/api/inventory/batches/:id/expire', authenticate, checkPermission('Management Product', 'edit'), async (req, res) => {
+    const { id } = req.params;
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+
+      const [batchRows] = await connection.query('SELECT * FROM batches WHERE id = ?', [id]);
+      if (batchRows.length === 0) {
+        connection.release();
+        return res.status(404).json({ success: false, message: 'Batch not found' });
+      }
+      const batch = batchRows[0];
+      const qty = batch.remaining_quantity;
+      if (qty <= 0) {
+        connection.release();
+        return res.status(400).json({ success: false, message: 'Batch has no remaining stock to expire' });
+      }
+
+      // Update batch remaining quantity to 0 and note as Expired
+      await connection.query('UPDATE batches SET remaining_quantity = 0, notes = "Expired" WHERE id = ?', [id]);
+
+      // Reduce product stock
+      await connection.query('UPDATE products SET stock = GREATEST(stock - ?, 0) WHERE id = ?', [qty, batch.product_id]);
+
+      // Get product info
+      const [product] = await connection.query('SELECT name, product_category, cost_price FROM products WHERE id = ?', [batch.product_id]);
+      const productName = product[0]?.name || `Produk #${batch.product_id}`;
+      const isObat = product[0]?.product_category === 'OBAT';
+      const inventoryAccount = isObat ? '103' : '104';
+      const expiredValue = qty * Number(product[0]?.cost_price || 0);
+
+      // Create journal: Debit Beban Obat Expired (526), Credit Persediaan Obat/Non-Obat
+      const journalItems = [
+        { accountCode: '526', debit: expiredValue },
+        { accountCode: inventoryAccount, credit: expiredValue }
+      ];
+
+      await createJournalEntry(connection, null, new Date().toISOString().split('T')[0],
+        `Obat/Barang Expired: ${productName} (${qty} pcs)`,
+        journalItems
+      );
+
+      await connection.commit();
+      res.json({ success: true });
+    } catch (err) {
+      await connection.rollback();
+      console.error('Error expiring batch:', err);
+      res.status(500).json({ success: false, message: 'Failed to expire batch' });
+    } finally {
+      connection.release();
+    }
+  });
+
   // Approval Endpoints
   app.put('/api/inventory/batches/:id/approve', authenticate, checkPermission('Approval Faktur', 'edit'), async (req, res) => {
     try {
@@ -323,14 +397,16 @@ function registerInventoryRoutes(app, pool, authenticate, checkPermission, uploa
         // Update stock AND activate product if it was pending
         await connection.query('UPDATE products SET stock = stock + ?, status = "active" WHERE id = ?', [batch.remaining_quantity, batch.product_id]);
 
-        // Get product name for journal description
-        const [product] = await connection.query('SELECT name FROM products WHERE id = ?', [batch.product_id]);
+        // Get product name and product_category for journal description
+        const [product] = await connection.query('SELECT name, product_category FROM products WHERE id = ?', [batch.product_id]);
         const productName = product[0]?.name || `Produk #${batch.product_id}`;
+        const isObat = product[0]?.product_category === 'OBAT';
+        const persediaanCode = isObat ? '103' : '104';
 
         // Create Journal Entry
         const totalAmount = Number(batch.initial_quantity) * Number(batch.cost_price);
         const journalItems = [
-          { accountCode: '110', debit: totalAmount } // Persediaan
+          { accountCode: persediaanCode, debit: totalAmount } // Persediaan Obat / Non-Obat
         ];
 
         if (batch.stock_type === 'lunas') {
@@ -338,13 +414,13 @@ function registerInventoryRoutes(app, pool, authenticate, checkPermission, uploa
         } else if (batch.stock_type === 'dp' && batch.dp_amount) {
           journalItems.push(
             { accountCode: '101', credit: Number(batch.dp_amount) }, // Kas (DP)
-            { accountCode: '201', credit: totalAmount - Number(batch.dp_amount) } // Hutang Usaha (Sisa)
+            { accountCode: '201', credit: totalAmount - Number(batch.dp_amount) } // Hutang Usaha Supplier (Sisa)
           );
         } else {
-          journalItems.push({ accountCode: '201', credit: totalAmount }); // Hutang Usaha
+          journalItems.push({ accountCode: '201', credit: totalAmount }); // Hutang Usaha Supplier
         }
 
-        const purchaseDate = batch.purchase_date ? batch.purchase_date.toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
+        const purchaseDate = batch.purchase_date ? (batch.purchase_date instanceof Date ? batch.purchase_date.toISOString().split('T')[0] : batch.purchase_date.substring(0, 10)) : new Date().toISOString().split('T')[0];
 
         await createJournalEntry(connection, null, purchaseDate, 
           `Pembelian stok (Approved): ${productName} (${batch.initial_quantity} pcs)`,

@@ -289,6 +289,14 @@ export default function Sidebar() {
                   <div className={`w-1.5 h-1.5 rounded-full ${isActive('/reports/general-ledger') ? 'bg-blue-600' : 'bg-transparent border border-slate-400'}`}></div>
                   <span className="font-medium text-sm">Buku Besar</span>
                 </Link>
+                <Link href="/reports/general-journal" className={`flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer ${isActive('/reports/general-journal') ? 'bg-blue-50 text-blue-600' : 'text-slate-500 hover:text-slate-700 hover:bg-gray-50'}`}>
+                  <div className={`w-1.5 h-1.5 rounded-full ${isActive('/reports/general-journal') ? 'bg-blue-600' : 'bg-transparent border border-slate-400'}`}></div>
+                  <span className="font-medium text-sm">Jurnal Umum</span>
+                </Link>
+                <Link href="/reports/financial-transactions" className={`flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer ${isActive('/reports/financial-transactions') ? 'bg-blue-50 text-blue-600' : 'text-slate-500 hover:text-slate-700 hover:bg-gray-50'}`}>
+                  <div className={`w-1.5 h-1.5 rounded-full ${isActive('/reports/financial-transactions') ? 'bg-blue-600' : 'bg-transparent border border-slate-400'}`}></div>
+                  <span className="font-medium text-sm">Transaksi Keuangan</span>
+                </Link>
               </div>
             )}
           </div>

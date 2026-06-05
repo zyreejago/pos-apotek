@@ -1,0 +1,236 @@
+================================================================================
+           PANDUAN LENGKAP LAPORAN KEUANGAN & ALIRAN AKUNTANSI APOTEK
+================================================================================
+
+Dokumen ini disusun khusus sebagai bahan pembelajaran untuk memahami bagaimana setiap 
+transaksi di Apotek dicatat, diproses, dan disajikan ke dalam 5 laporan utama:
+1. Laporan Transaksi/Penjualan (Sales Report)
+2. Jurnal Umum (General Journal)
+3. Buku Besar (General Ledger)
+4. Laporan Laba Rugi (Profit & Loss Statement)
+5. Neraca Keuangan (Balance Sheet)
+
+--------------------------------------------------------------------------------
+1. STRUKTUR DATABASE (ASAL DATA LAPORAN)
+--------------------------------------------------------------------------------
+Semua data keuangan disimpan dalam tabel-tabel database berikut:
+* `transactions` & `transaction_items`: Data struk penjualan kasir, nominal bayar, diskon, dan metode pembayaran.
+* `journal_entries`: Judul ayat jurnal (berisi ID, Tanggal Transaksi, dan Keterangan).
+* `journal_items`: Detail Debit/Kredit dari setiap jurnal (berisi Hubungan Akun, jumlah Debit, dan jumlah Kredit).
+* `accounts`: Daftar 35 Akun Akuntansi (Chart of Accounts) dengan Tipe dan Saldo Normalnya.
+* `batches` / `fakturs`: Faktur pembelian stok dari supplier masuk ke sini.
+
+--------------------------------------------------------------------------------
+2. LAPORAN 1: LAPORAN TRANSAKSI / PENJUALAN (SALES REPORT)
+--------------------------------------------------------------------------------
+Laporan ini fokus pada aktivitas operasional penjualan kasir sehari-hari.
+
+* Asal Data: Tabel `transactions` dan `transaction_items`
+* Karakteristik: Belum berupa Debit/Kredit akuntansi, melainkan catatan transaksi kasir.
+* Rumus-Rumus Utama:
+  1. Subtotal Item = Qty Terjual * Harga Jual Satuan
+  2. Subtotal Penjualan = Jumlah seluruh Subtotal Item sebelum diskon/pajak
+  3. Total Pajak (PPN 11%) = Subtotal Penjualan * 0.11
+  4. Total Diskon = Nominal diskon yang diberikan (diinput manual / diskon member)
+  5. Total Penerimaan Kasir (Gross Sales) = Subtotal Penjualan + Pajak - Diskon
+
+* Hubungan dengan Akuntansi:
+  Total Penerimaan Kasir inilah yang akan dicatat sebagai Debit pada akun KAS (101) atau BANK (102).
+
+--------------------------------------------------------------------------------
+3. LAPORAN 2: JURNAL UMUM (GENERAL JOURNAL)
+--------------------------------------------------------------------------------
+Jurnal Umum adalah buku harian tempat mencatat SELURUH aktivitas keuangan secara kronologis 
+menggunakan format Debit dan Kredit. Setiap entri jurnal harus seimbang (Total Debit = Total Kredit).
+
+* Asal Data: Tabel `journal_entries` (header) dan `journal_items` (items)
+* Aturan Pencatatan:
+  - Transaksi Penjualan Tunai:
+    - [Debit] Kas / Bank (101/102) -> Uang masuk sebesar Total Bayar Pelanggan
+    - [Debit] HPP Obat / Non-Obat (501/502) -> Beban pokok modal barang terjual
+    - [Kredit] Penjualan Obat / Non-Obat (401/402) -> Pendapatan diakui sebelum pajak
+    - [Kredit] Persediaan Obat / Non-Obat (103/104) -> Stok obat keluar/berkurang senilai harga pokok
+  
+  - Transaksi Pengeluaran Biaya (Biaya Operasional):
+    - [Debit] Akun Beban (Gaji/Listrik/Air/ATK, dll.) -> Biaya bertambah
+    - [Kredit] Kas / Bank (101/102) -> Saldo kas berkurang untuk membayar beban
+
+  - Transaksi Pembelian Stok Kredit (Tempo):
+    - [Debit] Persediaan Obat / Non-Obat (103/104) -> Stok gudang bertambah
+    - [Kredit] Hutang Usaha Supplier (201) -> Kewajiban membayar di masa depan bertambah
+
+* Rumus Validasi Balance:
+  Total Debit Jurnal = Total Kredit Jurnal (Selisih harus = 0)
+
+--------------------------------------------------------------------------------
+4. LAPORAN 3: BUKU BESAR (GENERAL LEDGER)
+--------------------------------------------------------------------------------
+Buku Besar adalah laporan yang mengelompokkan riwayat mutasi Debit/Kredit berdasarkan 
+SATU akun tertentu saja (misal: Buku Besar Kas saja, atau Buku Besar Hutang saja).
+
+* Asal Data: Tabel `journal_items` disaring berdasarkan `account_id` dan diurutkan berdasarkan tanggal.
+* Rumus Perhitungan Saldo Berjalan (Running Balance):
+  Saldo akhir dihitung baris demi baris secara kumulatif tergantung pada tipe Saldo Normal akun:
+  
+  - Untuk Akun Tipe DEBIT Normal (Kas, Bank, Persediaan, Beban):
+    Saldo Baru = Saldo Sebelumnya + Nilai Debit Baru - Nilai Kredit Baru
+    
+  - Untuk Akun Tipe KREDIT Normal (Hutang, Modal, Pendapatan):
+    Saldo Baru = Saldo Sebelumnya + Nilai Kredit Baru - Nilai Debit Baru
+
+--------------------------------------------------------------------------------
+5. LAPORAN 4: LAPORAN LABA RUGI (PROFIT & LOSS STATEMENT)
+--------------------------------------------------------------------------------
+Laporan yang merangkum hasil usaha (pendapatan dan pengeluaran) apotek dalam periode 
+tertentu untuk melihat apakah apotek menghasilkan Laba atau Rugi Bersih.
+
+* Asal Data: Akumulasi saldo akhir akun Pendapatan (4xx) dan Beban (5xx) dari Buku Besar.
+* Rumus-Rumus Laporan Laba Rugi:
+  1. TOTAL PENDAPATAN OPERASIONAL:
+     Rumus = Saldo Akhir (Penjualan Obat [401] + Penjualan Non-Obat [402])
+  2. TOTAL BEBAN POKOK PENJUALAN (HPP):
+     Rumus = Saldo Akhir (HPP Obat [501] + HPP Non-Obat [502])
+  3. LABA KOTOR (Gross Profit):
+     Rumus = TOTAL PENDAPATAN OPERASIONAL - TOTAL BEBAN POKOK PENJUALAN (HPP)
+  4. TOTAL BEBAN OPERASIONAL:
+     Rumus = Jumlah seluruh beban operasional (Beban Gaji [511] + Beban Sewa [516] + 
+             Beban Listrik [513] + Beban Obat Expired [525] + Beban Selisih Stok [527] + dll.)
+  5. LABA BERSIH (Net Profit):
+     Rumus = LABA KOTOR - TOTAL BEBAN OPERASIONAL
+
+--------------------------------------------------------------------------------
+6. LAPORAN 5: NERACA KEUANGAN (BALANCE SHEET)
+--------------------------------------------------------------------------------
+Laporan posisi keuangan apotek yang menunjukkan Harta (Aktiva) serta dari mana asal 
+dana harta tersebut (Pasiva berupa Hutang, dan Modal pemilik) pada tanggal tertentu.
+
+* Asal Data: Akumulasi saldo akhir akun Aktiva (1xx), Pasiva (2xx), dan Modal (3xx) dari Buku Besar.
+* Rumus Utama Neraca:
+  TOTAL AKTIVA (Harta) = TOTAL PASIVA (Kewajiban) + TOTAL MODAL (Ekuitas)
+
+* Rincian Sisi AKTIVA (Debit):
+  * Kas (101) + Bank (102) + Persediaan Obat (103) + Persediaan Non-Obat (104) + Peralatan Apotek (121)
+  * Rumus Total Aktiva = Jumlahkan seluruh saldo bersih akun Aktiva (Debit - Kredit)
+
+* Rincian Sisi PASIVA (Kredit):
+  * Hutang Usaha Supplier (201) + Hutang Pajak (202)
+  * Rumus Total Pasiva = Jumlahkan seluruh saldo bersih akun Pasiva (Kredit - Debit)
+
+* Rincian Sisi MODAL (Kredit):
+  * Modal Pemilik (301) - Prive Pemilik (302) + Laba Tahun Berjalan (311)
+  * Rumus Total Modal = (Saldo Modal Pemilik - Saldo Prive Pemilik) + LABA BERSIH
+
+--------------------------------------------------------------------------------
+7. DETIL FORMULA DAN SUMBER DATA PER-AKUN (35 AKUN APOTEK)
+--------------------------------------------------------------------------------
+Berikut rincian dari mana asal nilai (sumber transaksi) dan rumus perhitungan saldo 
+akhir untuk masing-masing dari 35 akun yang ada di sistem:
+
+KAS & BANK (Tipe: Aktiva | Normal: Debit)
+================================================================================
+* 101 - Kas
+  - Rumus Saldo Akhir: Total Debit - Total Kredit
+  - Sumber Debit (+): Penjualan Tunai di POS, Setor Modal tunai, Tarik tunai dari Bank.
+  - Sumber Kredit (-): Bayar Operasional tunai, Beli Stok/Aset tunai, Setor tunai ke Bank.
+* 102 - Bank
+  - Rumus Saldo Akhir: Total Debit - Total Kredit
+  - Sumber Debit (+): Pelunasan QRIS/Midtrans, Setor tunai ke Bank, Setor Modal via transfer.
+  - Sumber Kredit (-): Transfer pelunasan hutang supplier, Bayar operasional via transfer.
+
+PERSEDIAAN BARANG DAGANG (Tipe: Aktiva | Normal: Debit)
+================================================================================
+* 103 - Persediaan Obat
+  - Rumus Saldo Akhir: Total Debit - Total Kredit
+  - Sumber Debit (+): Persetujuan Faktur Pembelian Obat (Lunas/Tempo), Selisih Stock Opname (+).
+  - Sumber Kredit (-): HPP Penjualan Obat otomatis, Penjualan obat kadaluarsa, Opname (-).
+* 104 - Persediaan Non-Obat
+  - Rumus Saldo Akhir: Total Debit - Total Kredit
+  - Sumber Debit (+): Persetujuan Faktur Pembelian Non-Obat (Lunas/Tempo), Opname (+).
+  - Sumber Kredit (-): HPP Penjualan Non-Obat otomatis, Opname (-).
+
+ASET TETAP & DEPRESIASI (Tipe: Aktiva | Normal: Debit / Kredit)
+================================================================================
+* 121 - Peralatan Apotek
+  - Rumus Saldo Akhir: Total Debit - Total Kredit
+  - Sumber Debit (+): Pembelian peralatan apotek fisik (etalase, rak obat, kulkas vaksin).
+  - Sumber Kredit (-): Penjualan peralatan bekas/rusak.
+* 122 - Peralatan Komputer
+  - Rumus Saldo Akhir: Total Debit - Total Kredit
+  - Sumber Debit (+): Pembelian printer kasir, komputer kasir, barcode scanner, router.
+  - Sumber Kredit (-): Penghapusan komputer rusak.
+* 123 - Kendaraan Operasional
+  - Rumus Saldo Akhir: Total Debit - Total Kredit
+  - Sumber Debit (+): Pembelian motor/mobil operasional pengiriman obat apotek.
+* 129 - Akumulasi Penyusutan (Tipe: Aktiva | Normal: KREDIT - Akun Kontra)
+  - Rumus Saldo Akhir: Total Kredit - Total Debit
+  - Sumber Kredit (+): Jurnal penyesuaian penyusutan aset tetap bulanan.
+  - Sumber Debit (-): Penghentian penggunaan/penjualan aset yang disusutkan.
+
+KEWAJIBAN / HUTANG (Tipe: Pasiva | Normal: Kredit)
+================================================================================
+* 201 - Hutang Usaha Supplier
+  - Rumus Saldo Akhir: Total Kredit - Total Debit
+  - Sumber Kredit (+): Penerimaan Pembelian Faktur dengan tipe stok "Belum Bayar" atau "DP".
+  - Sumber Debit (-): Transaksi Pelunasan Hutang ke supplier.
+* 202 - Hutang Pajak
+  - Rumus Saldo Akhir: Total Kredit - Total Debit
+  - Sumber Kredit (+): PPN 11% yang dikutip otomatis dari transaksi penjualan kasir.
+  - Sumber Debit (-): Penyetoran pajak ke kas negara.
+
+MODAL / EKUITAS (Tipe: Modal | Normal: Kredit)
+================================================================================
+* 301 - Modal Pemilik
+  - Rumus Saldo Akhir: Total Kredit - Total Debit
+  - Sumber Kredit (+): Penyetoran modal usaha oleh pemilik (Tab Modal & Prive).
+* 302 - Prive Pemilik (Tipe: Modal | Normal: DEBIT - Akun Kontra)
+  - Rumus Saldo Akhir: Total Debit - Total Kredit
+  - Sumber Debit (+): Penarikan uang tunai apotek untuk keperluan pribadi pemilik.
+* 310 - Laba Ditahan
+  - Rumus Saldo Akhir: Total Kredit - Total Debit
+  - Sumber Kredit (+): Pemindahan sisa laba bersih dari tahun-tahun sebelumnya.
+* 311 - Laba Tahun Berjalan
+  - Rumus Saldo Akhir: Diambil otomatis dari Net Laba Bersih tahun ini.
+  - Sumber (+/-): Hasil perhitungan (Pendapatan - HPP - Seluruh Beban Operasional).
+
+PENDAPATAN / PENJUALAN (Tipe: Pendapatan | Normal: Kredit)
+================================================================================
+* 401 - Penjualan Obat
+  - Rumus Saldo Akhir: Total Kredit - Total Debit
+  - Sumber Kredit (+): Transaksi penjualan produk kategori "OBAT" yang sukses di POS.
+* 402 - Penjualan Non-Obat
+  - Rumus Saldo Akhir: Total Kredit - Total Debit
+  - Sumber Kredit (+): Transaksi penjualan produk kategori "NON_OBAT" yang sukses di POS.
+
+HARGA POKOK PENJUALAN / HPP (Tipe: Beban | Normal: Debit)
+================================================================================
+* 501 - HPP Obat
+  - Rumus Saldo Akhir: Total Debit - Total Kredit
+  - Sumber Debit (+): Terbentuk otomatis senilai harga beli obat saat terjadi penjualan obat.
+* 502 - HPP Non-Obat
+  - Rumus Saldo Akhir: Total Debit - Total Kredit
+  - Sumber Debit (+): Terbentuk otomatis senilai harga beli non-obat saat transaksi sukses.
+
+BEBAN OPERASIONAL (Tipe: Beban | Normal: Debit)
+================================================================================
+* Semuanya menggunakan rumus saldo akhir: Total Debit - Total Kredit.
+* Sumber Debit (+): Dicatat manual melalui menu "Transaksi Keuangan -> Biaya Operasional" 
+  atau menu "Jurnal Umum" dengan Kas/Bank di Kredit.
+
+* 511 - Beban Gaji                  : Pengeluaran untuk gaji pokok karyawan/apoteker.
+* 512 - Beban Tunjangan Karyawan    : Pembayaran tunjangan makan, transport, atau THR.
+* 513 - Beban Listrik                : Pembayaran tagihan listrik PLN bulanan apotek.
+* 514 - Beban Air                   : Pembayaran tagihan air PDAM bulanan.
+* 515 - Beban Internet & Telepon    : Pembayaran wifi, pulsa modem, atau telepon apotek.
+* 516 - Beban Sewa                  : Alokasi biaya sewa ruko/tempat apotek berdiri.
+* 517 - Beban ATK                   : Pembelian kertas struk, bolpoin, buku, tinta printer.
+* 518 - Beban Kebersihan            : Iuran sampah, pembelian sabun pel, sapu, desinfektan.
+* 519 - Beban Pemeliharaan          : Biaya servis AC, perbaikan etalase rusak, cat tembok.
+* 521 - Beban Administrasi Bank     : Potongan biaya admin bank bulanan atau biaya transfer.
+* 522 - Beban Pajak                 : Beban pajak penghasilan final apotek (bukan PPN).
+* 523 - Beban Promosi               : Pembuatan banner, brosur, diskon khusus marketing.
+* 524 - Beban Transportasi          : Pembelian bensin kurir pengirim obat, biaya ojek dinas.
+* 525 - Beban Keamanan              : Iuran satpam lingkungan, pemasangan alarm CCTV.
+* 526 - Beban Obat Expired          : Kerugian otomatis saat membuang obat kadaluarsa.
+* 527 - Beban Selisih Stok          : Kerugian otomatis dari selisih kurang barang di opname.
+* 529 - Beban Lain-lain             : Biaya insidental tak terduga lainnya.
+================================================================================

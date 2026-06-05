@@ -1,0 +1,166 @@
+================================================================================
+          PANDUAN SISTEM AKUNTANSI & JURNAL OTOMATIS - APOTEK SUMBER WARAS
+================================================================================
+
+Dokumen ini menjelaskan aliran akuntansi, jurnal otomatis, rumus perhitungan, 
+serta hubungan antar akun untuk mempermudah pemahaman operasional sistem keuangan apotek.
+
+--------------------------------------------------------------------------------
+1. DAFTAR AKUN UTAMA (CHART OF ACCOUNTS / COA)
+--------------------------------------------------------------------------------
+Akun-akun yang digunakan dikelompokkan menjadi 5 tipe utama. Setiap tipe memiliki 
+"Saldo Normal" yang menentukan apakah nilai bertambah saat di-Debit atau di-Kredit.
+
+Tipe Akun     | Saldo Normal | Jika di-DEBIT | Jika di-KREDIT
+--------------------------------------------------------------------------------
+1. Aktiva     | Debit        | Bertambah     | Berkurang     (Aset / Kekayaan)
+2. Pasiva     | Kredit       | Berkurang     | Bertambah     (Hutang / Kewajiban)
+3. Modal      | Kredit       | Berkurang     | Bertambah     (Ekuitas Pemilik)
+4. Pendapatan | Kredit       | Berkurang     | Bertambah     (Penjualan Obat/Barang)
+5. Beban      | Debit        | Bertambah     | Berkurang     (Biaya Operasional/HPP)
+
+Kode Akun Penting:
+* 101 - Kas (Uang tunai di kasir/brankas)
+* 102 - Bank (Saldo rekening bank apotek)
+* 103 - Persediaan Obat (Nilai stok obat siap jual)
+* 104 - Persediaan Non-Obat (Nilai stok non-obat siap jual)
+* 201 - Hutang Usaha Supplier (Kewajiban bayar ke supplier atas pembelian kredit)
+* 301 - Modal Pemilik (Uang/aset yang disetor pemilik ke bisnis)
+* 311 - Laba Tahun Berjalan (Akumulasi laba bersih tahun berjalan)
+* 401 - Penjualan Obat (Pendapatan hasil jualan obat)
+* 402 - Penjualan Non-Obat (Pendapatan hasil jualan non-obat)
+* 501 - HPP Obat (Harga Pokok Pembelian atas obat yang berhasil terjual)
+* 502 - HPP Non-Obat (Harga Pokok Pembelian atas non-obat yang berhasil terjual)
+
+--------------------------------------------------------------------------------
+2. JURNAL OTOMATIS DAN RUMUS PERHITUNGANNYA
+--------------------------------------------------------------------------------
+
+A. TRANSAKSI PENJUALAN TUNAI (CASH SALES)
+   Terjadi otomatis di kasir saat pelanggan membayar tunai.
+   
+   Rumus Perhitungan:
+   * Penjualan (Kredit) = Sum of (Qty Terjual * Harga Jual Satuan)
+   * HPP / Pokok (Debit) = Sum of (Qty Terjual * Harga Beli Satuan)
+   * Kas (Debit) = Total Bayar Pelanggan (Termasuk PPN / Pajak jika ada)
+
+   Jurnal yang Terbentuk:
+   [Debit]  101 - Kas                        (Sebesar Total Bayar Pelanggan)
+   [Kredit] 401/402 - Penjualan Obat/Non-Obat (Sebesar Harga Jual Sebelum Pajak)
+   [Debit]  501/502 - HPP Obat/Non-Obat       (Sebesar Harga Pokok Pembelian)
+   [Kredit] 103/104 - Persediaan Obat/Non-Obt (Sebesar Harga Pokok Pembelian)
+
+   *Catatan: Persediaan berkurang di Kredit karena barangnya keluar/terjual.
+
+B. PEMBELIAN STOK / FAKTUR BARU (LUNAS)
+   Terjadi saat apotek menyetujui faktur masuk dari supplier dengan tipe "Lunas".
+   
+   Rumus Perhitungan:
+   * Total Faktur = Sum of (Qty Beli * Harga Beli Satuan)
+
+   Jurnal yang Terbentuk:
+   [Debit]  103/104 - Persediaan Obat/Non-Obt (Persediaan bertambah senilai total faktur)
+   [Kredit] 101/102 - Kas / Bank              (Kas/Bank berkurang karena dibayar langsung)
+
+C. PEMBELIAN STOK / FAKTUR BARU (BELUM BAYAR / TEMPO)
+   Terjadi saat apotek menyetujui faktur dengan tipe "Belum Bayar" (Hutang).
+
+   Jurnal yang Terbentuk:
+   [Debit]  103/104 - Persediaan Obat/Non-Obt (Persediaan bertambah)
+   [Kredit] 201 - Hutang Usaha Supplier       (Hutang bertambah di Kredit)
+
+D. PELUNASAN HUTANG SUPPLIER (DEBT PAYMENT)
+   Terjadi saat apotek melunasi tagihan faktur tempo.
+
+   Jurnal yang Terbentuk:
+   [Debit]  201 - Hutang Usaha Supplier       (Hutang berkurang di Debit)
+   [Kredit] 101/102 - Kas / Bank              (Kas/Bank berkurang untuk membayar)
+
+E. MANAJEMEN OBAT KADALUARSA (EXPIRED BATCHES)
+   Terjadi saat user menekan tombol "Tandai Kadaluarsa" di detail batch produk.
+   Sisa stok pada batch tersebut otomatis dinolkan.
+   
+   Rumus Perhitungan:
+   * Nilai Kadaluarsa = Sisa Qty Batch * Harga Beli Satuan
+
+   Jurnal yang Terbentuk:
+   [Debit]  525 - Beban Obat Expired          (Beban bertambah senilai barang rusak)
+   [Kredit] 103/104 - Persediaan Obat/Non-Obt (Stok persediaan berkurang di Kredit)
+
+F. SELISIH STOCK OPNAME (STOCK ADJUSTMENT)
+   Terjadi saat melakukan pencocokan fisik stok di menu Stock Opname.
+   
+   Rumus Perhitungan:
+   * Selisih Qty = Qty Fisik Nyata - Qty Sistem
+   * Nilai Selisih = Selisih Qty * Harga Beli Satuan
+   
+   Jika Fisik KELIHATAN KURANG (Stok Hilang):
+   [Debit]  527 - Beban Selisih Stok          (Beban kerugian selisih bertambah)
+   [Kredit] 103/104 - Persediaan Obat/Non-Obt (Persediaan dikurangi di Kredit)
+
+   Jika Fisik KELIHATAN LEBIH (Ada kelebihan barang):
+   [Debit]  103/104 - Persediaan Obat/Non-Obt (Persediaan ditambah di Debit)
+   [Kredit] 527 - Beban Selisih Stok          (Dianggap mengurangi beban/keuntungan)
+
+--------------------------------------------------------------------------------
+3. TRANSAKSI KEUANGAN MANUAL (WIZARD TRANSAKSI KEUANGAN)
+--------------------------------------------------------------------------------
+Menu ini disediakan agar Anda dapat mencatat transaksi non-penjualan 
+dengan mudah tanpa perlu pusing menentukan Debit/Kredit:
+
+1. BIAYA OPERASIONAL (TAB 1)
+   * Contoh: Bayar Gaji (511) Rp 2.000.000 dengan Kas (101).
+   * Aliran: Mengurangi saldo Kas Anda dan mencatat Beban Gaji pada laporan Laba Rugi.
+   * Jurnal Otomatis:
+     - [Debit]  511 - Beban Gaji            Rp 2.000.000
+     - [Kredit] 101 - Kas                   Rp 2.000.000
+
+2. MODAL & PRIVE (TAB 2)
+   * Setor Modal (Meningkatkan Uang Kas):
+     - [Debit]  101 - Kas                   (Kas bertambah)
+     - [Kredit] 301 - Modal Pemilik         (Ekuitas bertambah)
+   * Prive/Tarik Tunai (Pemilik mengambil uang untuk kepentingan pribadi):
+     - [Debit]  302 - Prive Pemilik         (Prive bertambah di Debit)
+     - [Kredit] 101 - Kas                   (Kas berkurang di Kredit)
+
+3. PEMBELIAN ASET TETAP (TAB 3)
+   * Membeli peralatan/komputer/kendaraan operasional yang masa pakainya > 1 tahun.
+   * Contoh: Beli Peralatan Komputer (122) Rp 5.000.000 secara tunai.
+   * Jurnal Otomatis:
+     - [Debit]  122 - Peralatan Komputer    Rp 5.000.000 (Aset tetap bertambah)
+     - [Kredit] 101 - Kas                   Rp 5.000.000 (Kas tunai berkurang)
+
+--------------------------------------------------------------------------------
+4. RUMUS PADA LAPORAN KEUANGAN
+--------------------------------------------------------------------------------
+
+A. LAPORAN LABA RUGI (PROFIT AND LOSS)
+   Laporan ini mengukur kinerja laba bersih selama satu periode.
+   
+   Rumus:
+   1. TOTAL PENDAPATAN = Penjualan Obat (401) + Penjualan Non-Obat (402)
+   2. TOTAL BEBAN POKOK (HPP) = HPP Obat (501) + HPP Non-Obat (502)
+   3. LABA KOTOR = TOTAL PENDAPATAN - TOTAL BEBAN POKOK (HPP)
+   4. TOTAL BEBAN OPERASIONAL = Jumlah semua beban (Beban Gaji + Beban Listrik + 
+                                Beban Obat Expired + Beban Selisih Stok + dll.)
+   5. LABA BERSIH = LABA KOTOR - TOTAL BEBAN OPERASIONAL
+
+B. NERACA KEUANGAN (BALANCE SHEET)
+   Neraca harus seimbang (Balance) antara harta kekayaan dengan sumber pendanaan.
+   
+   Rumus Utama Neraca:
+   * TOTAL AKTIVA (Harta) = TOTAL PASIVA (Kewajiban) + TOTAL MODAL (Ekuitas)
+   
+   Rincian Aktiva (Aset):
+   * Kas + Bank + Persediaan Obat + Persediaan Non-Obat + Peralatan + Aset Lainnya.
+   
+   Rincian Pasiva (Kewajiban):
+   * Hutang Usaha Supplier + Hutang Pajak.
+   
+   Rincian Modal (Ekuitas):
+   * Modal Pemilik - Prive Pemilik + Laba Tahun Berjalan (Laba Bersih dari Laba Rugi).
+   
+   *Catatan: Nilai "Laba Tahun Berjalan" diambil otomatis dari Laba Bersih yang 
+   dihitung di Laporan Laba Rugi pada periode yang sama. Ini yang menghubungkan 
+   kedua laporan tersebut sehingga Neraca bisa seimbang secara sempurna.
+================================================================================

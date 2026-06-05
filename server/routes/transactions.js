@@ -8,6 +8,45 @@ module.exports = function registerTransactionRoutes(app, pool, authenticate, che
     clientKey: process.env.MIDTRANS_CLIENT_KEY
   });
 
+  // Helper function to create journal entry for completed sale
+  const createSaleJournalEntry = async (connection, transactionId, date, totalAmount, items, paymentAccountCode) => {
+    let obatSalesTotal = 0;
+    let nonObatSalesTotal = 0;
+    let obatCOGSTotal = 0;
+    let nonObatCOGSTotal = 0;
+
+    for (const item of items) {
+      const cost = Number(item.cost_price || 0);
+      const itemCOGS = cost * item.quantity;
+      const itemSales = Number(item.price) * item.quantity;
+      const isObat = item.product_category === 'OBAT';
+      if (isObat) {
+        obatSalesTotal += itemSales;
+        obatCOGSTotal += itemCOGS;
+      } else {
+        nonObatSalesTotal += itemSales;
+        nonObatCOGSTotal += itemCOGS;
+      }
+    }
+
+    const journalItems = [
+      { accountCode: paymentAccountCode, debit: totalAmount }
+    ];
+
+    if (obatSalesTotal > 0) journalItems.push({ accountCode: '401', credit: obatSalesTotal });
+    if (nonObatSalesTotal > 0) journalItems.push({ accountCode: '402', credit: nonObatSalesTotal });
+    if (obatCOGSTotal > 0) {
+      journalItems.push({ accountCode: '501', debit: obatCOGSTotal });
+      journalItems.push({ accountCode: '103', credit: obatCOGSTotal });
+    }
+    if (nonObatCOGSTotal > 0) {
+      journalItems.push({ accountCode: '502', debit: nonObatCOGSTotal });
+      journalItems.push({ accountCode: '104', credit: nonObatCOGSTotal });
+    }
+
+    await createJournalEntry(connection, transactionId, date, `Penjualan ${paymentAccountCode === '101' ? 'tunai' : 'non-tunai'} #${transactionId}`, journalItems);
+  };
+
   app.post(
     '/api/transactions',
     authenticate,
@@ -33,19 +72,12 @@ module.exports = function registerTransactionRoutes(app, pool, authenticate, che
       );
       const transactionId = transResult.insertId;
 
-      // Calculate total COGS
-      let totalCOGS = 0;
+      // Insert transaction items
       for (const item of items) {
         await connection.query(
           'INSERT INTO transaction_items (transaction_id, product_id, quantity, price) VALUES (?, ?, ?, ?)',
           [transactionId, item.id, item.quantity, item.price]
         );
-
-        // Get product cost price for COGS calculation
-        const [productResult] = await connection.query('SELECT cost_price FROM products WHERE id = ?', [item.id]);
-        if (productResult.length > 0) {
-          totalCOGS += productResult[0].cost_price * item.quantity;
-        }
 
         if (payment_method === 'cash') {
           await connection.query(
@@ -55,20 +87,20 @@ module.exports = function registerTransactionRoutes(app, pool, authenticate, che
         }
       }
 
-      // If cash, create journal entry immediately
+      // If cash, mark as completed and create journal entry immediately
       if (payment_method === 'cash') {
         await connection.query(
           'UPDATE transactions SET payment_status = ? WHERE id = ?',
           ['completed', transactionId]
         );
 
-        // Create journal entry: Debit Kas, Credit Penjualan, Debit HPP, Credit Persediaan
-        await createJournalEntry(connection, transactionId, today, `Penjualan tunai #${transactionId}`, [
-          { accountCode: '101', debit: total_amount },
-          { accountCode: '401', credit: total_amount },
-          { accountCode: '501', debit: totalCOGS },
-          { accountCode: '110', credit: totalCOGS },
-        ]);
+        // Get items with product details for journal entry
+        const [itemsWithDetails] = await connection.query(
+          'SELECT ti.*, p.cost_price, p.product_category FROM transaction_items ti JOIN products p ON ti.product_id = p.id WHERE ti.transaction_id = ?',
+          [transactionId]
+        );
+
+        await createSaleJournalEntry(connection, transactionId, today, total_amount, itemsWithDetails, '101');
       }
 
       if (payment_method === 'midtrans') {
@@ -169,47 +201,19 @@ module.exports = function registerTransactionRoutes(app, pool, authenticate, che
 
       if (paymentStatus === 'completed' && transaction.payment_status !== 'completed') {
         const [items] = await connection.query(
-          'SELECT ti.*, p.cost_price FROM transaction_items ti JOIN products p ON ti.product_id = p.id WHERE ti.transaction_id = ?',
+          'SELECT ti.*, p.cost_price, p.product_category FROM transaction_items ti JOIN products p ON ti.product_id = p.id WHERE ti.transaction_id = ?',
           [transaction.id]
         );
 
-        let totalCOGS = 0;
         for (const item of items) {
           await connection.query(
             'UPDATE products SET stock = stock - ? WHERE id = ?',
             [item.quantity, item.product_id]
           );
-          totalCOGS += item.cost_price * item.quantity;
         }
 
-        // Create journal entry for midtrans payment (bank)
         const today = new Date().toISOString().split('T')[0];
-        const [accResult] = await connection.query('SELECT id FROM accounts WHERE code = ?', ['102']);
-        if (accResult.length > 0) {
-          // Create journal entry header
-          const [journalResult] = await connection.query(
-            'INSERT INTO journal_entries (transaction_id, date, description) VALUES (?, ?, ?)',
-            [transaction.id, today, `Penjualan non-tunai #${transaction.id}`]
-          );
-          const journalId = journalResult.insertId;
-
-          const journalItems = [
-            { accountCode: '102', debit: transaction.total_amount },
-            { accountCode: '401', credit: transaction.total_amount },
-            { accountCode: '501', debit: totalCOGS },
-            { accountCode: '110', credit: totalCOGS },
-          ];
-
-          for (const item of journalItems) {
-            const [accRes] = await connection.query('SELECT id FROM accounts WHERE code = ?', [item.accountCode]);
-            if (accRes.length > 0) {
-              await connection.query(
-                'INSERT INTO journal_items (journal_entry_id, account_id, debit, credit) VALUES (?, ?, ?, ?)',
-                [journalId, accRes[0].id, item.debit || 0, item.credit || 0]
-              );
-            }
-          }
-        }
+        await createSaleJournalEntry(connection, transaction.id, today, transaction.total_amount, items, '102');
       }
 
       await connection.commit();
@@ -268,7 +272,7 @@ module.exports = function registerTransactionRoutes(app, pool, authenticate, che
 
       if (paymentStatus === 'completed' && transaction.payment_status !== 'completed') {
         const [items] = await connection.query(
-          'SELECT * FROM transaction_items WHERE transaction_id = ?',
+          'SELECT ti.*, p.cost_price, p.product_category FROM transaction_items ti JOIN products p ON ti.product_id = p.id WHERE ti.transaction_id = ?',
           [transaction.id]
         );
 
@@ -278,6 +282,9 @@ module.exports = function registerTransactionRoutes(app, pool, authenticate, che
             [item.quantity, item.product_id]
           );
         }
+
+        const today = new Date().toISOString().split('T')[0];
+        await createSaleJournalEntry(connection, transaction.id, today, transaction.total_amount, items, '102');
       }
 
       await connection.commit();

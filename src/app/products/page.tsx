@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import Link from 'next/link';
-import { Search, Plus, Edit, Trash2, FileText, Info, UploadCloud, Camera, X, Check, AlertCircle, CheckCircle, Package, Users, Calendar } from 'lucide-react';
+import { Search, Plus, Edit, Trash2, FileText, Info, UploadCloud, Camera, X, Check, AlertCircle, CheckCircle, Package, Users, Calendar, AlertTriangle } from 'lucide-react';
 import { goeyToast } from "@/components/ui/goey-toaster";
 import ConfirmModal from '@/components/ConfirmModal';
 import PageHeader from '@/components/PageHeader';
@@ -28,6 +28,7 @@ interface Product {
   invoice_number?: string | null;
   purchase_unit?: string | null;
   unit_multiplier?: number;
+  product_category?: 'OBAT' | 'NON_OBAT';
 }
 
 interface Faktur {
@@ -97,6 +98,7 @@ interface ProductFormData {
   purchase_unit?: string;
   unit_multiplier?: string;
   purchase_unit_stock?: string;
+  product_category: 'OBAT' | 'NON_OBAT';
 }
 
 // For multiple products
@@ -210,7 +212,8 @@ export default function ProductsPage() {
     dp_amount: '',
     due_date: '',
     purchase_unit: 'Box',
-    unit_multiplier: '1'
+    unit_multiplier: '1',
+    product_category: 'OBAT'
   });
   const [productFormImageFile, setProductFormImageFile] = useState<File | null>(null);
   const [productFormImagePreview, setProductFormImagePreview] = useState<string | null>(null);
@@ -580,6 +583,40 @@ export default function ProductsPage() {
     });
   };
 
+  const handleExpireBatch = async (faktur: Faktur) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Tandai Kadaluarsa',
+      message: `Apakah Anda yakin ingin menandai faktur/batch ${faktur.invoice_number || ''} sebagai kadaluarsa? Sisa stok akan dinolkan dan dicatat ke beban obat expired/selisih stok.`,
+      variant: 'danger',
+      onConfirm: async () => {
+        try {
+          const res = await fetch(`http://localhost:5000/api/inventory/batches/${faktur.id}/expire`, {
+            method: 'PUT',
+            headers: authHeaders
+          });
+          if (res.ok) {
+            goeyToast.success('Batch berhasil ditandai sebagai kadaluarsa!');
+            if (selectedProduct) {
+              fetchFakturs(selectedProduct.id);
+            }
+            fetchProducts(); // refresh product stock
+          } else {
+            const json = await res.json();
+            goeyToast.error(json.message || 'Gagal menandai batch sebagai kadaluarsa');
+          }
+        } catch (error) {
+          console.error('Error expiring batch:', error);
+          goeyToast.error('Gagal menandai batch sebagai kadaluarsa');
+        }
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+      },
+      onClose: () => setConfirmModal(prev => ({ ...prev, isOpen: false })),
+      confirmText: 'Tandai Kadaluarsa',
+      cancelText: 'Batal'
+    });
+  };
+
   const checkPermission = (action: 'create' | 'edit' | 'delete') => {
     return checkActionPermission(action);
   };
@@ -647,7 +684,8 @@ export default function ProductsPage() {
       invoice_number: '',
       purchase_unit: 'Box',
       unit_multiplier: '1',
-      purchase_unit_stock: ''
+      purchase_unit_stock: '',
+      product_category: 'OBAT'
     });
     setIsProductOffCanvasOpen(true);
   };
@@ -674,7 +712,8 @@ export default function ProductsPage() {
       invoice_number: product.invoice_number || '',
       purchase_unit: product.purchase_unit || 'Box',
       unit_multiplier: multiplier.toString(),
-      purchase_unit_stock: calculatedPurchaseStock
+      purchase_unit_stock: calculatedPurchaseStock,
+      product_category: product.product_category || 'OBAT'
     });
     setIsProductOffCanvasOpen(true);
   };
@@ -699,7 +738,8 @@ export default function ProductsPage() {
       dp_amount: '',
       due_date: '',
       purchase_unit: 'Box',
-      unit_multiplier: '1'
+      unit_multiplier: '1',
+      product_category: 'OBAT'
     });
     setIsMultipleProducts(false);
     setMultipleProducts([]);
@@ -775,7 +815,8 @@ export default function ProductsPage() {
           expired_date: formatDate(formData.expired_date),
           location_code: formData.location_code || null,
           purchase_unit: formData.purchase_unit || 'Box',
-          unit_multiplier: multiplier
+          unit_multiplier: multiplier,
+          product_category: formData.product_category
         };
         const res = await fetch(`http://localhost:5000/api/products/${selectedProduct.id}`, {
           method: 'PUT',
@@ -820,7 +861,8 @@ export default function ProductsPage() {
               expired_date: formatDate(item.expired_date) || formatDate(existingProduct.expired_date),
               location_code: item.location_code || existingProduct.location_code || null,
               purchase_unit: item.purchase_unit || existingProduct.purchase_unit || 'Box',
-              unit_multiplier: multiplier
+              unit_multiplier: multiplier,
+              product_category: item.product_category
             };
             await fetch(`http://localhost:5000/api/products/${productId}`, {
               method: 'PUT',
@@ -844,7 +886,8 @@ export default function ProductsPage() {
               location_code: item.location_code || null,
               purchase_unit: item.purchase_unit || 'Box',
               unit_multiplier: multiplier,
-              needsApproval: needsApproval // Pass flag to backend
+              needsApproval: needsApproval, // Pass flag to backend
+              product_category: item.product_category
             };
             const res = await fetch(`http://localhost:5000/api/products`, {
               method: 'POST',
@@ -1009,6 +1052,7 @@ export default function ProductsPage() {
               <tr>
                 {/* <th className="px-6 py-4 cursor-pointer hover:text-gray-700">ID ↕</th> */}
                 <th className="px-6 py-4 cursor-pointer hover:text-gray-700">Name </th>
+                <th className="px-6 py-4 cursor-pointer hover:text-gray-700">Kategori</th>
                 <th className="px-6 py-4 cursor-pointer hover:text-gray-700">Kode Lokasi </th>
                 <th className="px-6 py-4 cursor-pointer hover:text-gray-700">Supplier </th>
                 <th className="px-6 py-4 cursor-pointer hover:text-gray-700">Stock Type </th>
@@ -1022,13 +1066,13 @@ export default function ProductsPage() {
             <tbody className="">
               {loading ? (
                 <tr>
-                  <td colSpan={9} className="px-6 py-8 text-center text-gray-500">
+                  <td colSpan={10} className="px-6 py-8 text-center text-gray-500">
                     Loading products...
                   </td>
                 </tr>
               ) : products.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="px-6 py-8 text-center text-gray-500">
+                  <td colSpan={10} className="px-6 py-8 text-center text-gray-500">
                     No products found.
                   </td>
                 </tr>
@@ -1037,6 +1081,15 @@ export default function ProductsPage() {
                   <tr key={product.id} className="hover:bg-gray-50 transition-colors group">
                     {/* <td className="px-6 py-4 text-gray-500">#{product.id}</td> */}
                     <td className="px-6 py-4 font-medium text-gray-900">{product.name}</td>
+                    <td className="px-6 py-4 text-gray-600">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold ${
+                        product.product_category === 'NON_OBAT' 
+                          ? 'bg-amber-100 text-amber-800' 
+                          : 'bg-emerald-100 text-emerald-800'
+                      }`}>
+                        {product.product_category === 'NON_OBAT' ? 'Non-Obat' : 'Obat'}
+                      </span>
+                    </td>
                     <td className="px-6 py-4 text-gray-600 font-medium">{product.location_code || '-'}</td>
                     <td className="px-6 py-4 text-gray-600">{product.supplier_name || '-'}</td>
                     <td className="px-6 py-4">
@@ -1359,6 +1412,19 @@ export default function ProductsPage() {
                     placeholder="Enter product name"
                   />
                 </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Product Category</label>
+                  <select
+                    name="product_category"
+                    value={formData.product_category}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                  >
+                    <option value="OBAT">Obat</option>
+                    <option value="NON_OBAT">Non-Obat</option>
+                  </select>
+                </div>
                 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
@@ -1553,6 +1619,18 @@ export default function ProductsPage() {
                       />
                     </div>
                     <div>
+                      <label className="block text-xs text-gray-600 mb-1">Kategori Produk</label>
+                      <select
+                        name="product_category"
+                        value={formData.product_category}
+                        onChange={handleInputChange}
+                        className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm"
+                      >
+                        <option value="OBAT">Obat</option>
+                        <option value="NON_OBAT">Non-Obat</option>
+                      </select>
+                    </div>
+                    <div>
                       <label className="block text-xs text-gray-600 mb-1">Kode Lokasi</label>
                       <select
                         name="location_code"
@@ -1730,6 +1808,7 @@ export default function ProductsPage() {
                       setFormData({
                         ...formData,
                         name: '',
+                        product_category: 'OBAT',
                         location_code: '',
                         cost_price: '',
                         selling_price: '',
@@ -1759,7 +1838,7 @@ export default function ProductsPage() {
                           <div className="text-sm">
                             <div className="font-medium text-gray-800">{index + 1}. {item.name}</div>
                              <div className="text-gray-600 text-xs">
-                              {formatCurrency(Number(item.cost_price))} | Stok: {item.stock} {item.purchase_unit} (isi: {item.unit_multiplier} {item.unit}) | Batch: {item.invoice_number || '-'} | {(() => {
+                              Kategori: {item.product_category === 'NON_OBAT' ? 'Non-Obat' : 'Obat'} | {formatCurrency(Number(item.cost_price))} | Stok: {item.stock} {item.purchase_unit} (isi: {item.unit_multiplier} {item.unit}) | Batch: {item.invoice_number || '-'} | {(() => {
                                 const typeMap: Record<string, string> = {
                                   belum_bayar: 'Belum Bayar',
                                   konsinyasi: 'Konsinyasi',
@@ -1938,6 +2017,15 @@ export default function ProductsPage() {
                           >
                             <Edit size={14} />
                           </button>
+                          {faktur.status === 'approved' && (
+                            <button
+                              onClick={() => handleExpireBatch(faktur)}
+                              className="p-1 text-amber-600 hover:bg-amber-50 rounded"
+                              title="Tandai Kadaluarsa"
+                            >
+                              <AlertTriangle size={14} />
+                            </button>
+                          )}
                           <button
                             onClick={() => handleDeleteFaktur(faktur)}
                             className="p-1 text-red-600 hover:bg-red-50 rounded"

@@ -134,8 +134,10 @@ module.exports = function registerReportRoutes(app, pool, authenticate, checkPer
     checkPermission('Sales Report', 'show'),
     async (req, res) => {
     const { month, year } = req.query;
-    const endDate = new Date(parseInt(year), parseInt(month), 0).toISOString().split('T')[0];
-    const startDate = `${year}-01-01`;
+    const activeMonth = month ? parseInt(month) : (new Date().getMonth() + 1);
+    const activeYear = year ? parseInt(year) : new Date().getFullYear();
+    const endDate = new Date(activeYear, activeMonth, 0).toISOString().split('T')[0];
+    const startDate = `${activeYear}-01-01`;
 
     try {
       const connection = await pool.getConnection();
@@ -144,12 +146,11 @@ module.exports = function registerReportRoutes(app, pool, authenticate, checkPer
       let [accounts] = await connection.query(
         `
         SELECT a.*, 
-               COALESCE(SUM(ji.debit), 0) as total_debit, 
-               COALESCE(SUM(ji.credit), 0) as total_credit
+               COALESCE(SUM(CASE WHEN je.id IS NOT NULL THEN ji.debit ELSE 0 END), 0) as total_debit, 
+               COALESCE(SUM(CASE WHEN je.id IS NOT NULL THEN ji.credit ELSE 0 END), 0) as total_credit
         FROM accounts a
         LEFT JOIN journal_items ji ON a.id = ji.account_id
-        LEFT JOIN journal_entries je ON ji.journal_entry_id = je.id
-        WHERE je.date <= ? OR je.date IS NULL
+        LEFT JOIN journal_entries je ON ji.journal_entry_id = je.id AND je.date <= ?
         GROUP BY a.id
         ORDER BY a.code
       `, [endDate]);
@@ -158,12 +159,12 @@ module.exports = function registerReportRoutes(app, pool, authenticate, checkPer
       const [profitLossAccounts] = await connection.query(
         `
         SELECT a.*, 
-               COALESCE(SUM(ji.debit), 0) as total_debit, 
-               COALESCE(SUM(ji.credit), 0) as total_credit
+               COALESCE(SUM(CASE WHEN je.id IS NOT NULL THEN ji.debit ELSE 0 END), 0) as total_debit, 
+               COALESCE(SUM(CASE WHEN je.id IS NOT NULL THEN ji.credit ELSE 0 END), 0) as total_credit
         FROM accounts a
         LEFT JOIN journal_items ji ON a.id = ji.account_id
-        LEFT JOIN journal_entries je ON ji.journal_entry_id = je.id
-        WHERE (je.date BETWEEN ? AND ?) AND a.type IN ('pendapatan', 'beban')
+        LEFT JOIN journal_entries je ON ji.journal_entry_id = je.id AND (je.date BETWEEN ? AND ?)
+        WHERE a.type IN ('pendapatan', 'beban')
         GROUP BY a.id
         ORDER BY a.code
       `, [startDate, endDate]);
@@ -235,8 +236,10 @@ module.exports = function registerReportRoutes(app, pool, authenticate, checkPer
     checkPermission('Sales Report', 'show'),
     async (req, res) => {
     const { month, year, accountId } = req.query;
-    const startDate = `${year}-${String(month).padStart(2, '0')}-01`;
-    const endDate = new Date(parseInt(year), parseInt(month), 0).toISOString().split('T')[0];
+    const activeMonth = month ? parseInt(month) : (new Date().getMonth() + 1);
+    const activeYear = year ? parseInt(year) : new Date().getFullYear();
+    const startDate = `${activeYear}-${String(activeMonth).padStart(2, '0')}-01`;
+    const endDate = new Date(activeYear, activeMonth, 0).toISOString().split('T')[0];
 
     try {
       const connection = await pool.getConnection();
@@ -427,4 +430,94 @@ module.exports = function registerReportRoutes(app, pool, authenticate, checkPer
     }
     }
   );
+
+  // Get list of all journal entries (Jurnal Umum)
+  app.get('/api/accounting/journal-entries', authenticate, checkPermission('Sales Report', 'show'), async (req, res) => {
+    const { startDate, endDate } = req.query;
+    try {
+      const connection = await pool.getConnection();
+      let query = `
+        SELECT 
+          je.id as entry_id, je.date, je.description, je.created_at,
+          ji.id as item_id, ji.debit, ji.credit,
+          a.code as account_code, a.name as account_name, a.type as account_type
+        FROM journal_entries je
+        LEFT JOIN journal_items ji ON je.id = ji.journal_entry_id
+        LEFT JOIN accounts a ON ji.account_id = a.id
+      `;
+      const params = [];
+      if (startDate && endDate) {
+        query += ' WHERE je.date BETWEEN ? AND ?';
+        params.push(startDate, endDate);
+      }
+      query += ' ORDER BY je.date DESC, je.id DESC, a.code ASC';
+      const [rows] = await connection.query(query, params);
+      connection.release();
+
+      // Group items by journal entry
+      const entriesMap = {};
+      for (const row of rows) {
+        if (!entriesMap[row.entry_id]) {
+          entriesMap[row.entry_id] = {
+            id: row.entry_id,
+            date: row.date,
+            description: row.description,
+            created_at: row.created_at,
+            items: []
+          };
+        }
+        if (row.item_id) {
+          entriesMap[row.entry_id].items.push({
+            id: row.item_id,
+            debit: Number(row.debit || 0),
+            credit: Number(row.credit || 0),
+            account_code: row.account_code,
+            account_name: row.account_name,
+            account_type: row.account_type
+          });
+        }
+      }
+      res.json({ success: true, data: Object.values(entriesMap) });
+    } catch (err) {
+      console.error('Error fetching journal entries:', err);
+      res.status(500).json({ success: false, message: 'Server error' });
+    }
+  });
+
+  // Post a manual financial transaction (journal entry)
+  app.post('/api/accounting/journal-entries', authenticate, checkPermission('Sales Report', 'edit'), async (req, res) => {
+    const { date, description, items } = req.body;
+    if (!date || !description || !items || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ success: false, message: 'Missing required fields' });
+    }
+
+    // Validate total debits = total credits
+    let totalDebit = 0;
+    let totalCredit = 0;
+    for (const item of items) {
+      totalDebit += Number(item.debit || 0);
+      totalCredit += Number(item.credit || 0);
+    }
+
+    if (Math.abs(totalDebit - totalCredit) > 0.01) {
+      return res.status(400).json({ success: false, message: 'Total debit must equal total credit' });
+    }
+
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+
+      const { createJournalEntry } = require('../utils/journal');
+      await createJournalEntry(connection, null, date, description, items);
+
+      await connection.commit();
+      res.json({ success: true, message: 'Journal entry created successfully' });
+    } catch (err) {
+      await connection.rollback();
+      console.error('Error posting manual journal entry:', err);
+      res.status(500).json({ success: false, message: 'Server error' });
+    } finally {
+      connection.release();
+    }
+  });
 };

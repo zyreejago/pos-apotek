@@ -76,6 +76,7 @@ const initDB = async () => {
         unit VARCHAR(50),
         expired_date DATE,
         category VARCHAR(100),
+        product_category ENUM('OBAT', 'NON_OBAT') NOT NULL DEFAULT 'OBAT',
         location_code VARCHAR(100) NULL,
         purchase_unit VARCHAR(50) DEFAULT 'Box',
         unit_multiplier INT DEFAULT 1,
@@ -125,6 +126,9 @@ const initDB = async () => {
     } catch (e) {}
     try {
       await connection.query(`ALTER TABLE products ADD COLUMN unit_multiplier INT DEFAULT 1`);
+    } catch (e) {}
+    try {
+      await connection.query(`ALTER TABLE products ADD COLUMN product_category ENUM('OBAT', 'NON_OBAT') NOT NULL DEFAULT 'OBAT'`);
     } catch (e) {}
     try {
       await connection.query(`ALTER TABLE batches MODIFY COLUMN stock_type VARCHAR(50) DEFAULT 'belum_bayar'`);
@@ -439,48 +443,64 @@ const initDB = async () => {
     } catch (e) {}
 
     // Seed Chart of Accounts
-    const [accountCount] = await connection.query('SELECT COUNT(*) as count FROM accounts');
-    if (accountCount[0].count === 0) {
-      const accounts = [
-        { code: '101', name: 'Kas', type: 'aktiva', normal_balance: 'debit' },
-        { code: '102', name: 'Bank', type: 'aktiva', normal_balance: 'debit' },
-        { code: '110', name: 'Persediaan Barang', type: 'aktiva', normal_balance: 'debit' },
-        { code: '120', name: 'Piutang Usaha', type: 'aktiva', normal_balance: 'debit' },
-        { code: '201', name: 'Hutang Usaha', type: 'pasiva', normal_balance: 'kredit' },
-        { code: '301', name: 'Modal Awal', type: 'modal', normal_balance: 'kredit' },
-        { code: '310', name: 'Laba Ditahan', type: 'modal', normal_balance: 'kredit' },
-        { code: '311', name: 'Laba Tahun Berjalan', type: 'modal', normal_balance: 'kredit' },
-        { code: '401', name: 'Penjualan', type: 'pendapatan', normal_balance: 'kredit' },
-        { code: '402', name: 'Diskon Penjualan', type: 'pendapatan', normal_balance: 'debit' },
-        { code: '410', name: 'Pendapatan Selisih Stok', type: 'pendapatan', normal_balance: 'kredit' },
-        { code: '501', name: 'Harga Pokok Penjualan', type: 'beban', normal_balance: 'debit' },
-        { code: '510', name: 'Beban Gaji', type: 'beban', normal_balance: 'debit' },
-        { code: '520', name: 'Beban Sewa', type: 'beban', normal_balance: 'debit' },
-        { code: '530', name: 'Beban Listrik', type: 'beban', normal_balance: 'debit' },
-        { code: '540', name: 'Beban Selisih Stok', type: 'beban', normal_balance: 'debit' },
-        { code: '590', name: 'Beban Lain-lain', type: 'beban', normal_balance: 'debit' },
-      ];
-      for (const acc of accounts) {
-        await connection.query('INSERT INTO accounts (code, name, type, normal_balance) VALUES (?, ?, ?, ?)',
-          [acc.code, acc.name, acc.type, acc.normal_balance]);
-      }
-      console.log('Chart of accounts seeded');
-    } else {
-      // Add missing accounts if they don't exist
-      const missingAccounts = [
-        { code: '311', name: 'Laba Tahun Berjalan', type: 'modal', normal_balance: 'kredit' },
-        { code: '410', name: 'Pendapatan Selisih Stok', type: 'pendapatan', normal_balance: 'kredit' },
-        { code: '540', name: 'Beban Selisih Stok', type: 'beban', normal_balance: 'debit' },
-      ];
-      for (const acc of missingAccounts) {
-        const [existing] = await connection.query('SELECT id FROM accounts WHERE code = ?', [acc.code]);
-        if (existing.length === 0) {
-          await connection.query('INSERT INTO accounts (code, name, type, normal_balance) VALUES (?, ?, ?, ?)',
-            [acc.code, acc.name, acc.type, acc.normal_balance]);
-          console.log(`Added missing account: ${acc.code} - ${acc.name}`);
-        }
-      }
+    const accounts = [
+      // Assets (aktiva)
+      { code: '101', name: 'Kas', type: 'aktiva', normal_balance: 'debit' },
+      { code: '102', name: 'Bank', type: 'aktiva', normal_balance: 'debit' },
+      { code: '103', name: 'Persediaan Obat', type: 'aktiva', normal_balance: 'debit' },
+      { code: '104', name: 'Persediaan Non-Obat', type: 'aktiva', normal_balance: 'debit' },
+      { code: '121', name: 'Peralatan Apotek', type: 'aktiva', normal_balance: 'debit' },
+      { code: '122', name: 'Peralatan Komputer', type: 'aktiva', normal_balance: 'debit' },
+      { code: '123', name: 'Kendaraan Operasional', type: 'aktiva', normal_balance: 'debit' },
+      { code: '129', name: 'Akumulasi Penyusutan', type: 'aktiva', normal_balance: 'kredit' },
+      
+      // Liabilities (pasiva)
+      { code: '201', name: 'Hutang Usaha Supplier', type: 'pasiva', normal_balance: 'kredit' },
+      { code: '202', name: 'Hutang Pajak', type: 'pasiva', normal_balance: 'kredit' },
+      
+      // Equity (modal)
+      { code: '301', name: 'Modal Pemilik', type: 'modal', normal_balance: 'kredit' },
+      { code: '302', name: 'Prive Pemilik', type: 'modal', normal_balance: 'debit' },
+      { code: '310', name: 'Laba Ditahan', type: 'modal', normal_balance: 'kredit' },
+      { code: '311', name: 'Laba Tahun Berjalan', type: 'modal', normal_balance: 'kredit' },
+      
+      // Revenues (pendapatan)
+      { code: '401', name: 'Penjualan Obat', type: 'pendapatan', normal_balance: 'kredit' },
+      { code: '402', name: 'Penjualan Non-Obat', type: 'pendapatan', normal_balance: 'kredit' },
+      
+      // Cost of Goods Sold (beban)
+      { code: '501', name: 'HPP Obat', type: 'beban', normal_balance: 'debit' },
+      { code: '502', name: 'HPP Non-Obat', type: 'beban', normal_balance: 'debit' },
+      
+      // Expenses (beban)
+      { code: '511', name: 'Beban Gaji', type: 'beban', normal_balance: 'debit' },
+      { code: '512', name: 'Beban Tunjangan Karyawan', type: 'beban', normal_balance: 'debit' },
+      { code: '513', name: 'Beban Listrik', type: 'beban', normal_balance: 'debit' },
+      { code: '514', name: 'Beban Air', type: 'beban', normal_balance: 'debit' },
+      { code: '515', name: 'Beban Internet & Telepon', type: 'beban', normal_balance: 'debit' },
+      { code: '516', name: 'Beban Sewa', type: 'beban', normal_balance: 'debit' },
+      { code: '517', name: 'Beban ATK', type: 'beban', normal_balance: 'debit' },
+      { code: '518', name: 'Beban Kebersihan', type: 'beban', normal_balance: 'debit' },
+      { code: '519', name: 'Beban Pemeliharaan', type: 'beban', normal_balance: 'debit' },
+      { code: '521', name: 'Beban Administrasi Bank', type: 'beban', normal_balance: 'debit' },
+      { code: '522', name: 'Beban Pajak', type: 'beban', normal_balance: 'debit' },
+      { code: '523', name: 'Beban Promosi', type: 'beban', normal_balance: 'debit' },
+      { code: '524', name: 'Beban Transportasi', type: 'beban', normal_balance: 'debit' },
+      { code: '525', name: 'Beban Keamanan', type: 'beban', normal_balance: 'debit' },
+      { code: '526', name: 'Beban Obat Expired', type: 'beban', normal_balance: 'debit' },
+      { code: '527', name: 'Beban Selisih Stok', type: 'beban', normal_balance: 'debit' },
+      { code: '529', name: 'Beban Lain-lain', type: 'beban', normal_balance: 'debit' }
+    ];
+
+    for (const acc of accounts) {
+      await connection.query(
+        `INSERT INTO accounts (code, name, type, normal_balance) 
+         VALUES (?, ?, ?, ?) 
+         ON DUPLICATE KEY UPDATE name = VALUES(name), type = VALUES(type), normal_balance = VALUES(normal_balance)`,
+        [acc.code, acc.name, acc.type, acc.normal_balance]
+      );
     }
+    console.log('Chart of accounts synchronized');
 
     const [suppliers] = await connection.query('SELECT * FROM suppliers');
     if (suppliers.length === 0) {
