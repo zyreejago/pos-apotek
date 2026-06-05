@@ -1,0 +1,11 @@
+
+CREATE TABLE IF NOT EXISTS batch_dp_payments (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  batch_id INT NOT NULL,
+  amount DECIMAL(15,2) NOT NULL,
+  payment_date DATE NOT NULL,
+  notes TEXT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (batch_id) REFERENCES batches(id) ON DELETE CASCADE
+);
+

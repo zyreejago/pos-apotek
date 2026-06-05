@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import Link from 'next/link';
-import { Search, Plus, Edit, Trash2, FileText, Info, UploadCloud, Camera, X, Check, AlertCircle, CheckCircle, Package, Users, Calendar, AlertTriangle, ArrowUpDown } from 'lucide-react';
+import { Search, Plus, Edit, Trash2, FileText, Info, UploadCloud, Camera, X, Check, AlertCircle, CheckCircle, Package, Users, Calendar, AlertTriangle, ArrowUpDown, Wallet } from 'lucide-react';
 import { goeyToast } from "@/components/ui/goey-toaster";
 import ConfirmModal from '@/components/ConfirmModal';
 import PageHeader from '@/components/PageHeader';
@@ -31,6 +31,14 @@ interface Product {
   product_category?: 'OBAT' | 'NON_OBAT';
 }
 
+interface DpPayment {
+  id: number;
+  amount: number;
+  payment_date: string;
+  notes?: string | null;
+  created_at: string;
+}
+
 interface Faktur {
   id: number;
   product_id: number;
@@ -44,6 +52,8 @@ interface Faktur {
   supplier_name: string | null;
   purchase_date: string | null;
   quantity: number;
+  initial_quantity: number;
+  remaining_quantity: number;
   cost_price: number;
   total_amount: number;
   stock_type: 'belum_bayar' | 'konsinyasi' | 'dp' | 'lunas';
@@ -54,6 +64,7 @@ interface Faktur {
   image_url: string | null;
   status: 'approved' | 'pending' | 'rejected' | 'revision';
   created_at: string;
+  dp_payments?: DpPayment[];
 }
 
 interface DbBatch {
@@ -73,6 +84,7 @@ interface DbBatch {
   image_url: string | null;
   status: 'approved' | 'pending' | 'rejected' | 'revision';
   created_at: string;
+  dp_payments?: DpPayment[];
 }
 
 interface Pagination {
@@ -207,6 +219,9 @@ export default function ProductsPage() {
   const [fakturImageFile, setFakturImageFile] = useState<File | null>(null);
   const [fakturImagePreview, setFakturImagePreview] = useState<string | null>(null);
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
+  const [newDPAmount, setNewDPAmount] = useState('');
+  const [newDPDate, setNewDPDate] = useState(new Date().toISOString().split('T')[0]);
+  const [showAddDPForm, setShowAddDPForm] = useState(false);
 
   // Form State
   const [isMultipleProducts, setIsMultipleProducts] = useState(false);
@@ -299,11 +314,19 @@ export default function ProductsPage() {
           image_url: batch.image_url
         }));
         setFakturs(mappedFakturs);
+        
+        // Update selectedFaktur if it exists to refresh the DP list
+        if (selectedFaktur) {
+          const updatedFaktur = mappedFakturs.find((f: Faktur) => f.id === selectedFaktur.id);
+          if (updatedFaktur) {
+            setSelectedFaktur(updatedFaktur);
+          }
+        }
       }
     } catch (error) {
       console.error('Error fetching fakturs:', error);
     }
-  }, [authHeaders]);
+  }, [authHeaders, selectedFaktur]);
 
   const fetchGlobalPendingFakturs = useCallback(async () => {
     setIsFetchingPending(true);
@@ -430,6 +453,60 @@ export default function ProductsPage() {
         setFakturImagePreview(event.target?.result as string);
       };
       reader.readAsDataURL(file);
+    }
+  };
+
+  const handleAddDP = async () => {
+    if (!selectedFaktur?.id || !newDPAmount || Number(newDPAmount) <= 0) {
+      goeyToast.error('Jumlah DP harus lebih dari 0');
+      return;
+    }
+
+    try {
+      const res = await fetch(`http://localhost:5000/api/inventory/batches/${selectedFaktur.id}/dp-payments`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...authHeaders
+        },
+        body: JSON.stringify({
+          amount: Number(newDPAmount),
+          payment_date: newDPDate
+        })
+      });
+
+      if (res.ok) {
+        goeyToast.success('DP berhasil ditambahkan!');
+        setNewDPAmount('');
+        setShowAddDPForm(false);
+        if (selectedProduct) fetchFakturs(selectedProduct.id);
+      } else {
+        goeyToast.error('Gagal menambahkan DP');
+      }
+    } catch (error) {
+      console.error(error);
+      goeyToast.error('Terjadi kesalahan');
+    }
+  };
+
+  const handleDeleteDP = async (paymentId: number) => {
+    if (!selectedFaktur?.id) return;
+
+    try {
+      const res = await fetch(`http://localhost:5000/api/inventory/batches/${selectedFaktur.id}/dp-payments/${paymentId}`, {
+        method: 'DELETE',
+        headers: authHeaders
+      });
+
+      if (res.ok) {
+        goeyToast.success('DP berhasil dihapus!');
+        if (selectedProduct) fetchFakturs(selectedProduct.id);
+      } else {
+        goeyToast.error('Gagal menghapus DP');
+      }
+    } catch (error) {
+      console.error(error);
+      goeyToast.error('Terjadi kesalahan');
     }
   };
 
@@ -2126,117 +2203,148 @@ export default function ProductsPage() {
                     <th className="px-4 py-3">Tipe Stok</th>
                     <th className="px-4 py-3">Tgl Pembelian</th>
                     <th className="px-4 py-3">Status</th>
-                    <th className="px-4 py-3">Baru Bayar</th>
-                    <th className="px-4 py-3">Jatuh Tempo</th>
-                    <th className="px-4 py-3">Jumlah</th>
+                    <th className="px-4 py-3">Qty Awal</th>
+                    <th className="px-4 py-3">Qty Tersisa</th>
+                    <th className="px-4 py-3">Qty Terjual</th>
+                    <th className="px-4 py-3">Expired Date</th>
                     <th className="px-4 py-3">Harga Beli</th>
                     <th className="px-4 py-3">Total</th>
                     <th className="px-4 py-3 text-right">Aksi</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {fakturs.map((faktur) => (
-                    <tr key={faktur.id} className="border-b border-gray-100 hover:bg-gray-50">
-                      <td className="px-4 py-3 font-medium">
-                        {faktur.invoice_number}
-                        {faktur.notes === 'Expired' && (
-                          <div className="mt-1">
-                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-700 border border-red-200">
-                              <AlertTriangle size={10} /> KADALUARSA
-                            </span>
+                  {fakturs.map((faktur) => {
+                    const initialQty = faktur.initial_quantity || faktur.quantity;
+                    const remainingQty = faktur.remaining_quantity ?? faktur.quantity;
+                    const soldQty = initialQty - remainingQty;
+                    // Calculate total DP
+                    let totalDP = 0;
+                    if (faktur.dp_payments) {
+                      totalDP = faktur.dp_payments.reduce((sum: number, dp: any) => sum + Number(dp.amount), 0);
+                    } else if (faktur.dp_amount) {
+                      totalDP = Number(faktur.dp_amount);
+                    }
+                    const totalAmount = Number(faktur.total_amount) || (faktur.cost_price * (faktur.initial_quantity || faktur.quantity));
+                    let statusText = 'Belum Bayar';
+                    let canArchive = false;
+
+                    // Respect original stock_type first
+                    if (faktur.stock_type === 'lunas') {
+                      statusText = 'Lunas';
+                      canArchive = true;
+                    } else if (faktur.stock_type === 'belum_bayar') {
+                      statusText = 'Belum Bayar';
+                    } else if (faktur.stock_type === 'konsinyasi') {
+                      statusText = 'Konsinyasi';
+                    } else if (faktur.stock_type === 'dp') {
+                      // Only use DP calculation for stock_type 'dp'
+                      if (totalDP >= totalAmount) {
+                        statusText = 'Lunas';
+                        canArchive = true;
+                      } else if (totalDP > 0) {
+                        statusText = 'DP';
+                      } else {
+                        statusText = 'Belum Bayar';
+                      }
+                    }
+
+                    return (
+                      <tr key={faktur.id} className="border-b border-gray-100 hover:bg-gray-50">
+                        <td className="px-4 py-3 font-medium">
+                          {faktur.invoice_number}
+                          {faktur.notes === 'Expired' && (
+                            <div className="mt-1">
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-700 border border-red-200">
+                                <AlertTriangle size={10} /> KADALUARSA
+                              </span>
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-4 py-3">{faktur.supplier_name || '-'}</td>
+                        <td className="px-4 py-3">
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                            statusText === 'Lunas'
+                              ? 'bg-green-100 text-green-700'
+                              : statusText === 'DP'
+                              ? 'bg-blue-100 text-blue-700'
+                              : statusText === 'Belum Bayar'
+                              ? 'bg-yellow-100 text-yellow-700'
+                              : 'bg-gray-100 text-gray-700'
+                          }`}>
+                            {statusText}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">{faktur.purchase_date ? new Date(faktur.purchase_date).toLocaleDateString('id-ID') : '-'}</td>
+                        <td className="px-4 py-3">
+                          <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                            faktur.status === 'approved' 
+                              ? 'bg-green-100 text-green-700' 
+                              : faktur.status === 'pending'
+                              ? 'bg-yellow-100 text-yellow-700 animate-pulse'
+                              : faktur.status === 'rejected'
+                              ? 'bg-red-100 text-red-700'
+                              : 'bg-orange-100 text-orange-700 border border-orange-200'
+                          }`}>
+                            {faktur.status === 'pending' ? 'Pending Approval' : 
+                             faktur.status === 'rejected' ? 'Ditolak' :
+                             faktur.status === 'revision' ? 'Menunggu Perbaikan' : 'Approved'}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span>{initialQty} {selectedProduct?.unit || 'Tablet'}</span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span>{remainingQty} {selectedProduct?.unit || 'Tablet'}</span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className={soldQty > 0 ? 'text-blue-600' : ''}>{soldQty} {selectedProduct?.unit || 'Tablet'}</span>
+                        </td>
+                        <td className="px-4 py-3">
+                          {faktur.expired_date ? new Date(faktur.expired_date).toLocaleDateString('id-ID') : '-'}
+                        </td>
+                        <td className="px-4 py-3">{formatCurrency(faktur.cost_price)}</td>
+                        <td className="px-4 py-3 font-medium">{formatCurrency(totalAmount)}</td>
+                        <td className="px-4 py-3 text-right">
+                          <div className="flex justify-end gap-2">
+                            {faktur.image_url && (
+                              <button
+                                onClick={() => setPreviewImageUrl(`http://localhost:5000${faktur.image_url}`)}
+                                className="p-1 text-green-600 hover:bg-green-50 rounded"
+                                title="Lihat Bukti"
+                              >
+                                <FileText size={14} />
+                              </button>
+                            )}
+                            <button
+                              onClick={() => handleOpenEditFakturModal(faktur)}
+                              className={`p-1 rounded ${faktur.status === 'revision' || faktur.status === 'rejected' ? 'text-orange-600 bg-orange-50 border border-orange-200' : 'text-blue-600 hover:bg-blue-50'}`}
+                              title={faktur.status === 'revision' || faktur.status === 'rejected' ? 'Perbaiki' : 'Edit'}
+                            >
+                              <Edit size={14} />
+                            </button>
+                            {faktur.status === 'approved' && (
+                              <button
+                                onClick={() => handleExpireBatch(faktur)}
+                                className="p-1 text-amber-600 hover:bg-amber-50 rounded"
+                                title="Tandai Kadaluarsa"
+                              >
+                                <AlertTriangle size={14} />
+                              </button>
+                            )}
+                            {canArchive && (
+                              <button
+                                onClick={() => handleArchiveFaktur(faktur)}
+                                className="p-1 text-gray-500 hover:bg-gray-100 rounded"
+                                title="Arsipkan Faktur"
+                              >
+                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="21 8 21 21 3 21 3 8"></polyline><rect x="1" y="3" width="22" height="5"></rect><line x1="10" y1="12" x2="14" y2="12"></line></svg>
+                              </button>
+                            )}
                           </div>
-                        )}
-                      </td>
-                      <td className="px-4 py-3">{faktur.supplier_name || '-'}</td>
-                      <td className="px-4 py-3">
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                          faktur.stock_type === 'lunas'
-                            ? 'bg-green-100 text-green-700'
-                            : faktur.stock_type === 'belum_bayar'
-                            ? 'bg-yellow-100 text-yellow-700'
-                            : faktur.stock_type === 'konsinyasi'
-                            ? 'bg-purple-100 text-purple-700'
-                            : faktur.stock_type === 'dp'
-                            ? 'bg-blue-100 text-blue-700'
-                            : 'bg-gray-100 text-gray-700'
-                        }`}>
-                          {faktur.stock_type === 'lunas' ? 'Lunas' :
-                           faktur.stock_type === 'belum_bayar' ? 'Belum Bayar' :
-                           faktur.stock_type === 'konsinyasi' ? 'Konsinyasi' :
-                           faktur.stock_type === 'dp' ? 'DP' : '-'}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">{faktur.purchase_date ? new Date(faktur.purchase_date).toLocaleDateString('id-ID') : '-'}</td>
-                      <td className="px-4 py-3">
-                        <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                          faktur.status === 'approved' 
-                            ? 'bg-green-100 text-green-700' 
-                            : faktur.status === 'pending'
-                            ? 'bg-yellow-100 text-yellow-700 animate-pulse'
-                            : faktur.status === 'rejected'
-                            ? 'bg-red-100 text-red-700'
-                            : 'bg-orange-100 text-orange-700 border border-orange-200'
-                        }`}>
-                          {faktur.status === 'pending' ? 'Pending Approval' : 
-                           faktur.status === 'rejected' ? 'Ditolak' :
-                           faktur.status === 'revision' ? 'Menunggu Perbaikan' : 'Approved'}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        {faktur.stock_type === 'dp' && faktur.dp_amount 
-                          ? formatCurrency(faktur.dp_amount) 
-                          : '-'}
-                      </td>
-                      <td className="px-4 py-3">
-                        {faktur.stock_type === 'dp' && faktur.due_date 
-                          ? new Date(faktur.due_date).toLocaleDateString('id-ID') 
-                          : '-'}
-                      </td>
-                      <td className="px-4 py-3">
-                        <span>{faktur.quantity} {selectedProduct?.unit || 'Tablet'}</span>
-                      </td>
-                      <td className="px-4 py-3">{formatCurrency(faktur.cost_price)}</td>
-                      <td className="px-4 py-3 font-medium">{formatCurrency(faktur.total_amount)}</td>
-                      <td className="px-4 py-3 text-right">
-                        <div className="flex justify-end gap-2">
-                          {faktur.image_url && (
-                            <button
-                              onClick={() => setPreviewImageUrl(`http://localhost:5000${faktur.image_url}`)}
-                              className="p-1 text-green-600 hover:bg-green-50 rounded"
-                              title="Lihat Bukti"
-                            >
-                              <FileText size={14} />
-                            </button>
-                          )}
-                          <button
-                            onClick={() => handleOpenEditFakturModal(faktur)}
-                            className={`p-1 rounded ${faktur.status === 'revision' || faktur.status === 'rejected' ? 'text-orange-600 bg-orange-50 border border-orange-200' : 'text-blue-600 hover:bg-blue-50'}`}
-                            title={faktur.status === 'revision' || faktur.status === 'rejected' ? 'Perbaiki' : 'Edit'}
-                          >
-                            <Edit size={14} />
-                          </button>
-                          {faktur.status === 'approved' && (
-                            <button
-                              onClick={() => handleExpireBatch(faktur)}
-                              className="p-1 text-amber-600 hover:bg-amber-50 rounded"
-                              title="Tandai Kadaluarsa"
-                            >
-                              <AlertTriangle size={14} />
-                            </button>
-                          )}
-                          {faktur.stock_type === 'lunas' && (
-                            <button
-                              onClick={() => handleArchiveFaktur(faktur)}
-                              className="p-1 text-gray-500 hover:bg-gray-100 rounded"
-                              title="Arsipkan Faktur"
-                            >
-                              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="21 8 21 21 3 21 3 8"></polyline><rect x="1" y="3" width="22" height="5"></rect><line x1="10" y1="12" x2="14" y2="12"></line></svg>
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -2425,6 +2533,153 @@ export default function ProductsPage() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                   />
                 </div>
+
+                {/* DP BERTahap - ONLY IN EDIT MODE */}
+                {fakturModalMode === 'edit' && selectedFaktur && selectedFaktur.stock_type === 'dp' && (
+                  <div className="col-span-2 md:col-span-3 mt-4 bg-gray-50 rounded-xl p-4 border border-gray-200">
+                    <h4 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
+                      <Wallet size={18} /> Ringkasan Pembayaran
+                    </h4>
+
+                    {/* Total Faktur */}
+                    <div className="flex justify-between items-center py-2 border-b border-gray-200">
+                      <span className="text-gray-600">Total Faktur</span>
+                      <span className="font-bold text-lg text-gray-900">
+                        {formatCurrency(Number(selectedFaktur.total_amount || (selectedFaktur.cost_price * (selectedFaktur.initial_quantity || selectedFaktur.quantity))))}
+                      </span>
+                    </div>
+
+                    {/* List DP Payments */}
+                    {(() => {
+                      let dpList: any[] = [];
+                      if (selectedFaktur.dp_payments) {
+                        dpList = selectedFaktur.dp_payments;
+                      } else if (selectedFaktur.dp_amount) {
+                        dpList = [{ id: -1, amount: Number(selectedFaktur.dp_amount), payment_date: selectedFaktur.purchase_date }];
+                      }
+
+                      return dpList.map((dp, index) => (
+                        <div key={dp.id} className="flex justify-between items-center py-2 border-b border-gray-100">
+                          <span className="text-gray-600">DP {index + 1}</span>
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium text-blue-700">
+                              {formatCurrency(Number(dp.amount))}
+                            </span>
+                            {dp.payment_date && (
+                              <span className="text-xs text-gray-400">
+                                {new Date(dp.payment_date).toLocaleDateString('id-ID')}
+                              </span>
+                            )}
+                            {dp.id !== -1 && (
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteDP(dp.id)}
+                                className="p-1 text-red-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      ));
+                    })()}
+
+                    {/* Total DP */}
+                    <div className="flex justify-between items-center py-2 border-t border-gray-300 mt-2">
+                      <span className="text-gray-700 font-semibold">Total DP</span>
+                      <span className="font-bold text-blue-700">
+                        {(() => {
+                          let totalDP = 0;
+                          if (selectedFaktur.dp_payments) {
+                            totalDP = selectedFaktur.dp_payments.reduce((sum: number, dp: any) => sum + Number(dp.amount), 0);
+                          } else if (selectedFaktur.dp_amount) {
+                            totalDP = Number(selectedFaktur.dp_amount);
+                          }
+                          return formatCurrency(totalDP);
+                        })()}
+                      </span>
+                    </div>
+
+                    {/* Sisa Hutang */}
+                    <div className="flex justify-between items-center py-2">
+                      <span className="text-gray-700 font-semibold">Sisa Hutang</span>
+                      <span className={`font-bold ${(() => {
+                          const totalAmount = Number(selectedFaktur.total_amount || (selectedFaktur.cost_price * (selectedFaktur.initial_quantity || selectedFaktur.quantity)));
+                          let totalDP = 0;
+                          if (selectedFaktur.dp_payments) {
+                            totalDP = selectedFaktur.dp_payments.reduce((sum: number, dp: any) => sum + Number(dp.amount), 0);
+                          } else if (selectedFaktur.dp_amount) {
+                            totalDP = Number(selectedFaktur.dp_amount);
+                          }
+                          const sisa = totalAmount - totalDP;
+                          return sisa <= 0 ? 'text-green-700' : 'text-orange-600';
+                        })()}`}>
+                        {(() => {
+                          const totalAmount = Number(selectedFaktur.total_amount || (selectedFaktur.cost_price * (selectedFaktur.initial_quantity || selectedFaktur.quantity)));
+                          let totalDP = 0;
+                          if (selectedFaktur.dp_payments) {
+                            totalDP = selectedFaktur.dp_payments.reduce((sum: number, dp: any) => sum + Number(dp.amount), 0);
+                          } else if (selectedFaktur.dp_amount) {
+                            totalDP = Number(selectedFaktur.dp_amount);
+                          }
+                          const sisa = totalAmount - totalDP;
+                          return sisa <= 0 ? 'Lunas' : formatCurrency(sisa);
+                        })()}
+                      </span>
+                    </div>
+
+                    {/* Add New DP Button/Form */}
+                    {!showAddDPForm ? (
+                      <button
+                        type="button"
+                        onClick={() => setShowAddDPForm(true)}
+                        className="w-full mt-3 flex items-center justify-center gap-2 py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
+                      >
+                        <Plus size={16} /> Tambah DP
+                      </button>
+                    ) : (
+                      <div className="mt-3 space-y-3">
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Jumlah DP</label>
+                            <input
+                              type="number"
+                              value={newDPAmount}
+                              onChange={(e) => setNewDPAmount(e.target.value)}
+                              placeholder="0"
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Tanggal Bayar</label>
+                            <input
+                              type="date"
+                              value={newDPDate}
+                              onChange={(e) => setNewDPDate(e.target.value)}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                            />
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => { setShowAddDPForm(false); setNewDPAmount(''); }}
+                            className="flex-1 py-2 px-4 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+                          >
+                            Batal
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleAddDP}
+                            className="flex-1 py-2 px-4 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                          >
+                            Simpan DP
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {fakturFormData.notes && (
                   <div className="col-span-2 md:col-span-3 bg-orange-50 border border-orange-200 p-4 rounded-xl flex items-start gap-3">

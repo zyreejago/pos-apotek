@@ -1,0 +1,159 @@
+# ALUR SISTEM POS APOTEK SUMBER WARAS SECARA DETAIL
+
+## Pendahuluan
+Sistem ini adalah sistem POS (Point of Sales) untuk apotek yang mengelola produk, transaksi, faktur (batch), dan akuntansi. Sistem ini bertujuan untuk memastikan manajemen stok yang tepat dengan metode FEFO (First Expired, First Out), yaitu stok yang paling cepat kadaluarsa dijual terlebih dahulu.
+
+
+## Struktur Utama Tabel Database
+1. **`products`**: Menyimpan data master produk
+   - id, name, cost_price, selling_price, stock, unit, expired_date (default untuk produk tanpa batch), location_code, supplier_id, purchase_unit, unit_multiplier, product_category, status, created_at, updated_at
+2. **`batches` (atau faktur)**: Menyimpan data batch/faktur produk
+   - id, product_id, supplier_id, batch_number (nomor faktur), stock_type (belum_bayar, konsinyasi, dp, lunas), purchase_date, initial_quantity, remaining_quantity, cost_price, expired_date (tanggal kadaluarsa batch ini), dp_amount, due_date, image_url, status (pending, approved, dll), notes, is_archived, created_at, updated_at
+3. **`transactions`**: Menyimpan header transaksi
+4. **`transaction_items`**: Menyimpan detail item dalam transaksi
+
+
+## Alur 1: Menambahkan Produk Baru
+1. Pengguna mengakses halaman Products
+2. Klik tombol "Tambah Produk"
+3. Isi form: Nama produk, harga beli, harga jual, unit dasar, unit pembelian, unit multiplier, lokasi, dll.
+4. Klik simpan
+5. Backend:
+   - Membuat record baru di tabel `products`
+   - Membuat catatan audit trail
+   - Membuat jurnal (jika stok awal ditambahkan dan tidak ada supplier)
+   - Mengembalikan response sukses
+
+
+## Alur 2: Menambahkan Faktur/Batch Baru
+1. Di halaman Products, pilih produk yang ingin ditambahkan faktur
+2. Klik tombol "Tambah Faktur"
+3. Isi form:
+   - Nomor batch (opsional)
+   - Supplier
+   - Tipe stok (belum_bayar/konsinyasi/dp/lunas)
+   - Tanggal pembelian
+   - Unit pembelian
+   - Unit dasar
+   - Isi per unit pembelian (unit_multiplier)
+   - Jumlah (dalam unit pembelian)
+   - Harga beli
+   - Harga jual
+   - Tanggal kadaluarsa batch ini
+   - Catatan
+   - Upload bukti faktur (opsional)
+4. Klik simpan
+5. Backend:
+   - **Pertama**: Update data produk di tabel `products` (harga beli, harga jual, unit, purchase_unit, unit_multiplier, dll.)
+   - **Kedua**: Hitung jumlah dalam satuan dasar: `initial_quantity = jumlah_diform * unit_multiplier`
+   - **Ketiga**: Hitung total nilai transaksi: `total_amount = initial_quantity * cost_price`
+   - **Keempat**: Cek apakah memerlukan approval (jika total_amount > Rp2.000.000):
+     - Jika iya, set batch status ke `pending`
+     - Jika tidak, set batch status ke `approved` dan update stok produk
+   - **Kelima**: Simpan data batch di tabel `batches`
+   - **Keenam**: Jika status `approved`, buat jurnal entri akuntansi
+   - **Ketujuh**: Buat catatan audit trail
+   - Kembalikan response sukses
+
+
+## Alur 3: Approve Faktur/Pending (Untuk User dengan Hak Akses Approve)
+1. Akses halaman Approval Faktur
+2. Lihat daftar faktur yang pending
+3. Klik "Approve" pada faktur yang ingin disetujui
+4. Backend:
+   - Ubah status batch menjadi `approved`
+   - Update stok produk di tabel `products`
+   - Buat jurnal entri akuntansi
+   - Buat catatan audit trail
+   - Kembalikan response sukses
+
+
+## Alur 4: Transaksi Penjualan (Dengan FEFO!) - ALUR PENTING!
+Ini adalah alur inti untuk memastikan stok yang paling cepat kadaluarsa dijual terlebih dahulu!
+
+1. **Frontend (POS Page)**:
+   - Pengguna memilih produk yang ingin dibeli
+   - Masukkan jumlah yang ingin dibeli
+   - Klik tombol "Pembayaran"
+   - Frontend mengirim data transaksi ke backend
+
+2. **Backend (Transactions Route)**:
+   a. **Validasi Awal**:
+      - Cek apakah user memiliki izin
+      - Cek apakah keranjang tidak kosong
+   
+   b. **Buat Header Transaksi**:
+      - Insert data ke tabel `transactions` dengan status `pending`
+   
+   c. **Untuk Setiap Item dalam Transaksi**:
+      i. **Ambil Semua Batch Produk Yang Tersedia**:
+         - Query: `SELECT * FROM batches WHERE product_id = ? AND remaining_quantity > 0 AND is_archived = FALSE ORDER BY expired_date ASC, created_at ASC`
+         - Diurutkan berdasarkan tanggal kadaluarsa TERDEKAT terlebih dahulu (FEFO!)
+      
+      ii. **Loop Melalui Batch-Batch tersebut untuk Mengurangi Stok**:
+          - Contoh: Produk A butuh 10 pcs
+            - Batch 1: expired 2026-06-10, remaining 4 pcs → ambil semua 4, sisa kebutuhan 6
+            - Batch 2: expired 2026-06-15, remaining 8 pcs → ambil 6, sisa kebutuhan 0
+            - Batch 3: expired 2026-06-20, remaining 5 pcs → tidak perlu diambil
+      
+      iii. **Untuk Setiap Batch Yang Digunakan**:
+          - Update `remaining_quantity` di tabel `batches` (kurangi dengan jumlah yang diambil dari batch ini)
+          - (Opsional tapi direkomendasikan) Insert ke tabel `transaction_batch_usage` (jika ada) untuk mencatat batch mana yang dipakai
+          - Hitung COGS (Cost of Goods Sold) per batch: `jumlah_dari_batch * cost_price_batch`
+      
+      iv. **Update Total Stok di Tabel `products`**:
+          - Kurangi `stock` dengan total jumlah yang dibeli
+      
+      v. **Insert ke `transaction_items`**:
+          - Simpan detail item transaksi
+   
+   d. **Proses Pembayaran**:
+      - Jika tunai: Update status transaksi menjadi `completed` dan buat jurnal akuntansi langsung
+      - Jika Midtrans: Redirect ke halaman pembayaran Midtrans, dan proses setelah pembayaran berhasil
+
+   e. **Buat Jurnal Entri Akuntansi**:
+      - Debit Kas/Bank
+      - Credit Penjualan Obat
+      - Credit Penjualan Non-Obat
+      - Credit Hutang Pajak (PPN)
+      - Debit HPP Obat
+      - Credit Persediaan Obat
+      - Debit HPP Non-Obat
+      - Credit Persediaan Non-Obat
+
+   f. **Buat Catatan Audit Trail**:
+      - Simpan log aktivitas transaksi
+   
+   g. **Kembalikan Response ke Frontend**:
+      - Beri notifikasi sukses
+      - Beri data untuk mencetak nota
+
+
+## Alur 5: Mengarsipkan Faktur
+1. Di halaman Products, pilih produk, lalu pilih faktur yang ingin diarsipkan
+2. Klik tombol "Arsipkan" (hanya muncul jika tipe stok `lunas`)
+3. Konfirmasi
+4. Backend:
+   - Cek apakah `stock_type == 'lunas'` (jika tidak, tolak permintaan)
+   - Ubah `is_archived` di tabel `batches` menjadi `true`
+   - Buat catatan audit trail
+   - Kembalikan response sukses
+
+
+## Alur 6: Melihat Riwayat Pembelian
+1. Akses halaman Purchase History
+2. Lihat semua faktur yang pernah dibuat
+3. Bisa sortir berdasarkan tanggal, total harga, dll.
+
+
+## Alur 7: Manajemen Akuntansi (Opsional)
+1. Membuat jurnal manual
+2. Melihat laporan keuangan
+3. Melihat buku besar
+4. dll.
+
+
+## Catatan Penting untuk FEFO!
+- **FEFO HANYA BERKERJA JIKA KITA MENGURANGI `remaining_quantity` DI TABEL `batches` SECARA URUT BERDASARKAN `expired_date ASC`!**
+- Jangan cuma mengurangi total stok di `products` tanpa mengelola `batches`!
+- Setiap transaksi harus mencatat batch mana saja yang digunakan!

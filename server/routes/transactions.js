@@ -65,6 +65,30 @@ module.exports = function registerTransactionRoutes(app, pool, authenticate, che
         }
 
         if (payment_method === 'cash') {
+          // Implementasi FEFO! Kurangi stok dari batch yang expired paling cepat!
+          let remainingToReduce = item.quantity;
+          
+          // Ambil batch yang masih ada stok, diurutkan by expired_date ASC
+          const [batches] = await connection.query(
+            'SELECT id, remaining_quantity FROM batches WHERE product_id = ? AND remaining_quantity > 0 AND is_archived = FALSE ORDER BY expired_date ASC, created_at ASC',
+            [item.id]
+          );
+
+          for (const batch of batches) {
+            if (remainingToReduce <= 0) break;
+
+            const reduceAmount = Math.min(remainingToReduce, batch.remaining_quantity);
+            
+            // Kurangi remaining_quantity batch
+            await connection.query(
+              'UPDATE batches SET remaining_quantity = remaining_quantity - ? WHERE id = ?',
+              [reduceAmount, batch.id]
+            );
+
+            remainingToReduce -= reduceAmount;
+          }
+
+          // Update total stok di products
           await connection.query(
             'UPDATE products SET stock = stock - ? WHERE id = ?',
             [item.quantity, item.id]
@@ -223,10 +247,35 @@ module.exports = function registerTransactionRoutes(app, pool, authenticate, che
         let nonObatCOGSTotal = 0;
 
         for (const item of items) {
+          // Implementasi FEFO untuk Midtrans juga!
+          let remainingToReduce = item.quantity;
+          
+          // Ambil batch yang masih ada stok, diurutkan by expired_date ASC
+          const [batches] = await connection.query(
+            'SELECT id, remaining_quantity FROM batches WHERE product_id = ? AND remaining_quantity > 0 AND is_archived = FALSE ORDER BY expired_date ASC, created_at ASC',
+            [item.product_id]
+          );
+
+          for (const batch of batches) {
+            if (remainingToReduce <= 0) break;
+
+            const reduceAmount = Math.min(remainingToReduce, batch.remaining_quantity);
+            
+            // Kurangi remaining_quantity batch
+            await connection.query(
+              'UPDATE batches SET remaining_quantity = remaining_quantity - ? WHERE id = ?',
+              [reduceAmount, batch.id]
+            );
+
+            remainingToReduce -= reduceAmount;
+          }
+
+          // Update total stok di products
           await connection.query(
             'UPDATE products SET stock = stock - ? WHERE id = ?',
             [item.quantity, item.product_id]
           );
+
           const cost = Number(item.cost_price || 0);
           const itemCOGS = cost * item.quantity;
           const itemSales = Number(item.price) * item.quantity;

@@ -286,6 +286,32 @@ const initDB = async () => {
         FOREIGN KEY (supplier_id) REFERENCES suppliers(id) ON DELETE SET NULL
       )
     `);
+
+    // Batch DP Payments Table
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS batch_dp_payments (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        batch_id INT NOT NULL,
+        amount DECIMAL(15,2) NOT NULL,
+        payment_date DATE NOT NULL,
+        notes TEXT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (batch_id) REFERENCES batches(id) ON DELETE CASCADE
+      )
+    `);
+
+    // Migrate existing dp_amount from batches to batch_dp_payments
+    try {
+      await connection.query(`
+        INSERT IGNORE INTO batch_dp_payments (batch_id, amount, payment_date)
+        SELECT id, dp_amount, purchase_date 
+        FROM batches 
+        WHERE dp_amount IS NOT NULL AND dp_amount > 0
+      `);
+      console.log('Migrated existing DP amounts to batch_dp_payments');
+    } catch (e) {
+      console.log('Skipping DP migration:', e.message);
+    }
     
     try {
       await connection.query(`ALTER TABLE products ADD COLUMN status ENUM('active', 'pending') DEFAULT 'active'`);

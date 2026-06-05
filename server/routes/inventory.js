@@ -2,7 +2,7 @@
 const { createJournalEntry } = require('../utils/journal');
 
 function registerInventoryRoutes(app, pool, authenticate, checkPermission, upload, createAuditTrail) {
-  // Get all batches for a product
+  // Get all batches for a product with DP payments
   app.get('/api/inventory/batches/:productId', authenticate, async (req, res) => {
     try {
       const { productId } = req.params;
@@ -13,10 +13,78 @@ function registerInventoryRoutes(app, pool, authenticate, checkPermission, uploa
         WHERE b.product_id = ? AND b.is_archived = FALSE
         ORDER BY b.expired_date ASC, b.id ASC
       `, [productId]);
+
+      // For each batch, try to get its DP payments (handle if table doesn't exist yet)
+      for (const batch of rows) {
+        try {
+          const [dpPayments] = await pool.query(
+            'SELECT * FROM batch_dp_payments WHERE batch_id = ? ORDER BY created_at ASC',
+            [batch.id]
+          );
+          batch.dp_payments = dpPayments;
+        } catch (dpErr) {
+          batch.dp_payments = []; // If table doesn't exist yet, just set empty array
+        }
+      }
+
       res.json({ success: true, data: rows });
     } catch (err) {
       console.error('Error fetching batches:', err);
       res.status(500).json({ success: false, message: 'Failed to fetch batches' });
+    }
+  });
+
+  // Add DP payment to a batch
+  app.post('/api/inventory/batches/:batchId/dp-payments', authenticate, checkPermission('Management Product', 'edit'), async (req, res) => {
+    try {
+      const { batchId } = req.params;
+      const { amount, payment_date, notes } = req.body;
+
+      if (!amount || amount <= 0) {
+        return res.status(400).json({ success: false, message: 'Jumlah DP harus lebih dari 0' });
+      }
+
+      await pool.query(
+        'INSERT INTO batch_dp_payments (batch_id, amount, payment_date, notes) VALUES (?, ?, ?, ?)',
+        [batchId, amount, payment_date || new Date().toISOString().split('T')[0], notes]
+      );
+
+      await createAuditTrail({
+        user_id: req.user.id,
+        username: req.user.username,
+        role: req.user.role,
+        module: 'Management Product',
+        action: 'create',
+        description: `Menambahkan DP sebesar ${amount} untuk batch #${batchId}`
+      });
+
+      res.json({ success: true, message: 'DP berhasil ditambahkan' });
+    } catch (err) {
+      console.error('Error adding DP payment:', err);
+      res.status(500).json({ success: false, message: 'Failed to add DP payment' });
+    }
+  });
+
+  // Delete DP payment from a batch
+  app.delete('/api/inventory/batches/:batchId/dp-payments/:paymentId', authenticate, checkPermission('Management Product', 'edit'), async (req, res) => {
+    try {
+      const { paymentId } = req.params;
+
+      await pool.query('DELETE FROM batch_dp_payments WHERE id = ?', [paymentId]);
+
+      await createAuditTrail({
+        user_id: req.user.id,
+        username: req.user.username,
+        role: req.user.role,
+        module: 'Management Product',
+        action: 'delete',
+        description: `Menghapus DP #${paymentId}`
+      });
+
+      res.json({ success: true, message: 'DP berhasil dihapus' });
+    } catch (err) {
+      console.error('Error deleting DP payment:', err);
+      res.status(500).json({ success: false, message: 'Failed to delete DP payment' });
     }
   });
 
