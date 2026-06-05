@@ -198,7 +198,7 @@ const requireSuperadmin = (req, res, next) => {
 const checkPermission = (moduleName, action) => {
   return async (req, res, next) => {
     // Superadmin bypass for critical settings access to prevent lockout
-    if (req.user.role === 'superadmin' && moduleName === 'System Settings') return next();
+    if (req.user.role === 'superadmin' && (moduleName === 'Role & Permission' || moduleName === 'Transaction Setting')) return next();
     
     try {
       const [roles] = await pool.query('SELECT id FROM roles WHERE name = ?', [req.user.role]);
@@ -240,7 +240,8 @@ const RBAC_MODULES = [
   'Suppliers',
   'Stock Opname',
   'Resep Dokter',
-  'System Settings',
+  'Role & Permission',
+  'Transaction Setting',
   'Audit Trail',
   'Approval Faktur',
   'Riwayat Pembelian',

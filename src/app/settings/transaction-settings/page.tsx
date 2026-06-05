@@ -7,7 +7,7 @@ import PageHeader from "@/components/PageHeader";
 import { useRequirePermission } from "@/hooks/useRequirePermission";
 
 export default function Page() {
-  const { loading: permLoading, hasPermission, checkActionPermission } = useRequirePermission('System Settings');
+  const { loading: permLoading, hasPermission, checkActionPermission } = useRequirePermission('Transaction Setting');
   const router = useRouter();
   
   const [settings, setSettings] = useState<{

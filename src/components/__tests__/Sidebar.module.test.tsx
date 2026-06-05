@@ -132,13 +132,13 @@ describe('Sidebar', () => {
     });
   });
 
-  test('renders system settings expandable menu for regular user', async () => {
+  test('renders system settings menu for regular user', async () => {
     localStorage.setItem('token', 'test-token');
     localStorage.setItem('user', JSON.stringify({ id: 1, role: 'user', username: 'test' }));
     global.fetch = jest.fn().mockResolvedValue({
       ok: true,
       status: 200,
-      json: async () => [{ module: 'System Settings', show: true }],
+      json: async () => [{ module: 'System Setting', show: true }],
     });
     
     const { getByText, getByTitle, getByRole } = render(<Sidebar />);

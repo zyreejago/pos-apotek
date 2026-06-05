@@ -32,7 +32,7 @@ export function useRequirePermission(moduleName: string) {
         setCurrentUserRole(user.role);
         
         // Superadmin bypass for critical settings access
-        if (user.role === 'superadmin' && moduleName === 'System Settings') {
+        if (user.role === 'superadmin' && (moduleName === 'Role & Permission' || moduleName === 'Transaction Setting')) {
           setHasPermission(true);
           setLoading(false);
           return;
@@ -79,9 +79,8 @@ export function useRequirePermission(moduleName: string) {
   const checkActionPermission = (action: 'create' | 'edit' | 'delete' | 'show') => {
     if (loading) return false;
     
-    // Superadmin has full access to System Settings and can be a fallback for other modules
-    // but usually they follow the permissions table now
-    if (currentUserRole === 'superadmin' && moduleName === 'System Settings') return true;
+    // Superadmin has full access to critical settings
+    if (currentUserRole === 'superadmin' && (moduleName === 'Role & Permission' || moduleName === 'Transaction Setting')) return true;
     
     const perm = permissions.find(p => p.module === moduleName);
     const hasPerm = perm ? (perm[action] === true || perm[action] === 1 || perm[action] === '1') : false;

@@ -167,7 +167,7 @@ export default function Sidebar() {
     if (module === 'Dashboards') return true;
     
     // Superadmin bypass for critical settings access
-    if (userRole === 'superadmin' && module === 'System Settings') return true;
+    if (userRole === 'superadmin' && (module === 'Role & Permission' || module === 'System Setting')) return true;
     
     const perm = permissions.find(p => p.module === module);
     const hasPerm = perm ? (perm.show || perm.create || perm.edit || perm.delete) : false;
@@ -364,7 +364,8 @@ export default function Sidebar() {
           <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">{isCollapsed ? '...' : 'Others'}</span>
         </div>
         
-        {canShow('System Settings') && (
+        {/* Merge permissions: show System Settings if user has access to either child */}
+        {(canShow('Role & Permission') || canShow('Transaction Setting')) && (
           <div>
             <button
               onClick={() => {
@@ -387,11 +388,11 @@ export default function Sidebar() {
               <div className="ml-4 mt-1 space-y-1 border-l border-gray-100 pl-2">
                 <Link href="/settings/role-permissions" className={`flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer ${isActive('/settings/role-permissions') ? 'bg-blue-50 text-blue-600' : 'text-slate-500 hover:text-slate-700 hover:bg-gray-50'}`}>
                   <div className={`w-1.5 h-1.5 rounded-full ${isActive('/settings/role-permissions') ? 'bg-blue-600' : 'bg-transparent border border-slate-400'}`}></div>
-                  <span className="font-medium text-sm">Role & Permissions</span>
+                  <span className="font-medium text-sm">Role & Permission</span>
                 </Link>
                 <Link href="/settings/transaction-settings" className={`flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer ${isActive('/settings/transaction-settings') ? 'bg-blue-50 text-blue-600' : 'text-slate-500 hover:text-slate-700 hover:bg-gray-50'}`}>
                   <div className={`w-1.5 h-1.5 rounded-full ${isActive('/settings/transaction-settings') ? 'bg-blue-600' : 'bg-transparent border border-slate-400'}`}></div>
-                  <span className="font-medium text-sm">Transactions Settings</span>
+                  <span className="font-medium text-sm">Transaction Setting</span>
                 </Link>
               </div>
             )}

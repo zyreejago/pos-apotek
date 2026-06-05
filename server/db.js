@@ -552,6 +552,20 @@ const initDB = async () => {
       )
     `);
 
+    // Immutable triggers: prevent UPDATE/DELETE on audit_trails (append-only event log)
+    try {
+      await connection.query(`
+        CREATE TRIGGER prevent_audit_update BEFORE UPDATE ON audit_trails FOR EACH ROW
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Audit trail is immutable - cannot update records'
+      `);
+    } catch (e) {}
+    try {
+      await connection.query(`
+        CREATE TRIGGER prevent_audit_delete BEFORE DELETE ON audit_trails FOR EACH ROW
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Audit trail is immutable - cannot delete records'
+      `);
+    } catch (e) {}
+
     const [settings] = await connection.query('SELECT * FROM system_settings');
     if (settings.length === 0) {
       await connection.query(`

@@ -23,7 +23,8 @@ const MODULE_CONFIG: Record<string, string[]> = {
   'Substitutions': ['show'],
   'Suppliers': ['create', 'edit', 'delete', 'show'],
   'Stock Opname': ['create', 'show'],
-  'System Settings': ['show', 'create', 'edit', 'delete'],
+  'Role & Permission': ['show', 'create', 'edit', 'delete'],
+  'Transaction Setting': ['show', 'edit'],
   'Audit Trail': ['show'],
   'Approval Faktur': ['show', 'edit'],
   'Riwayat Pembelian': ['show'],
@@ -32,7 +33,7 @@ const MODULE_CONFIG: Record<string, string[]> = {
 
 export default function Page() {
   const { loading: permLoading, hasPermission, currentUserRole } =
-    useRequirePermission("System Settings");
+    useRequirePermission("Role & Permission");
   const router = useRouter();
   const [roles, setRoles] = useState<Role[]>([]);
   const [selectedRole, setSelectedRole] = useState<Role | null>(null);
