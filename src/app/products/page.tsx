@@ -682,6 +682,11 @@ export default function ProductsPage() {
   };
 
   const handleArchiveFaktur = async (faktur: Faktur) => {
+    if (faktur.stock_type !== 'lunas') {
+      goeyToast.error('Hanya faktur dengan tipe stok \"lunas\" yang dapat diarsipkan!');
+      return;
+    }
+    
     setConfirmModal({
       isOpen: true,
       title: 'Arsipkan Faktur',
@@ -2219,13 +2224,15 @@ export default function ProductsPage() {
                               <AlertTriangle size={14} />
                             </button>
                           )}
-                          <button
-                            onClick={() => handleArchiveFaktur(faktur)}
-                            className="p-1 text-gray-500 hover:bg-gray-100 rounded"
-                            title="Arsipkan Faktur"
-                          >
-                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="21 8 21 21 3 21 3 8"></polyline><rect x="1" y="3" width="22" height="5"></rect><line x1="10" y1="12" x2="14" y2="12"></line></svg>
-                          </button>
+                          {faktur.stock_type === 'lunas' && (
+                            <button
+                              onClick={() => handleArchiveFaktur(faktur)}
+                              className="p-1 text-gray-500 hover:bg-gray-100 rounded"
+                              title="Arsipkan Faktur"
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="21 8 21 21 3 21 3 8"></polyline><rect x="1" y="3" width="22" height="5"></rect><line x1="10" y1="12" x2="14" y2="12"></line></svg>
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>

@@ -43,6 +43,17 @@ function registerInventoryRoutes(app, pool, authenticate, checkPermission, uploa
       const { id } = req.params;
       const { is_archived } = req.body;
       
+      // Get the batch first to check stock_type
+      const [batch] = await pool.query('SELECT stock_type FROM batches WHERE id = ?', [id]);
+      if (batch.length === 0) {
+        return res.status(404).json({ success: false, message: 'Batch tidak ditemukan' });
+      }
+      
+      // If trying to archive, check if stock_type is 'lunas'
+      if (is_archived && batch[0].stock_type !== 'lunas') {
+        return res.status(400).json({ success: false, message: 'Hanya faktur dengan tipe stok \"lunas\" yang dapat diarsipkan' });
+      }
+      
       await pool.query('UPDATE batches SET is_archived = ? WHERE id = ?', [is_archived ? 1 : 0, id]);
       
       await createAuditTrail({
