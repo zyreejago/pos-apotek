@@ -548,6 +548,43 @@ export default function SuppliersPage() {
                               </span>
                             </div>
                           </div>
+
+                          {(() => {
+                            let dpList = [];
+                            if (batch.dp_payments && batch.dp_payments.length > 0) {
+                              dpList = batch.dp_payments;
+                            } else if (batch.dp_amount) {
+                              dpList = [{ id: -1, amount: batch.dp_amount, payment_date: batch.purchase_date || '', created_at: batch.created_at }];
+                            }
+                            if (dpList.length > 0) {
+                              const totalDp = dpList.reduce((sum: number, dp: any) => sum + Number(dp.amount), 0);
+                              const totalAmount = batch.cost_price * batch.initial_quantity;
+                              const remainingDebt = totalAmount - totalDp;
+                              return (
+                                <div className="border-t border-gray-100 pt-2 mt-2">
+                                  <div className="space-y-0.5">
+                                    {dpList.map((dp: any, idx: number) => (
+                                      <div key={dp.id} className="text-sm">
+                                        <span className="font-medium text-yellow-600">DP {idx + 1}:</span>
+                                        <span className="text-blue-600 font-semibold ml-1">{new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format(dp.amount)}</span>
+                                        {dp.payment_date && (
+                                          <span className="text-gray-400 ml-2">({new Date(dp.payment_date).toLocaleDateString('id-ID')})</span>
+                                        )}
+                                      </div>
+                                    ))}
+                                    {remainingDebt > 0 ? (
+                                      <div className="text-sm text-orange-600 font-medium">
+                                        Sisa hutang: {new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format(remainingDebt)}
+                                      </div>
+                                    ) : remainingDebt <= 0 && totalDp > 0 ? (
+                                      <div className="text-sm text-green-600 font-medium">Lunas</div>
+                                    ) : null}
+                                  </div>
+                                </div>
+                              );
+                            }
+                            return null;
+                          })()}
                           {batch.notes && (
                             <p className="text-sm text-gray-500 italic">
                               Catatan: {batch.notes}

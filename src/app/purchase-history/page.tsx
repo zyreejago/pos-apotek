@@ -6,6 +6,14 @@ import { goeyToast } from "@/components/ui/goey-toaster";
 import PageHeader from '@/components/PageHeader';
 import { useRequirePermission } from '@/hooks/useRequirePermission';
 
+interface DpPayment {
+  id: number;
+  amount: number;
+  payment_date: string;
+  notes?: string | null;
+  created_at: string;
+}
+
 interface HistoryFaktur {
   id: number;
   product_id: number;
@@ -15,15 +23,18 @@ interface HistoryFaktur {
   supplier_name: string | null;
   purchase_date: string | null;
   initial_quantity: number;
+  remaining_quantity: number;
   cost_price: number;
-  stock_type: string;
+  stock_type: 'belum_bayar' | 'konsinyasi' | 'dp' | 'lunas';
   dp_amount: number | null;
   due_date: string | null;
+  expired_date: string | null;
   image_url: string | null;
   status: string;
   is_archived: number;
   notes: string | null;
   created_at: string;
+  dp_payments?: DpPayment[];
 }
 
 export default function PurchaseHistoryPage() {
@@ -214,7 +225,9 @@ export default function PurchaseHistoryPage() {
                   <SortableHeader field="created_at" label="Tanggal" />
                   <SortableHeader field="product_name" label="Produk" />
                   <SortableHeader field="supplier_name" label="Supplier" />
+                  <th className="px-6 py-4">Stok</th>
                   <SortableHeader field="total_price" label="Total Harga" />
+                  <th className="px-6 py-4">DP & Hutang</th>
                   <SortableHeader field="status" label="Status" />
                   <th className="px-6 py-4 text-center">Bukti</th>
                 </tr>
@@ -222,13 +235,13 @@ export default function PurchaseHistoryPage() {
               <tbody className="divide-y divide-gray-100">
                 {loading ? (
                   <tr>
-                    <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
+                    <td colSpan={8} className="px-6 py-8 text-center text-gray-500">
                       Loading riwayat pembelian...
                     </td>
                   </tr>
                 ) : filteredAndSortedFakturs.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
+                    <td colSpan={8} className="px-6 py-12 text-center text-gray-500">
                       <div className="flex flex-col items-center justify-center">
                         <Package size={32} className="text-gray-300 mb-3" />
                         <p>Tidak ada riwayat pembelian yang ditemukan.</p>
@@ -236,7 +249,19 @@ export default function PurchaseHistoryPage() {
                     </td>
                   </tr>
                 ) : (
-                  filteredAndSortedFakturs.map((faktur) => (
+                  filteredAndSortedFakturs.map((faktur) => {
+                    const soldQty = faktur.initial_quantity - faktur.remaining_quantity;
+                    let dpList: DpPayment[] = [];
+                    if (faktur.dp_payments && faktur.dp_payments.length > 0) {
+                      dpList = faktur.dp_payments;
+                    } else if (faktur.dp_amount) {
+                      dpList = [{ id: -1, amount: faktur.dp_amount, payment_date: faktur.purchase_date || '', created_at: faktur.created_at }];
+                    }
+                    const totalAmount = faktur.cost_price * faktur.initial_quantity;
+                    const totalDp = dpList.reduce((sum, dp) => sum + Number(dp.amount), 0);
+                    const remainingDebt = totalAmount - totalDp;
+
+                    return (
                     <tr key={faktur.id} className="hover:bg-gray-50 transition-colors">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="font-medium text-gray-900">
@@ -251,17 +276,57 @@ export default function PurchaseHistoryPage() {
                       <td className="px-6 py-4">
                         <div className="font-medium text-gray-900">{faktur.product_name}</div>
                         <div className="text-xs text-gray-500 mt-1">Batch: {faktur.batch_number || '-'}</div>
+                        {faktur.expired_date && (
+                          <div className="text-xs text-orange-600 mt-1">
+                            Exp: {new Date(faktur.expired_date).toLocaleDateString('id-ID')}
+                          </div>
+                        )}
                       </td>
                       <td className="px-6 py-4">
                         <div className="text-gray-700">{faktur.supplier_name || '-'}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-gray-800">
+                          {faktur.remaining_quantity} / {faktur.initial_quantity}
+                        </div>
+                        <div className="text-xs text-gray-500 mt-1">
+                          Sisa / Awal
+                          {soldQty > 0 && <span className="text-blue-600 ml-2">({soldQty} terjual)</span>}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
                         <div className="font-bold text-blue-600">
-                          {formatCurrency(faktur.cost_price * faktur.initial_quantity)}
+                          {formatCurrency(totalAmount)}
                         </div>
                         <div className="text-xs text-gray-500 mt-1">
                           {faktur.initial_quantity} pcs @ {formatCurrency(faktur.cost_price)}
                         </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        {dpList.length > 0 ? (
+                          <div className="space-y-1">
+                            {dpList.map((dp, idx) => (
+                              <div key={dp.id} className="text-xs">
+                                <span className="font-medium text-gray-700">DP {idx + 1}:</span>
+                                <span className="text-blue-600 font-semibold ml-1">{formatCurrency(dp.amount)}</span>
+                                {dp.payment_date && (
+                                  <span className="text-gray-400 ml-2">({new Date(dp.payment_date).toLocaleDateString('id-ID')})</span>
+                                )}
+                              </div>
+                            ))}
+                            {remainingDebt > 0 ? (
+                              <div className="text-xs text-orange-600 font-medium mt-1">
+                                Sisa hutang: {formatCurrency(remainingDebt)}
+                              </div>
+                            ) : remainingDebt <= 0 && totalDp > 0 ? (
+                              <div className="text-xs text-green-600 font-medium mt-1">
+                                Lunas
+                              </div>
+                            ) : null}
+                          </div>
+                        ) : (
+                          <span className="text-xs text-gray-400 italic">{faktur.stock_type === 'lunas' ? 'Lunas' : '-'}</span>
+                        )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`px-2.5 py-1 text-xs font-medium rounded-full ${
@@ -290,7 +355,8 @@ export default function PurchaseHistoryPage() {
                         )}
                       </td>
                     </tr>
-                  ))
+                  );
+                  })
                 )}
               </tbody>
             </table>

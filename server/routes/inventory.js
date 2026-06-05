@@ -98,6 +98,20 @@ function registerInventoryRoutes(app, pool, authenticate, checkPermission, uploa
         LEFT JOIN products p ON b.product_id = p.id
         ORDER BY b.created_at DESC
       `);
+
+      // For each batch, get its DP payments
+      for (const batch of rows) {
+        try {
+          const [dpPayments] = await pool.query(
+            'SELECT * FROM batch_dp_payments WHERE batch_id = ? ORDER BY created_at ASC',
+            [batch.id]
+          );
+          batch.dp_payments = dpPayments;
+        } catch (dpErr) {
+          batch.dp_payments = [];
+        }
+      }
+
       res.json({ success: true, data: rows });
     } catch (err) {
       console.error('Error fetching history:', err);

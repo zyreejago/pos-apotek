@@ -29,6 +29,19 @@ module.exports = function registerSupplierRoutes(app, pool, authenticate, checkP
           WHERE b.supplier_id = ? AND b.is_archived = FALSE
           ORDER BY b.created_at DESC
         `, [id]);
+
+        // Attach dp_payments to each batch
+        for (const batch of batches) {
+          try {
+            const [dpPayments] = await connection.query(
+              'SELECT * FROM batch_dp_payments WHERE batch_id = ? ORDER BY created_at ASC',
+              [batch.id]
+            );
+            batch.dp_payments = dpPayments;
+          } catch (dpErr) {
+            batch.dp_payments = [];
+          }
+        }
         
         // Get unique products from this supplier (from batches and purchase items)
         const [products] = await connection.query(`
