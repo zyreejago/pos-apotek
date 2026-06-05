@@ -59,15 +59,13 @@ export default function BalanceSheetAccountingPage() {
     fetchData();
   }, [fetchData]);
 
-  const formatCurrency = (amount: any) => {
-    const num = Number(amount);
-    if (isNaN(num) || num === 0) return '';
+  const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('id-ID', {
       style: 'currency',
       currency: 'IDR',
       minimumFractionDigits: 0,
       maximumFractionDigits: 0
-    }).format(num);
+    }).format(amount || 0);
   };
 
   const getMonthName = (m: number) => {
@@ -134,12 +132,7 @@ export default function BalanceSheetAccountingPage() {
       const tableRowsLeft: (string | number)[][] = [];
       
       assetAccounts.forEach((a, index) => {
-        const balance = getAccountBalance(a);
-        tableRowsLeft.push([
-          a.name, 
-          a.normal_balance === 'debit' ? formatCurrency(balance) : '', 
-          a.normal_balance === 'kredit' ? formatCurrency(balance) : ''
-        ]);
+        tableRowsLeft.push([a.name, a.normal_balance === 'debit' ? formatCurrency(getAccountBalance(a)) : '', a.normal_balance === 'kredit' ? formatCurrency(getAccountBalance(a)) : '']);
       });
       tableRowsLeft.push(['TOTAL AKTIVA', formatCurrency(totalAssets), '']);
 
@@ -148,23 +141,13 @@ export default function BalanceSheetAccountingPage() {
       
       tableRowsRight.push(['PASIVA', '', '']);
       liabilityAccounts.forEach((a, index) => {
-        const balance = getAccountBalance(a);
-        tableRowsRight.push([
-          a.name, 
-          a.normal_balance === 'debit' ? formatCurrency(balance) : '', 
-          a.normal_balance === 'kredit' ? formatCurrency(balance) : ''
-        ]);
+        tableRowsRight.push([a.name, a.normal_balance === 'debit' ? formatCurrency(getAccountBalance(a)) : '', a.normal_balance === 'kredit' ? formatCurrency(getAccountBalance(a)) : '']);
       });
       tableRowsRight.push(['TOTAL PASIVA', '', formatCurrency(totalLiabilities)]);
 
       tableRowsRight.push(['MODAL', '', '']);
       equityAccounts.forEach((a, index) => {
-        const balance = getAccountBalance(a);
-        tableRowsRight.push([
-          a.name, 
-          a.normal_balance === 'debit' ? formatCurrency(balance) : '', 
-          a.normal_balance === 'kredit' ? formatCurrency(balance) : ''
-        ]);
+        tableRowsRight.push([a.name, a.normal_balance === 'debit' ? formatCurrency(getAccountBalance(a)) : '', a.normal_balance === 'kredit' ? formatCurrency(getAccountBalance(a)) : '']);
       });
       tableRowsRight.push(['TOTAL PASIVA & MODAL', '', formatCurrency(totalLiabilitiesEquity)]);
 
@@ -291,20 +274,17 @@ export default function BalanceSheetAccountingPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50">
-                    {assetAccounts.map((a) => {
-                      const balance = getAccountBalance(a);
-                      return (
-                        <tr key={a.id} className="hover:bg-gray-50 transition-colors">
-                          <td className="px-6 py-3 text-gray-600">{a.name}</td>
-                          <td className="px-6 py-3 text-right text-gray-600">
-                            {a.normal_balance === 'debit' ? formatCurrency(balance) : ''}
-                          </td>
-                          <td className="px-6 py-3 text-right text-gray-600">
-                            {a.normal_balance === 'kredit' ? formatCurrency(balance) : ''}
-                          </td>
-                        </tr>
-                      );
-                    })}
+                    {assetAccounts.map((a) => (
+                      <tr key={a.id} className="hover:bg-gray-50 transition-colors">
+                        <td className="px-6 py-3 text-gray-600">{a.name}</td>
+                        <td className="px-6 py-3 text-right text-gray-600">
+                          {a.normal_balance === 'debit' ? formatCurrency(getAccountBalance(a)) : ''}
+                        </td>
+                        <td className="px-6 py-3 text-right text-gray-600">
+                          {a.normal_balance === 'kredit' ? formatCurrency(getAccountBalance(a)) : ''}
+                        </td>
+                      </tr>
+                    ))}
                     <tr className="font-bold bg-gray-100">
                       <td className="px-6 py-4 text-gray-900">Total Aktiva</td>
                       <td className="px-6 py-4 text-right text-gray-900">{formatCurrency(totalAssets)}</td>
@@ -333,20 +313,17 @@ export default function BalanceSheetAccountingPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
-                      {liabilityAccounts.map((a) => {
-                        const balance = getAccountBalance(a);
-                        return (
-                          <tr key={a.id} className="hover:bg-gray-50 transition-colors">
-                            <td className="px-6 py-3 text-gray-600">{a.name}</td>
-                            <td className="px-6 py-3 text-right text-gray-600">
-                              {a.normal_balance === 'debit' ? formatCurrency(balance) : ''}
-                            </td>
-                            <td className="px-6 py-3 text-right text-gray-600">
-                              {a.normal_balance === 'kredit' ? formatCurrency(balance) : ''}
-                            </td>
-                          </tr>
-                        );
-                      })}
+                      {liabilityAccounts.map((a) => (
+                        <tr key={a.id} className="hover:bg-gray-50 transition-colors">
+                          <td className="px-6 py-3 text-gray-600">{a.name}</td>
+                          <td className="px-6 py-3 text-right text-gray-600">
+                            {a.normal_balance === 'debit' ? formatCurrency(getAccountBalance(a)) : ''}
+                          </td>
+                          <td className="px-6 py-3 text-right text-gray-600">
+                            {a.normal_balance === 'kredit' ? formatCurrency(getAccountBalance(a)) : ''}
+                          </td>
+                        </tr>
+                      ))}
                       <tr className="font-bold bg-gray-100">
                         <td className="px-6 py-4 text-gray-900">Total Pasiva</td>
                         <td className="px-6 py-4 text-right text-gray-900"></td>
@@ -373,20 +350,17 @@ export default function BalanceSheetAccountingPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
-                      {equityAccounts.map((a) => {
-                        const balance = getAccountBalance(a);
-                        return (
-                          <tr key={a.id} className="hover:bg-gray-50 transition-colors">
-                            <td className="px-6 py-3 text-gray-600">{a.name}</td>
-                            <td className="px-6 py-3 text-right text-gray-600">
-                              {a.normal_balance === 'debit' ? formatCurrency(balance) : ''}
-                            </td>
-                            <td className="px-6 py-3 text-right text-gray-600">
-                              {a.normal_balance === 'kredit' ? formatCurrency(balance) : ''}
-                            </td>
-                          </tr>
-                        );
-                      })}
+                      {equityAccounts.map((a) => (
+                        <tr key={a.id} className="hover:bg-gray-50 transition-colors">
+                          <td className="px-6 py-3 text-gray-600">{a.name}</td>
+                          <td className="px-6 py-3 text-right text-gray-600">
+                            {a.normal_balance === 'debit' ? formatCurrency(getAccountBalance(a)) : ''}
+                          </td>
+                          <td className="px-6 py-3 text-right text-gray-600">
+                            {a.normal_balance === 'kredit' ? formatCurrency(getAccountBalance(a)) : ''}
+                          </td>
+                        </tr>
+                      ))}
                       <tr className="font-bold bg-gray-100">
                         <td className="px-6 py-4 text-gray-900">Total Modal</td>
                         <td className="px-6 py-4 text-right text-gray-900"></td>

@@ -37,7 +37,6 @@ export default function ProfitLossAccountingPage() {
       
       if (res.ok) {
         const data = await res.json();
-        console.log('Accounts data:', data.accounts);
         setAccounts(data.accounts || []);
       } else {
         const err = await res.json();
@@ -59,15 +58,13 @@ export default function ProfitLossAccountingPage() {
     fetchData();
   }, [fetchData]);
 
-  const formatCurrency = (amount: any) => {
-    const num = Number(amount);
-    if (isNaN(num) || num === 0) return '';
+  const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('id-ID', {
       style: 'currency',
       currency: 'IDR',
       minimumFractionDigits: 0,
       maximumFractionDigits: 0
-    }).format(num);
+    }).format(amount || 0);
   };
 
   const getMonthName = (m: number) => {
@@ -125,24 +122,14 @@ export default function ProfitLossAccountingPage() {
       // Revenue accounts
       tableRows.push(['', 'PENDAPATAN', '', '']);
       revenueAccounts.forEach((a, index) => {
-        tableRows.push([
-          index + 1, 
-          a.name, 
-          formatCurrency(a.total_debit), 
-          formatCurrency(a.total_credit)
-        ]);
+        tableRows.push([index + 1, a.name, formatCurrency(a.total_debit), formatCurrency(a.total_credit)]);
       });
       tableRows.push(['', 'Total Pendapatan', '', formatCurrency(totalRevenue)]);
 
       // Expense accounts
       tableRows.push(['', 'BEBAN', '', '']);
       expenseAccounts.forEach((a, index) => {
-        tableRows.push([
-          revenueAccounts.length + index + 1, 
-          a.name, 
-          formatCurrency(a.total_debit), 
-          formatCurrency(a.total_credit)
-        ]);
+        tableRows.push([revenueAccounts.length + index + 1, a.name, formatCurrency(a.total_debit), formatCurrency(a.total_credit)]);
       });
       tableRows.push(['', 'Total Beban', formatCurrency(totalExpenses), '']);
 

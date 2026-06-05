@@ -319,7 +319,7 @@ const initDB = async () => {
         FOREIGN KEY (transaction_id) REFERENCES transactions(id) ON DELETE SET NULL
       )
     `);
-
+    
     // Prescription items table
     await connection.query(`
       CREATE TABLE IF NOT EXISTS prescription_items (
