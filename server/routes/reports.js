@@ -485,7 +485,7 @@ module.exports = function registerReportRoutes(app, pool, authenticate, checkPer
   });
 
   // Post a manual financial transaction (journal entry)
-  app.post('/api/accounting/journal-entries', authenticate, checkPermission('Sales Report', 'edit'), async (req, res) => {
+  app.post('/api/accounting/journal-entries', authenticate, checkPermission('Sales Report', 'create'), async (req, res) => {
     const { date, description, items } = req.body;
     if (!date || !description || !items || !Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ success: false, message: 'Missing required fields' });

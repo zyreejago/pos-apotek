@@ -216,8 +216,8 @@ const checkPermission = (moduleName, action) => {
       
       if (perms.length > 0 && perms[0].allowed) {
         next();
-      } else if (req.user.role === 'superadmin') {
-        // Fallback for superadmin if no specific permission record exists
+      } else if (perms.length === 0 && req.user.role === 'superadmin') {
+        // Fallback for superadmin if no permission record exists at all (prevent lockout)
         next();
       } else {
         res.status(403).json({ message: 'Forbidden' });

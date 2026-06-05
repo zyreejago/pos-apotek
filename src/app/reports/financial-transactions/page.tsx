@@ -3,7 +3,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import PageHeader from '@/components/PageHeader';
 import { goeyToast } from '@/components/ui/goey-toaster';
-import { Wallet, Landmark, TrendingUp, Cpu, Truck, UserCheck, RefreshCw, Send } from 'lucide-react';
+import { Wallet, Landmark, TrendingUp, Cpu, Truck, UserCheck, RefreshCw, Send, Ban } from 'lucide-react';
+import { useRequirePermission } from '@/hooks/useRequirePermission';
 
 interface Account {
   id: number;
@@ -17,6 +18,8 @@ export default function FinancialTransactionsPage() {
   const [activeTab, setActiveTab] = useState<'expense' | 'equity' | 'asset'>('expense');
   const [loading, setLoading] = useState(false);
   const [accounts, setAccounts] = useState<Account[]>([]);
+  const { checkActionPermission } = useRequirePermission('Sales Report');
+  const canCreate = checkActionPermission('create');
 
   // Auth tokens
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
@@ -349,11 +352,11 @@ export default function FinancialTransactionsPage() {
 
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || !canCreate}
               className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-semibold transition-colors flex items-center justify-center gap-2 shadow-sm disabled:bg-gray-300 disabled:cursor-not-allowed"
             >
-              {loading ? <RefreshCw className="animate-spin" size={16} /> : <Send size={16} />}
-              Posting Biaya
+              {loading ? <RefreshCw className="animate-spin" size={16} /> : !canCreate ? <Ban size={16} /> : <Send size={16} />}
+              {!canCreate ? 'Akses Ditolak' : 'Posting Biaya'}
             </button>
           </form>
         )}
@@ -444,13 +447,13 @@ export default function FinancialTransactionsPage() {
 
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || !canCreate}
               className={`w-full py-3 text-white rounded-lg text-sm font-semibold transition-colors flex items-center justify-center gap-2 shadow-sm disabled:bg-gray-300 disabled:cursor-not-allowed ${
-                equityType === 'setor' ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'
+                !canCreate ? '' : equityType === 'setor' ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'
               }`}
             >
-              {loading ? <RefreshCw className="animate-spin" size={16} /> : <Send size={16} />}
-              Posting Permodalan ({equityType === 'setor' ? 'Setor Modal' : 'Tarik Prive'})
+              {loading ? <RefreshCw className="animate-spin" size={16} /> : !canCreate ? <Ban size={16} /> : <Send size={16} />}
+              {!canCreate ? 'Akses Ditolak' : `Posting Permodalan (${equityType === 'setor' ? 'Setor Modal' : 'Tarik Prive'})`}
             </button>
           </form>
         )}
@@ -562,11 +565,11 @@ export default function FinancialTransactionsPage() {
 
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || !canCreate}
               className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-semibold transition-colors flex items-center justify-center gap-2 shadow-sm disabled:bg-gray-300 disabled:cursor-not-allowed"
             >
-              {loading ? <RefreshCw className="animate-spin" size={16} /> : <Send size={16} />}
-              Posting Pembelian Aset
+              {loading ? <RefreshCw className="animate-spin" size={16} /> : !canCreate ? <Ban size={16} /> : <Send size={16} />}
+              {!canCreate ? 'Akses Ditolak' : 'Posting Pembelian Aset'}
             </button>
           </form>
         )}

@@ -11,17 +11,23 @@ import { useRequirePermission } from "@/hooks/useRequirePermission";
 
 type Role = { id: number; name: string };
 type PermItem = { module: string; create: boolean; edit: boolean; delete: boolean; show: boolean };
+type PermAction = keyof Omit<PermItem, 'module'>;
+const ALL_PERM_ACTIONS: PermAction[] = ['create', 'edit', 'delete', 'show'];
 
 const MODULE_CONFIG: Record<string, string[]> = {
   'Management Product': ['create', 'edit', 'delete', 'show'],
   'Transactions': ['create', 'show'],
   'Management Pengguna': ['create', 'edit', 'delete', 'show'],
-  'Sales Report': ['show'],
+  'Sales Report': ['show', 'create'],
   'Peramalan Stok': ['show'],
   'Substitutions': ['show'],
   'Suppliers': ['create', 'edit', 'delete', 'show'],
   'Stock Opname': ['create', 'show'],
-  'System Settings': ['create', 'edit', 'delete', 'show'],
+  'System Settings': ['show', 'create', 'edit', 'delete'],
+  'Audit Trail': ['show'],
+  'Approval Faktur': ['show', 'edit'],
+  'Riwayat Pembelian': ['show'],
+  'Resep Dokter': ['create', 'edit', 'delete', 'show'],
 };
 
 export default function Page() {
@@ -412,21 +418,27 @@ export default function Page() {
               </div>
             ) : (
               <>
+                {(() => {
+                  const usedActions = ALL_PERM_ACTIONS.filter(a =>
+                    Object.values(MODULE_CONFIG).some(actions => actions.includes(a))
+                  );
+                  const colCount = 1 + usedActions.length;
+
+                  return (
                 <div className="overflow-x-auto border border-gray-100 rounded-lg">
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="text-gray-500 bg-gray-50">
                         <th className="text-left font-medium px-3 py-2">Module</th>
-                        <th className="font-medium px-3 py-2 text-center">create</th>
-                        <th className="font-medium px-3 py-2 text-center">edit</th>
-                        <th className="font-medium px-3 py-2 text-center">delete</th>
-                        <th className="font-medium px-3 py-2 text-center">show</th>
+                        {usedActions.map(a => (
+                          <th key={a} className="font-medium px-3 py-2 text-center capitalize">{a}</th>
+                        ))}
                       </tr>
                     </thead>
                     <tbody>
                       {loading ? (
                         <tr>
-                          <td className="px-3 py-4 text-gray-500" colSpan={5}>
+                          <td className="px-3 py-4 text-gray-500" colSpan={colCount}>
                             Loading...
                           </td>
                         </tr>
@@ -434,7 +446,7 @@ export default function Page() {
                         filteredPerms.map((row) => (
                           <tr key={row.module} className="border-t border-gray-100">
                             <td className="px-3 py-3 text-gray-800">{row.module}</td>
-                            {(["create", "edit", "delete", "show"] as const).map((a) => {
+                            {usedActions.map((a) => {
                               const isAllowed = MODULE_CONFIG[row.module]
                                 ? MODULE_CONFIG[row.module].includes(a)
                                 : true;
@@ -470,6 +482,8 @@ export default function Page() {
                     </tbody>
                   </table>
                 </div>
+                  );
+                })()}
 
                 {canManage ? (
                   <div className="mt-6 flex justify-end">
