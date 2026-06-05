@@ -215,6 +215,19 @@ function registerInventoryRoutes(app, pool, authenticate, checkPermission, uploa
         notes || null
       ]);
       
+      // Auto-create DP 1 payment record if dp_amount is filled
+      const batchId = result.insertId;
+      if (stock_type === 'dp' && dp_amount && Number(dp_amount) > 0) {
+        try {
+          await pool.query(
+            'INSERT INTO batch_dp_payments (batch_id, amount, payment_date, payment_method, notes) VALUES (?, ?, ?, ?, ?)',
+            [batchId, Number(dp_amount), formattedPurchaseDate || new Date().toISOString().split('T')[0], 'cash', 'DP 1 (saat pembuatan faktur)']
+          );
+        } catch (dpErr) {
+          console.error('Error auto-creating DP payment:', dpErr);
+        }
+      }
+      
       // Update product's total stock only if approved
       if (status === 'approved') {
         const connection = await pool.getConnection();
