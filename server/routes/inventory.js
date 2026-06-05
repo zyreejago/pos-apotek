@@ -10,13 +10,54 @@ function registerInventoryRoutes(app, pool, authenticate, checkPermission, uploa
         SELECT b.*, s.name as supplier_name 
         FROM batches b 
         LEFT JOIN suppliers s ON b.supplier_id = s.id 
-        WHERE b.product_id = ? 
+        WHERE b.product_id = ? AND b.is_archived = FALSE
         ORDER BY b.expired_date ASC, b.id ASC
       `, [productId]);
       res.json({ success: true, data: rows });
     } catch (err) {
       console.error('Error fetching batches:', err);
       res.status(500).json({ success: false, message: 'Failed to fetch batches' });
+    }
+  });
+
+  // Get all batches (Purchase History / Riwayat Pembelian)
+  app.get('/api/inventory/history', authenticate, checkPermission('Riwayat Pembelian', 'show'), async (req, res) => {
+    try {
+      const [rows] = await pool.query(`
+        SELECT b.*, s.name as supplier_name, p.name as product_name
+        FROM batches b 
+        LEFT JOIN suppliers s ON b.supplier_id = s.id 
+        LEFT JOIN products p ON b.product_id = p.id
+        ORDER BY b.created_at DESC
+      `);
+      res.json({ success: true, data: rows });
+    } catch (err) {
+      console.error('Error fetching history:', err);
+      res.status(500).json({ success: false, message: 'Failed to fetch history' });
+    }
+  });
+
+  // Archive/Unarchive a batch
+  app.put('/api/inventory/batches/:id/archive', authenticate, checkPermission('Management Product', 'edit'), async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { is_archived } = req.body;
+      
+      await pool.query('UPDATE batches SET is_archived = ? WHERE id = ?', [is_archived ? 1 : 0, id]);
+      
+      await createAuditTrail({
+        user_id: req.user.id,
+        username: req.user.username,
+        role: req.user.role,
+        module: 'Management Product',
+        action: 'edit',
+        description: `${is_archived ? 'Mengarsipkan' : 'Membuka arsip'} faktur/batch #${id}`,
+      });
+      
+      res.json({ success: true });
+    } catch (err) {
+      console.error('Error archiving batch:', err);
+      res.status(500).json({ success: false, message: 'Server error' });
     }
   });
 

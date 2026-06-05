@@ -26,7 +26,7 @@ module.exports = function registerSupplierRoutes(app, pool, authenticate, checkP
           SELECT b.*, pr.name as product_name 
           FROM batches b
           JOIN products pr ON b.product_id = pr.id
-          WHERE b.supplier_id = ?
+          WHERE b.supplier_id = ? AND b.is_archived = FALSE
           ORDER BY b.created_at DESC
         `, [id]);
         

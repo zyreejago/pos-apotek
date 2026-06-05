@@ -241,7 +241,8 @@ const RBAC_MODULES = [
   'Resep Dokter',
   'System Settings',
   'Audit Trail',
-  'Approval Faktur'
+  'Approval Faktur',
+  'Riwayat Pembelian'
 ];
 
 app.get('/api/rbac/modules', authenticate, (req, res) => {

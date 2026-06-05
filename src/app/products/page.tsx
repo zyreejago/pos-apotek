@@ -617,6 +617,42 @@ export default function ProductsPage() {
     });
   };
 
+  const handleArchiveFaktur = async (faktur: Faktur) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Arsipkan Faktur',
+      message: `Apakah Anda yakin ingin mengarsipkan faktur ${faktur.invoice_number || ''}? Faktur yang diarsipkan tidak akan muncul di daftar produk dan supplier, namun tetap ada di Riwayat Pembelian.`,
+      variant: 'warning',
+      onConfirm: async () => {
+        try {
+          const res = await fetch(`http://localhost:5000/api/inventory/batches/${faktur.id}/archive`, {
+            method: 'PUT',
+            headers: {
+              ...authHeaders,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ is_archived: true })
+          });
+          if (res.ok) {
+            goeyToast.success('Faktur berhasil diarsipkan!');
+            if (selectedProduct) {
+              fetchFakturs(selectedProduct.id);
+            }
+          } else {
+            goeyToast.error('Gagal mengarsipkan faktur');
+          }
+        } catch (error) {
+          console.error('Error archiving faktur:', error);
+          goeyToast.error('Gagal mengarsipkan faktur');
+        }
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+      },
+      onClose: () => setConfirmModal(prev => ({ ...prev, isOpen: false })),
+      confirmText: 'Arsipkan',
+      cancelText: 'Batal'
+    });
+  };
+
   const checkPermission = (action: 'create' | 'edit' | 'delete') => {
     return checkActionPermission(action);
   };
@@ -2026,6 +2062,13 @@ export default function ProductsPage() {
                               <AlertTriangle size={14} />
                             </button>
                           )}
+                          <button
+                            onClick={() => handleArchiveFaktur(faktur)}
+                            className="p-1 text-gray-500 hover:bg-gray-100 rounded"
+                            title="Arsipkan Faktur"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="21 8 21 21 3 21 3 8"></polyline><rect x="1" y="3" width="22" height="5"></rect><line x1="10" y1="12" x2="14" y2="12"></line></svg>
+                          </button>
                           <button
                             onClick={() => handleDeleteFaktur(faktur)}
                             className="p-1 text-red-600 hover:bg-red-50 rounded"

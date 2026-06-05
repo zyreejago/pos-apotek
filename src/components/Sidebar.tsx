@@ -243,6 +243,10 @@ export default function Sidebar() {
           <NavItem href="/transactions" icon={<ShoppingCart size={20} />} label="Transactions" active={isActive('/transactions')} isCollapsed={isCollapsed} />
         )}
 
+        {canShow('Riwayat Pembelian') && (
+          <NavItem href="/purchase-history" icon={<Repeat size={20} />} label="Riwayat Pembelian" active={isActive('/purchase-history')} isCollapsed={isCollapsed} />
+        )}
+
         {canShow('Approval Faktur') && (
           <NavItem href="/approvals" icon={<CheckCircle size={20} />} label="Approval Faktur" active={isActive('/approvals')} isCollapsed={isCollapsed} />
         )}
