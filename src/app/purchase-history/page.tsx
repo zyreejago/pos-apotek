@@ -33,7 +33,7 @@ export default function PurchaseHistoryPage() {
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
   
   // Sorting and Filtering
-  const [sortField, setSortField] = useState<keyof HistoryFaktur>('created_at');
+  const [sortField, setSortField] = useState<keyof HistoryFaktur | 'total_price'>('created_at');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -67,12 +67,20 @@ export default function PurchaseHistoryPage() {
     fetchHistory();
   }, [fetchHistory]);
 
-  const handleSort = (field: keyof HistoryFaktur) => {
+  const handleSort = (field: keyof HistoryFaktur | 'total_price') => {
     if (sortField === field) {
       setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
     } else {
       setSortField(field);
-      setSortDirection('asc');
+      const defaultDirection: Record<string, 'asc' | 'desc'> = {
+        created_at: 'desc',
+        purchase_date: 'desc',
+        due_date: 'desc',
+        total_price: 'asc',
+        cost_price: 'asc',
+        initial_quantity: 'asc'
+      };
+      setSortDirection(defaultDirection[field] || 'asc');
     }
   };
 
@@ -111,12 +119,20 @@ export default function PurchaseHistoryPage() {
 
     // Sort
     result.sort((a, b) => {
-      let valA = a[sortField];
-      let valB = b[sortField];
+      let valA: any;
+      let valB: any;
 
-      // Handle nulls
-      if (valA === null) valA = '';
-      if (valB === null) valB = '';
+      if (sortField === 'total_price') {
+        valA = a.cost_price * a.initial_quantity;
+        valB = b.cost_price * b.initial_quantity;
+      } else {
+        valA = a[sortField];
+        valB = b[sortField];
+
+        // Handle nulls
+        if (valA === null) valA = '';
+        if (valB === null) valB = '';
+      }
 
       if (typeof valA === 'string' && typeof valB === 'string') {
         return sortDirection === 'asc' 
@@ -134,7 +150,7 @@ export default function PurchaseHistoryPage() {
     return result;
   }, [fakturs, searchQuery, sortField, sortDirection, statusFilter]);
 
-  const SortableHeader = ({ field, label }: { field: keyof HistoryFaktur, label: string }) => (
+  const SortableHeader = ({ field, label }: { field: keyof HistoryFaktur | 'total_price', label: string }) => (
     <th 
       className="px-6 py-4 text-left cursor-pointer hover:bg-gray-100 transition-colors select-none"
       onClick={() => handleSort(field)}
@@ -198,7 +214,7 @@ export default function PurchaseHistoryPage() {
                   <SortableHeader field="created_at" label="Tanggal" />
                   <SortableHeader field="product_name" label="Produk" />
                   <SortableHeader field="supplier_name" label="Supplier" />
-                  <SortableHeader field="cost_price" label="Total Harga" />
+                  <SortableHeader field="total_price" label="Total Harga" />
                   <SortableHeader field="status" label="Status" />
                   <th className="px-6 py-4 text-center">Bukti</th>
                 </tr>
