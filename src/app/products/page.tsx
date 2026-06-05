@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import Link from 'next/link';
-import { Search, Plus, Edit, Trash2, FileText, Info, UploadCloud, Camera, X, Check, AlertCircle, CheckCircle, Package, Users, Calendar, AlertTriangle } from 'lucide-react';
+import { Search, Plus, Edit, Trash2, FileText, Info, UploadCloud, Camera, X, Check, AlertCircle, CheckCircle, Package, Users, Calendar, AlertTriangle, ArrowUpDown } from 'lucide-react';
 import { goeyToast } from "@/components/ui/goey-toaster";
 import ConfirmModal from '@/components/ConfirmModal';
 import PageHeader from '@/components/PageHeader';
@@ -145,6 +145,8 @@ export default function ProductsPage() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
+  const [sortField, setSortField] = useState<keyof Product | 'name'>('name');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
   const [pagination, setPagination] = useState<Pagination>({
@@ -672,6 +674,11 @@ export default function ProductsPage() {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
+  // Reset page when sort changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [sortField, sortDirection]);
+
   const formatStock = (stock: number, multiplier: number, purchaseUnit: string, baseUnit: string) => {
     return `${stock} ${baseUnit || 'Tablet'}`;
   };
@@ -706,6 +713,78 @@ export default function ProductsPage() {
     if (diffDays < 90) return 'bg-yellow-100 text-yellow-700'; // Expiring soon (< 3 months)
     return 'bg-green-100 text-green-700'; // Safe
   };
+
+  const handleSort = (field: keyof Product | 'name') => {
+    if (sortField === field) {
+      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      const defaultDirection: Record<string, 'asc' | 'desc'> = {
+        expired_date: 'asc',
+        cost_price: 'asc',
+        selling_price: 'asc',
+        stock: 'desc',
+        name: 'asc'
+      };
+      setSortDirection(defaultDirection[field] || 'asc');
+    }
+  };
+
+  const SortableHeader = ({ field, label }: { field: keyof Product | 'name', label: string }) => (
+    <th 
+      className="px-6 py-4 cursor-pointer hover:bg-gray-100 transition-colors select-none"
+      onClick={() => handleSort(field)}
+    >
+      <div className="flex items-center gap-2">
+        <span>{label}</span>
+        <ArrowUpDown size={14} className={`text-gray-400 ${sortField === field ? 'text-blue-500' : ''}`} />
+      </div>
+    </th>
+  );
+
+  const filteredAndSortedProducts = useMemo(() => {
+    let result = [...allProducts];
+
+    // Filter search
+    if (debouncedSearchQuery) {
+      const query = debouncedSearchQuery.toLowerCase();
+      result = result.filter(p => 
+        p.name.toLowerCase().includes(query) ||
+        (p.supplier_name?.toLowerCase().includes(query)) ||
+        (p.location_code?.toLowerCase().includes(query))
+      );
+    }
+
+    // Sort
+    result.sort((a, b) => {
+      let valA: any = a[sortField];
+      let valB: any = b[sortField];
+
+      // Handle nulls
+      if (valA === null) valA = '';
+      if (valB === null) valB = '';
+
+      if (sortField === 'expired_date') {
+        const dateA = valA ? new Date(valA).getTime() : Infinity;
+        const dateB = valB ? new Date(valB).getTime() : Infinity;
+        return sortDirection === 'asc' ? dateA - dateB : dateB - dateA;
+      }
+
+      if (typeof valA === 'string' && typeof valB === 'string') {
+        return sortDirection === 'asc' 
+          ? valA.localeCompare(valB) 
+          : valB.localeCompare(valA);
+      }
+
+      if (typeof valA === 'number' && typeof valB === 'number') {
+        return sortDirection === 'asc' ? valA - valB : valB - valA;
+      }
+
+      return 0;
+    });
+
+    return result;
+  }, [allProducts, debouncedSearchQuery, sortField, sortDirection]);
 
   // Handlers
   const handleOpenAddOffCanvas = () => {
@@ -1093,15 +1172,15 @@ export default function ProductsPage() {
             <thead className="bg-gray-50 text-gray-500 font-medium">
               <tr>
                 {/* <th className="px-6 py-4 cursor-pointer hover:text-gray-700">ID ↕</th> */}
-                <th className="px-6 py-4 cursor-pointer hover:text-gray-700">Name </th>
-                <th className="px-6 py-4 cursor-pointer hover:text-gray-700">Kategori</th>
-                <th className="px-6 py-4 cursor-pointer hover:text-gray-700">Kode Lokasi </th>
-                <th className="px-6 py-4 cursor-pointer hover:text-gray-700">Supplier </th>
-                <th className="px-6 py-4 cursor-pointer hover:text-gray-700">Stock Type </th>
-                <th className="px-6 py-4 cursor-pointer hover:text-gray-700">Cost Price </th>
-                <th className="px-6 py-4 cursor-pointer hover:text-gray-700">Selling Price </th>
-                <th className="px-6 py-4 cursor-pointer hover:text-gray-700">Expired Date </th>
-                <th className="px-6 py-4 cursor-pointer hover:text-gray-700">Stock </th>
+                <SortableHeader field="name" label="Name" />
+                <SortableHeader field="product_category" label="Kategori" />
+                <SortableHeader field="location_code" label="Kode Lokasi" />
+                <SortableHeader field="supplier_name" label="Supplier" />
+                <SortableHeader field="stock_type" label="Stock Type" />
+                <SortableHeader field="cost_price" label="Cost Price" />
+                <SortableHeader field="selling_price" label="Selling Price" />
+                <SortableHeader field="expired_date" label="Expired Date" />
+                <SortableHeader field="stock" label="Stock" />
                 <th className="px-6 py-4 text-right">Actions</th>
               </tr>
             </thead>
@@ -1112,14 +1191,16 @@ export default function ProductsPage() {
                     Loading products...
                   </td>
                 </tr>
-              ) : products.length === 0 ? (
+              ) : filteredAndSortedProducts.length === 0 ? (
                 <tr>
                   <td colSpan={10} className="px-6 py-8 text-center text-gray-500">
                     No products found.
                   </td>
                 </tr>
               ) : (
-                products.map((product) => (
+                filteredAndSortedProducts
+                  .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
+                  .map((product) => (
                   <tr key={product.id} className="hover:bg-gray-50 transition-colors group">
                     {/* <td className="px-6 py-4 text-gray-500">#{product.id}</td> */}
                     <td className="px-6 py-4 font-medium text-gray-900">{product.name}</td>
@@ -1235,7 +1316,7 @@ export default function ProductsPage() {
           
           <div className="flex items-center gap-2">
             <span>
-              {(currentPage - 1) * itemsPerPage + 1}-{Math.min(currentPage * itemsPerPage, pagination.total)} of {pagination.total}
+              {(currentPage - 1) * itemsPerPage + 1}-{Math.min(currentPage * itemsPerPage, filteredAndSortedProducts.length)} of {filteredAndSortedProducts.length}
             </span>
             <div className="flex gap-1">
               <button
@@ -1249,9 +1330,9 @@ export default function ProductsPage() {
                 {currentPage}
               </span>
               <button
-                className={`w-8 h-8 flex items-center justify-center rounded border ${currentPage === pagination.totalPages ? 'text-gray-300 border-gray-200 cursor-not-allowed' : 'text-gray-600 border-gray-300 hover:bg-gray-50'}`}
-                onClick={() => setCurrentPage(p => Math.min(pagination.totalPages, p + 1))}
-                disabled={currentPage === pagination.totalPages}
+                className={`w-8 h-8 flex items-center justify-center rounded border ${currentPage === Math.ceil(filteredAndSortedProducts.length / itemsPerPage) ? 'text-gray-300 border-gray-200 cursor-not-allowed' : 'text-gray-600 border-gray-300 hover:bg-gray-50'}`}
+                onClick={() => setCurrentPage(p => Math.min(Math.ceil(filteredAndSortedProducts.length / itemsPerPage), p + 1))}
+                disabled={currentPage === Math.ceil(filteredAndSortedProducts.length / itemsPerPage)}
               >
                 →
               </button>
