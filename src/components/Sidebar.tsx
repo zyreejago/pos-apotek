@@ -176,21 +176,21 @@ export default function Sidebar() {
     return hasPerm;
   };
 
-  // Auto-collapse sidebar when offcanvas opens
+  // Auto-collapse sidebar when offcanvas opens, but allow manual toggle
+  const prevOffCanvasRef = useRef(isAnyOffCanvasOpen);
   useEffect(() => {
     if (isAuthPage) return;
     
-    if (isAnyOffCanvasOpen) {
-      // If offcanvas opens, collapse sidebar and save user's original state
-      if (!isCollapsed) {
-        setUserCollapsedState(isCollapsed);
-      }
+    if (isAnyOffCanvasOpen && !prevOffCanvasRef.current) {
+      // Offcanvas just opened — save user's original state and collapse
+      setUserCollapsedState(isCollapsed);
       setIsCollapsed(true);
-    } else {
-      // If offcanvas closes, restore user's original state
+    } else if (!isAnyOffCanvasOpen && prevOffCanvasRef.current) {
+      // Offcanvas just closed — restore user's original state
       setIsCollapsed(userCollapsedState);
     }
-  }, [isAnyOffCanvasOpen, isAuthPage, isCollapsed, setIsCollapsed, setUserCollapsedState, userCollapsedState]);
+    prevOffCanvasRef.current = isAnyOffCanvasOpen;
+  }, [isAnyOffCanvasOpen, isAuthPage, setIsCollapsed, setUserCollapsedState, userCollapsedState]);
 
   if (isAuthPage) {
     return null;
