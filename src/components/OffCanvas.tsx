@@ -29,44 +29,39 @@ export default function OffCanvas({
   const [mounted, setMounted] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const scrollPositionRef = useRef<number>(0);
+  const initialWidthSet = useRef(false);
 
   const prevIsOpen = useRef(isOpen);
 
   useEffect(() => {
     setMounted(true);
   }, []);
-  useEffect(() => {
-  console.log('OFFCANVAS EFFECT', {
-    title,
-    isOpen,
-    width
-  });
 
-  if (isOpen) {
-    setIsAnyOffCanvasOpen(true);
-    setOffCanvasWidth(width);
-  } else if (prevIsOpen.current) {
-    console.log('CLOSING', title);
-    closeOffCanvas();
-  }
-
-  prevIsOpen.current = isOpen;
-}, [isOpen]);
-useEffect(() => {
-  return () => {
-    closeOffCanvas();
-  };
-}, [closeOffCanvas]);
   useEffect(() => {
     if (isOpen) {
       setIsAnyOffCanvasOpen(true);
-      setOffCanvasWidth(width);
+      if (!initialWidthSet.current) {
+        setOffCanvasWidth(width);
+        initialWidthSet.current = true;
+      }
     } else if (prevIsOpen.current) {
-      // Only call closeOffCanvas() when isOpen transitions from true to false
       closeOffCanvas();
+      initialWidthSet.current = false;
     }
     prevIsOpen.current = isOpen;
   }, [isOpen, width, setIsAnyOffCanvasOpen, setOffCanvasWidth, closeOffCanvas]);
+
+  // Reset width flag when width prop changes (new feature opens)
+  useEffect(() => {
+    initialWidthSet.current = false;
+  }, [width]);
+
+  // Cleanup: close offcanvas when component unmounts
+  useEffect(() => {
+    return () => {
+      closeOffCanvas();
+    };
+  }, [closeOffCanvas]);
 
   // Simpan scroll position sebelum re-render
   useEffect(() => {
