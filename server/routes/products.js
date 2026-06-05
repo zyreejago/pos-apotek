@@ -15,20 +15,27 @@ module.exports = function registerProductRoutes(app, pool, authenticate, checkPe
     try {
       const connection = await pool.getConnection();
 
-      // Base query: JOIN with the latest batch per product to get supplier_name and stock_type
+      // Stock type priority: RETUR > BELUM_BAYAR > DP > KONSINYASI > LUNAS
       let query = `
         SELECT p.*, 
-               lb.supplier_id, 
+               b.supplier_id, 
                s.name AS supplier_name, 
-               lb.stock_type
+               b.stock_type
         FROM products p
         LEFT JOIN (
-          SELECT b1.* FROM batches b1
-          INNER JOIN (
-            SELECT product_id, MAX(id) AS max_id FROM batches GROUP BY product_id
-          ) b2 ON b1.id = b2.max_id
-        ) lb ON p.id = lb.product_id
-        LEFT JOIN suppliers s ON lb.supplier_id = s.id
+          SELECT b1.product_id, b1.supplier_id, b1.stock_type
+          FROM batches b1
+          WHERE b1.is_archived = FALSE
+            AND NOT EXISTS (
+              SELECT 1 FROM batches b2
+              WHERE b2.product_id = b1.product_id
+                AND b2.is_archived = FALSE
+                AND FIELD(b2.stock_type, 'retur', 'belum_bayar', 'dp', 'konsinyasi', 'lunas')
+                  < FIELD(b1.stock_type, 'retur', 'belum_bayar', 'dp', 'konsinyasi', 'lunas')
+            )
+          GROUP BY b1.product_id
+        ) b ON p.id = b.product_id
+        LEFT JOIN suppliers s ON b.supplier_id = s.id
       `;
       let countQuery = 'SELECT COUNT(*) as total FROM products';
       let params = [];
