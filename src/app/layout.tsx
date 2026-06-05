@@ -19,6 +19,7 @@ const poppins = Poppins({
 export const metadata: Metadata = {
   title: "Apotek Sumber Waras",
   description: "Point of Sales System",
+  icons: [{ rel: "icon", url: "/logo.png" }],
 };
 
 export default function RootLayout({

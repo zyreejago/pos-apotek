@@ -201,20 +201,26 @@ export default function Sidebar() {
   return (
     <div className={`${isCollapsed ? 'w-20' : 'w-72'} h-screen bg-white border-r border-gray-200 flex flex-col font-sans shrink-0 sticky top-0 transition-all duration-300`}>
       {/* Header */}
-      <div className={`p-4 flex items-center ${isCollapsed ? 'justify-center flex-col gap-4' : 'justify-between'}`}>
-        <div className="flex items-center gap-3">
-          {/* Logo Icon */}
-          <div className="text-pink-500 bg-pink-50 p-2 rounded-xl shrink-0">
-            <Activity size={22} strokeWidth={2.5} />
-          </div>
-          {!isCollapsed && <span className="text-lg font-bold text-slate-800 leading-tight">Apotek Sumber Waras</span>}
+      <div className={`relative flex items-center ${isCollapsed ? 'flex-col justify-center pt-3 pb-1 gap-2' : 'justify-center pt-0 pb-0 -mb-7'}`}>
+        <div className="shrink-0">
+          <img src="/logo.png" alt="Logo" className={`object-contain ${isCollapsed ? 'w-12 h-12' : 'w-28 h-28'}`} />
         </div>
-        <button
-          onClick={handleToggleCollapse}
-          className="p-1.5 rounded-lg hover:bg-gray-100 border border-gray-200 text-gray-400 shrink-0"
-        >
-          {isCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
-        </button>
+        {!isCollapsed && (
+          <button
+            onClick={handleToggleCollapse}
+            className="absolute right-3 p-1.5 rounded-lg hover:bg-gray-100 border border-gray-200 text-gray-400 shrink-0"
+          >
+            <ChevronLeft size={16} />
+          </button>
+        )}
+        {isCollapsed && (
+          <button
+            onClick={handleToggleCollapse}
+            className="p-1 rounded-lg hover:bg-gray-100 text-gray-400 shrink-0"
+          >
+            <ChevronRight size={14} />
+          </button>
+        )}
       </div>
 
       {/* Menu Items */}
