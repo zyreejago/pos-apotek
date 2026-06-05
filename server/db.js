@@ -345,6 +345,9 @@ const initDB = async () => {
       await connection.query(`ALTER TABLE batches ADD COLUMN is_archived BOOLEAN DEFAULT FALSE`);
     } catch (e) {}
 
+    try {
+      await connection.query(`ALTER TABLE suppliers ADD COLUMN is_deleted BOOLEAN DEFAULT FALSE`);
+    } catch (e) {}
 
     // Prescriptions table
     await connection.query(`

@@ -9,7 +9,7 @@ module.exports = function registerSupplierRoutes(app, pool, authenticate, checkP
         const connection = await pool.getConnection();
         
         // Get supplier details
-        const [suppliers] = await connection.query('SELECT * FROM suppliers WHERE id = ?', [id]);
+        const [suppliers] = await connection.query('SELECT * FROM suppliers WHERE id = ? AND (is_deleted != 1 OR is_deleted IS NULL)', [id]);
         if (suppliers.length === 0) {
           connection.release();
           return res.status(404).json({ message: 'Supplier not found' });
@@ -99,13 +99,13 @@ module.exports = function registerSupplierRoutes(app, pool, authenticate, checkP
 
     try {
       const connection = await pool.getConnection();
-      let query = 'SELECT * FROM suppliers';
-      let countQuery = 'SELECT COUNT(*) as total FROM suppliers';
+      let query = 'SELECT * FROM suppliers WHERE (is_deleted != 1 OR is_deleted IS NULL)';
+      let countQuery = 'SELECT COUNT(*) as total FROM suppliers WHERE (is_deleted != 1 OR is_deleted IS NULL)';
       let params = [];
 
       if (search) {
-        query += ' WHERE name LIKE ?';
-        countQuery += ' WHERE name LIKE ?';
+        query += ' AND name LIKE ?';
+        countQuery += ' AND name LIKE ?';
         params.push(`%${search}%`);
       }
 
@@ -215,7 +215,7 @@ module.exports = function registerSupplierRoutes(app, pool, authenticate, checkP
       // Get current supplier name
       const [currentSupplier] = await pool.query('SELECT name FROM suppliers WHERE id = ?', [id]);
       
-      await pool.query('DELETE FROM suppliers WHERE id = ?', [id]);
+      await pool.query('UPDATE suppliers SET is_deleted = TRUE WHERE id = ?', [id]);
 
       await createAuditTrail({
         user_id: req.user.id,
@@ -223,7 +223,7 @@ module.exports = function registerSupplierRoutes(app, pool, authenticate, checkP
         role: req.user.role,
         module: 'Suppliers',
         action: 'delete',
-        description: `Menghapus supplier: ${currentSupplier[0]?.name || id}`,
+        description: `Menghapus supplier (soft): ${currentSupplier[0]?.name || id}`,
       });
 
       res.json({ message: 'Supplier deleted successfully' });

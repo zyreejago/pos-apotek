@@ -401,15 +401,112 @@ module.exports = function registerTransactionRoutes(app, pool, authenticate, che
 
       if (paymentStatus === 'completed' && transaction.payment_status !== 'completed') {
         const [items] = await connection.query(
-          'SELECT * FROM transaction_items WHERE transaction_id = ?',
+          'SELECT ti.*, p.cost_price, p.product_category FROM transaction_items ti JOIN products p ON ti.product_id = p.id WHERE ti.transaction_id = ?',
           [transaction.id]
         );
 
+        let totalCOGS = 0;
+        let obatSalesTotal = 0;
+        let nonObatSalesTotal = 0;
+        let obatCOGSTotal = 0;
+        let nonObatCOGSTotal = 0;
+
         for (const item of items) {
+          // Implementasi FEFO untuk Midtrans juga!
+          let remainingToReduce = item.quantity;
+
+          // Ambil batch yang masih ada stok, diurutkan by expired_date ASC
+          const [batches] = await connection.query(
+            'SELECT id, remaining_quantity FROM batches WHERE product_id = ? AND remaining_quantity > 0 AND is_archived = FALSE ORDER BY expired_date ASC, created_at ASC',
+            [item.product_id]
+          );
+
+          for (const batch of batches) {
+            if (remainingToReduce <= 0) break;
+
+            const reduceAmount = Math.min(remainingToReduce, batch.remaining_quantity);
+
+            // Kurangi remaining_quantity batch
+            await connection.query(
+              'UPDATE batches SET remaining_quantity = remaining_quantity - ? WHERE id = ?',
+              [reduceAmount, batch.id]
+            );
+
+            remainingToReduce -= reduceAmount;
+          }
+
+          // Update total stok di products
           await connection.query(
             'UPDATE products SET stock = stock - ? WHERE id = ?',
             [item.quantity, item.product_id]
           );
+
+          const cost = Number(item.cost_price || 0);
+          const itemCOGS = cost * item.quantity;
+          const itemSales = Number(item.price) * item.quantity;
+          totalCOGS += itemCOGS;
+
+          const isObat = item.product_category === 'OBAT';
+          if (isObat) {
+            obatSalesTotal += itemSales;
+            obatCOGSTotal += itemCOGS;
+          } else {
+            nonObatSalesTotal += itemSales;
+            nonObatCOGSTotal += itemCOGS;
+          }
+        }
+
+        // Calculate sales without PPN (for income accounts) and separate PPN for Hutang Pajak
+        const salesTotalWithoutTax = transaction.subtotal || 0;
+        const taxAmountValue = transaction.tax_amount || 0;
+
+        // Create journal entry for midtrans payment (bank)
+        const today = new Date().toISOString().split('T')[0];
+        const [accResult] = await connection.query('SELECT id FROM accounts WHERE code = ?', ['102']);
+        if (accResult.length > 0) {
+          // Create journal entry header
+          const [journalResult] = await connection.query(
+            'INSERT INTO journal_entries (transaction_id, date, description) VALUES (?, ?, ?)',
+            [transaction.id, today, `Penjualan non-tunai #${transaction.id}`]
+          );
+          const journalId = journalResult.insertId;
+
+          const journalItems = [
+            { accountCode: '102', debit: transaction.total_amount }
+          ];
+
+          // Split sales without tax proportionally between OBAT and NON_OBAT
+          const totalSalesWithTax = obatSalesTotal + nonObatSalesTotal;
+          let obatSalesWithoutTax = 0;
+          let nonObatSalesWithoutTax = 0;
+
+          if (totalSalesWithTax > 0 && salesTotalWithoutTax > 0) {
+            obatSalesWithoutTax = (obatSalesTotal / totalSalesWithTax) * salesTotalWithoutTax;
+            nonObatSalesWithoutTax = (nonObatSalesTotal / totalSalesWithTax) * salesTotalWithoutTax;
+          }
+
+          if (obatSalesWithoutTax > 0) journalItems.push({ accountCode: '401', credit: Math.round(obatSalesWithoutTax) });
+          if (nonObatSalesWithoutTax > 0) journalItems.push({ accountCode: '402', credit: Math.round(nonObatSalesWithoutTax) });
+          if (taxAmountValue > 0) journalItems.push({ accountCode: '202', credit: Math.round(taxAmountValue) });
+
+          if (obatCOGSTotal > 0) {
+            journalItems.push({ accountCode: '501', debit: obatCOGSTotal });
+            journalItems.push({ accountCode: '103', credit: obatCOGSTotal });
+          }
+          if (nonObatCOGSTotal > 0) {
+            journalItems.push({ accountCode: '502', debit: nonObatCOGSTotal });
+            journalItems.push({ accountCode: '104', credit: nonObatCOGSTotal });
+          }
+
+          for (const item of journalItems) {
+            const [accRes] = await connection.query('SELECT id FROM accounts WHERE code = ?', [item.accountCode]);
+            if (accRes.length > 0) {
+              await connection.query(
+                'INSERT INTO journal_items (journal_entry_id, account_id, debit, credit) VALUES (?, ?, ?, ?)',
+                [journalId, accRes[0].id, item.debit || 0, item.credit || 0]
+              );
+            }
+          }
         }
       }
 

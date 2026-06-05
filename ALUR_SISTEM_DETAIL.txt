@@ -1,159 +1,933 @@
-# ALUR SISTEM POS APOTEK SUMBER WARAS SECARA DETAIL
+# ALUR SISTEM POS APOTEK SUMBER WARAS — DETAIL LENGKAP
 
-## Pendahuluan
-Sistem ini adalah sistem POS (Point of Sales) untuk apotek yang mengelola produk, transaksi, faktur (batch), dan akuntansi. Sistem ini bertujuan untuk memastikan manajemen stok yang tepat dengan metode FEFO (First Expired, First Out), yaitu stok yang paling cepat kadaluarsa dijual terlebih dahulu.
+================================================================================
+                             ARSITEKTUR SISTEM
+================================================================================
 
+Frontend   : Next.js 14 (App Router) + TypeScript + Tailwind CSS
+Backend    : Express.js 4 (Node.js) + mysql2/promise
+Database   : MySQL 8+
+Auth       : JWT (jsonwebtoken) + bcryptjs, dual-layer (cookie middleware + client)
+Payment    : Midtrans Snap (sandbox)
+Forecast   : Google Gemini API + Holt-Winters + OpenRouter
+File Upload: Multer (memoryStorage → LONGBLOB MySQL)
+Notifikasi : goey-toast
+Icons      : lucide-react
 
-## Struktur Utama Tabel Database
-1. **`products`**: Menyimpan data master produk
-   - id, name, cost_price, selling_price, stock, unit, expired_date (default untuk produk tanpa batch), location_code, supplier_id, purchase_unit, unit_multiplier, product_category, status, created_at, updated_at
-2. **`batches` (atau faktur)**: Menyimpan data batch/faktur produk
-   - id, product_id, supplier_id, batch_number (nomor faktur), stock_type (belum_bayar, konsinyasi, dp, lunas), purchase_date, initial_quantity, remaining_quantity, cost_price, expired_date (tanggal kadaluarsa batch ini), dp_amount, due_date, image_url, status (pending, approved, dll), notes, is_archived, created_at, updated_at
-3. **`transactions`**: Menyimpan header transaksi
-4. **`transaction_items`**: Menyimpan detail item dalam transaksi
-
-
-## Alur 1: Menambahkan Produk Baru
-1. Pengguna mengakses halaman Products
-2. Klik tombol "Tambah Produk"
-3. Isi form: Nama produk, harga beli, harga jual, unit dasar, unit pembelian, unit multiplier, lokasi, dll.
-4. Klik simpan
-5. Backend:
-   - Membuat record baru di tabel `products`
-   - Membuat catatan audit trail
-   - Membuat jurnal (jika stok awal ditambahkan dan tidak ada supplier)
-   - Mengembalikan response sukses
-
-
-## Alur 2: Menambahkan Faktur/Batch Baru
-1. Di halaman Products, pilih produk yang ingin ditambahkan faktur
-2. Klik tombol "Tambah Faktur"
-3. Isi form:
-   - Nomor batch (opsional)
-   - Supplier
-   - Tipe stok (belum_bayar/konsinyasi/dp/lunas)
-   - Tanggal pembelian
-   - Unit pembelian
-   - Unit dasar
-   - Isi per unit pembelian (unit_multiplier)
-   - Jumlah (dalam unit pembelian)
-   - Harga beli
-   - Harga jual
-   - Tanggal kadaluarsa batch ini
-   - Catatan
-   - Upload bukti faktur (opsional)
-4. Klik simpan
-5. Backend:
-   - **Pertama**: Update data produk di tabel `products` (harga beli, harga jual, unit, purchase_unit, unit_multiplier, dll.)
-   - **Kedua**: Hitung jumlah dalam satuan dasar: `initial_quantity = jumlah_diform * unit_multiplier`
-   - **Ketiga**: Hitung total nilai transaksi: `total_amount = initial_quantity * cost_price`
-   - **Keempat**: Cek apakah memerlukan approval (jika total_amount > Rp2.000.000):
-     - Jika iya, set batch status ke `pending`
-     - Jika tidak, set batch status ke `approved` dan update stok produk
-   - **Kelima**: Simpan data batch di tabel `batches`
-   - **Keenam**: Jika status `approved`, buat jurnal entri akuntansi
-   - **Ketujuh**: Buat catatan audit trail
-   - Kembalikan response sukses
+Struktur Provider:
+<html>
+  <head><Script src="https://app.sandbox.midtrans.com/snap/snap.js" ... /></head>
+  <body>
+    <OffCanvasProvider>
+      <AuthProvider>
+        <HeaderProvider>
+          <SidebarProvider>
+            <KeyboardShortcutsProvider>
+              <MainLayout>
+                {children}  ← halaman yang diakses
+              </MainLayout>
+            </KeyboardShortcutsProvider>
+          </SidebarProvider>
+        </HeaderProvider>
+        <GoeyToaster />
+      </AuthProvider>
+    </OffCanvasProvider>
+  </body>
+</html>
 
 
-## Alur 3: Approve Faktur/Pending (Untuk User dengan Hak Akses Approve)
-1. Akses halaman Approval Faktur
-2. Lihat daftar faktur yang pending
-3. Klik "Approve" pada faktur yang ingin disetujui
+================================================================================
+                          STRUKTUR DATABASE LENGKAP
+================================================================================
+
+1. users
+   - id, username, password (bcrypt hash), role (superadmin/admin/kasir/gudang),
+     full_name, email, phone, status (active/inactive), created_at
+
+2. roles
+   - id, name
+
+3. role_permissions
+   - id, role_id, module (VARCHAR 100), action (ENUM: create/edit/delete/show),
+     allowed (TINYINT 1), UNIQUE(role_id, module, action)
+
+4. suppliers
+   - id, name, contact_person, phone, address, created_at
+
+5. products
+   - id, name, cost_price, selling_price, stock (desimal stok total),
+     unit, expired_date, location_code, supplier_id, purchase_unit,
+     unit_multiplier, product_category (OBAT/NON_OBAT), status (active/pending),
+     image_url, created_at
+
+6. batches (Bukti Faktur Pembelian)
+   - id, product_id, supplier_id, batch_number, stock_type
+     (belum_bayar/konsinyasi/dp/lunas), purchase_date, initial_quantity,
+     remaining_quantity, cost_price, expired_date, dp_amount, due_date,
+     image_url, status (approved/pending/rejected/revision), notes,
+     is_archived (BOOLEAN), created_at
+
+7. batch_dp_payments
+   - id, batch_id, amount, payment_date, payment_method (cash/transfer),
+     notes, created_at
+
+8. transactions
+   - id, user_id, total_amount, tax_amount, discount_amount, subtotal,
+     payment_method (cash/midtrans), payment_status (pending/completed/
+     cancelled/settlement), midtrans_order_id, midtrans_transaction_id,
+     created_at
+
+9. transaction_items
+   - id, transaction_id, product_id, batch_id, quantity, cost_price,
+     selling_price, subtotal, created_at
+
+10. purchases (legacy)
+    - id, supplier_id, user_id, total_amount, payment_status, due_date,
+      created_at
+
+11. purchase_items (legacy)
+    - id, purchase_id, product_id, quantity, cost_price
+
+12. purchase_payments (legacy)
+    - id, purchase_id, amount, payment_date, payment_method
+
+13. stock_opname
+    - id, product_id, batch_id, system_stock, physical_stock, difference,
+      notes, user_id, created_at
+
+14. accounts (Chart of Accounts)
+    - id, code, name, type (asset/liability/equity/revenue/expense),
+      normal_balance (debit/credit), is_active
+
+15. journal_entries
+    - id, transaction_id, entry_date, description, created_at
+
+16. journal_items
+    - id, journal_entry_id, account_id, debit (DECIMAL 15,2),
+      credit (DECIMAL 15,2)
+
+17. audit_trails
+    - id, user_id, username, role, module, action, description, created_at
+
+18. system_settings
+    - id, setting_key, setting_value
+
+19. substitutions_cache
+    - id, product_name, result (JSON), created_at
+
+20. stock_forecasts
+    - id, product_id, forecast_date, forecast_qty, confidence, model_used
+
+21. password_reset_requests
+    - id, email, token (6-digit), expires_at, verified (BOOLEAN), used (BOOLEAN)
+
+22. purchases (existing — untuk tabel pembelian legacy)
+
+
+================================================================================
+                    RBAC — MODUL & ACTION PER MODUL
+================================================================================
+
+Module              | Actions yang dicek di Backend
+--------------------|-------------------------------
+Management Product  | create, edit, delete, show
+Transactions        | create (show akses halaman via frontend)
+Management Pengguna | create, edit, delete, show
+Sales Report        | show, create (POST jurnal)
+Peramalan Stok      | show
+Substitutions       | show (frontend only)
+Suppliers           | create, edit, delete, show
+Stock Opname        | create
+System Settings     | (tidak ada checkPermission backend — superadmin only)
+Audit Trail         | show
+Approval Faktur     | show, edit
+Riwayat Pembelian   | show
+Resep Dokter        | show, create, edit, delete
+
+Catatan:
+- Superadmin: bypass via `req.user.role === 'superadmin'` + fallback jika
+  record permission tidak ada sama sekali. Jika record permission ADA dan
+  allowed = 0, superadmin pun akan ditolak.
+- `useRequirePermission(module)` di frontend: cek 'show'. Jika tidak punya,
+  redirect ke /dashboard.
+
+
+================================================================================
+                     ALUR 1: AUTHENTIKASI & LOGIN
+================================================================================
+
+1. User akses halaman manapun (selain /login, /register, /forgot-password)
+
+2. Next.js Middleware (src/middleware.ts):
+   a. Baca cookie 'token'
+   b. Jika tidak ada → redirect ke /login
+   c. Jika ada → lanjut
+
+3. Client-side AuthProvider (src/components/AuthProvider.tsx):
+   a. Cek localStorage.getItem('token')
+   b. Jika tidak ada → redirect ke /login
+   c. Jika ada → render children
+
+4. Halaman Login (src/app/login/page.tsx):
+   a. Form: username, password
+   b. Klik "Login"
+   c. Fetch POST http://localhost:5000/api/auth/login
+      - Body: { username, password }
+   d. Backend:
+      - Cari user di tabel users WHERE username = ? AND status = 'active'
+      - Jika tidak ditemukan → 401
+      - Compare password dengan bcrypt
+      - Jika salah → 401
+      - Jika benar:
+        * Generate JWT: jwt.sign({ id: user.id, username, role }, SECRET, { expiresIn: '24h' })
+        * Return 200: { token, user: { id, username, role, full_name } }
+   e. Frontend:
+      - Simpan token di localStorage
+      - Simpan user (JSON) di localStorage
+      - Set cookie 'token' = token
+      - Dispatch event 'auth:changed' di window
+      - Redirect ke /dashboard
+
+5. Auto-logout (terjadi ketika):
+   - API return 401 → localStorage.clear() + cookie dihapus + redirect /login
+   - Token expired → middleware redirect ke /login
+
+
+================================================================================
+                ALUR 1b: REGISTER & FORGOT PASSWORD
+================================================================================
+
+--- REGISTER ---
+1. Akses /register
+2. Isi form: username, password (min 6), konfirmasi password
+3. Submit → POST http://localhost:5000/api/auth/register
 4. Backend:
-   - Ubah status batch menjadi `approved`
-   - Update stok produk di tabel `products`
-   - Buat jurnal entri akuntansi
-   - Buat catatan audit trail
-   - Kembalikan response sukses
+   - Cek username unik
+   - Hash password dengan bcrypt
+   - INSERT ke tabel users, role default 'kasir', status 'active'
+   - Return 201 { message, id }
+
+--- FORGOT PASSWORD (4 Langkah) ---
+Langkah 1: Kirim Email
+   a. Akses /forgot-password, masukkan email
+   b. POST /api/forgot-password → { email }
+   c. Backend:
+      - Generate 6-digit random code
+      - Simpan di password_reset_requests (email, code hash, expires_at + 15 menit)
+      - Kirim email via nodemailer (Gmail SMTP)
+      - Return 200 { message }
+   d. Frontend → lanjut step 2
+
+Langkah 2: Verifikasi Kode
+   a. Masukkan kode 6-digit
+   b. POST /api/verify-reset-code → { email, code }
+   c. Backend:
+      - Cari record di password_reset_requests WHERE email AND code AND expires_at > NOW()
+      - Jika cocok → set verified = true, return 200
+      - Jika tidak → 400
+   d. Frontend → lanjut step 3
+
+Langkah 3: Reset Password
+   a. Masukkan password baru + konfirmasi
+   b. POST /api/reset-password → { email, code, new_password }
+   c. Backend:
+      - Verifikasi code & verified = true & belum used
+      - Hash password baru
+      - UPDATE users SET password = ?
+      - Tandai request sebagai used
+      - Return 200
+   d. Frontend → lanjut step 4 (Done, link ke /login)
 
 
-## Alur 4: Transaksi Penjualan (Dengan FEFO!) - ALUR PENTING!
-Ini adalah alur inti untuk memastikan stok yang paling cepat kadaluarsa dijual terlebih dahulu!
+================================================================================
+                  ALUR 2: SIDEBAR & NAVIGASI
+================================================================================
 
-1. **Frontend (POS Page)**:
-   - Pengguna memilih produk yang ingin dibeli
-   - Masukkan jumlah yang ingin dibeli
-   - Klik tombol "Pembayaran"
-   - Frontend mengirim data transaksi ke backend
+1. Sidebar (src/components/Sidebar.tsx):
+   a. Fetch permissions: GET /api/rbac/permissions?roleName={role}
+   b. Untuk tiap item navigasi, panggil canShow(module):
+      - Dashboard → true (semua user)
+      - Management Product → cek perm.show || perm.create || perm.edit || perm.delete
+      - Transactions → sama
+      - Stock Opname → sama
+      - Suppliers → sama
+      - Prescriptions → sama
+      - Users → sama
+      - Reports → sama (cek Sales Report)
+      - System Settings → superadmin bypass
+   c. Jika loading → sembunyikan semua menu
 
-2. **Backend (Transactions Route)**:
-   a. **Validasi Awal**:
-      - Cek apakah user memiliki izin
-      - Cek apakah keranjang tidak kosong
-   
-   b. **Buat Header Transaksi**:
-      - Insert data ke tabel `transactions` dengan status `pending`
-   
-   c. **Untuk Setiap Item dalam Transaksi**:
-      i. **Ambil Semua Batch Produk Yang Tersedia**:
-         - Query: `SELECT * FROM batches WHERE product_id = ? AND remaining_quantity > 0 AND is_archived = FALSE ORDER BY expired_date ASC, created_at ASC`
-         - Diurutkan berdasarkan tanggal kadaluarsa TERDEKAT terlebih dahulu (FEFO!)
-      
-      ii. **Loop Melalui Batch-Batch tersebut untuk Mengurangi Stok**:
-          - Contoh: Produk A butuh 10 pcs
-            - Batch 1: expired 2026-06-10, remaining 4 pcs → ambil semua 4, sisa kebutuhan 6
-            - Batch 2: expired 2026-06-15, remaining 8 pcs → ambil 6, sisa kebutuhan 0
-            - Batch 3: expired 2026-06-20, remaining 5 pcs → tidak perlu diambil
-      
-      iii. **Untuk Setiap Batch Yang Digunakan**:
-          - Update `remaining_quantity` di tabel `batches` (kurangi dengan jumlah yang diambil dari batch ini)
-          - (Opsional tapi direkomendasikan) Insert ke tabel `transaction_batch_usage` (jika ada) untuk mencatat batch mana yang dipakai
-          - Hitung COGS (Cost of Goods Sold) per batch: `jumlah_dari_batch * cost_price_batch`
-      
-      iv. **Update Total Stok di Tabel `products`**:
-          - Kurangi `stock` dengan total jumlah yang dibeli
-      
-      v. **Insert ke `transaction_items`**:
-          - Simpan detail item transaksi
-   
-   d. **Proses Pembayaran**:
-      - Jika tunai: Update status transaksi menjadi `completed` dan buat jurnal akuntansi langsung
-      - Jika Midtrans: Redirect ke halaman pembayaran Midtrans, dan proses setelah pembayaran berhasil
+2. Collapse/Expand:
+   a. Klik tombol chevron di header sidebar
+   b. Toggle isCollapsed via SidebarContext
+   c. Sidebar width: w-20 (collapsed) ↔ w-72 (expanded)
+   d. Auto-collapse ketika OffCanvas terbuka (via useEffect)
+   e. User bisa manual expand kembali meski OffCanvas masih terbuka
 
-   e. **Buat Jurnal Entri Akuntansi**:
-      - Debit Kas/Bank
-      - Credit Penjualan Obat
-      - Credit Penjualan Non-Obat
-      - Credit Hutang Pajak (PPN)
-      - Debit HPP Obat
-      - Credit Persediaan Obat
-      - Debit HPP Non-Obat
-      - Credit Persediaan Non-Obat
-
-   f. **Buat Catatan Audit Trail**:
-      - Simpan log aktivitas transaksi
-   
-   g. **Kembalikan Response ke Frontend**:
-      - Beri notifikasi sukses
-      - Beri data untuk mencetak nota
+3. Keyboard Shortcuts (KeyboardShortcutsContext):
+   - Ctrl/Cmd+B → toggle sidebar
+   - 1-8 → navigasi cepat ke halaman
+   - / → fokus search input
+   - Huruf a-z, A-Z → fokus search input
 
 
-## Alur 5: Mengarsipkan Faktur
-1. Di halaman Products, pilih produk, lalu pilih faktur yang ingin diarsipkan
-2. Klik tombol "Arsipkan" (hanya muncul jika tipe stok `lunas`)
-3. Konfirmasi
+================================================================================
+              ALUR 3: PRODUCT MANAGEMENT (HALAMAN PRODUCTS)
+================================================================================
+
+--- 3a. Melihat Daftar Produk ---
+1. Akses /products
+2. Frontend:
+   a. Fetch GET http://localhost:5000/api/products
+      - Backend query: SELECT * FROM products ORDER BY created_at DESC
+   b. Render tabel: kode, nama, stok, kategori, harga jual, status
+   c. Search: input filter → set searchQuery → debounce 500ms → refetch
+   d. Pagination: Show per page (10/20/50)
+
+--- 3b. Menambah Produk Baru (Single) ---
+1. Klik "Add Product" → buka OffCanvas (lebar default 400px)
+2. State: showProductForm = true, productOffCanvasMode = 'add'
+3. Form:
+   a. Nama Produk (required)
+   b. Harga Beli (cost_price)
+   c. Harga Jual (selling_price)
+   d. Kategori (OBAT / NON_OBAT)
+   e. Stok Minimal (min_stock)
+   f. Unit (Tablet/Kapsul/...)
+   g. Unit Pembelian (Box/Strip/Botol/...)
+   h. Unit Multiplier (konversi ke unit dasar)
+   i. Supplier (dropdown dari GET /api/suppliers)
+   j. Lokasi Rak (location_code)
+   k. Tanggal Kadaluarsa (expired_date — default)
+   l. Gambar (upload via file)
+   m. Catatan
+4. Klik "Create Product"
+5. Fetch POST /api/products (FormData — multipart, termasuk image)
+6. Backend (routes/products.js):
+   a. Insert ke tabel products
+   b. Buat audit trail
+   c. Return 201
+7. Frontend: toast sukses, refresh daftar, tutup OffCanvas
+
+--- 3c. Menambah Banyak Produk Sekaligus (Multiple) ---
+1. Di form Add Product, toggle "Multiple Products"
+2. Form berubah: input Nomor Invoice + Upload Bukti Faktur (image)
+3. Tabel untuk memasukkan banyak produk sekaligus:
+   - Nama produk, jumlah (dalam unit pembelian), harga beli, harga jual,
+     tanggal kadaluarsa, unit multiplier
+   - Klik "Tambah Baris" untuk menambah row
+4. Klik "Simpan Semua"
+5. Backend:
+   a. Cek/fetch supplier (dari invoice)
+   b. Untuk setiap baris:
+      - Cari produk berdasarkan nama
+      - Jika tidak ditemukan → skip return error
+      - Insert batch baru dengan supplier & image dari invoice +
+        data per-produk
+   c. Buat audit trail
+   d. Return sukses
+
+--- 3d. Edit Produk ---
+1. Klik ikon edit pada baris produk
+2. OffCanvas terbuka (mode 'edit') dengan data terisi
+3. Ubah field, klik "Save Changes"
+4. PUT /api/products/:id
+5. Backend update products + audit trail
+
+--- 3e. Hapus Produk ---
+1. Klik ikon hapus → ConfirmModal (variant danger)
+2. Konfirmasi → DELETE /api/products/:id
+3. Backend: set status = 'inactive' (soft delete) + audit trail
+
+
+================================================================================
+              ALUR 4: MANAJEMEN FAKTUR / BATCH (DALAM PRODUCTS)
+================================================================================
+
+--- 4a. Melihat Faktur Suatu Produk ---
+1. Di halaman Products, klik baris produk → buka Faktur OffCanvas (lebar 800px)
+2. State: isFakturOffCanvasOpen = true
+3. Fetch GET /api/inventory/batches/:productId
+   - Backend: SELECT batches JOIN suppliers, JOIN batch_dp_payments
+4. Tabel: nomor batch, supplier, tipe stok, tgl beli, qty awal, sisa stok,
+   harga, status (Disetujui/Menunggu/Ditolak/Revisi)
+5. Status badge warna: approved=green, pending=yellow, rejected=red, revision=orange
+
+--- 4b. Menambah Faktur Baru ---
+1. Dalam Faktur OffCanvas, klik "Tambah Faktur"
+2. State: showFakturForm = true, fakturModalMode = 'add'
+3. Form muncul di dalam OffCanvas (inline, bukan modal terpisah)
+4. Field:
+   a. Nomor Batch/Invoice (opsional)
+   b. Supplier (dropdown)
+   c. Tipe Stok:
+      - Belum Bayar (hutang)
+      - Konsinyasi (titip jual)
+      - DP (bayar sebagian)
+      - Lunas (bayar lunas)
+   d. Tanggal Pembelian
+   e. Unit Pembelian (Box/Strip/Botol/Tube/Pcs)
+   f. Unit Dasar (Tablet/Kapsul/dll)
+   g. Isi Per Unit (unit_multiplier — konversi)
+   h. Jumlah (dalam unit pembelian)
+   i. Harga Beli per unit dasar
+   j. Harga Jual per unit dasar
+   k. Tanggal Kadaluarsa (untuk batch ini)
+   l. Jika tipe DP:
+      - Jumlah DP (IDR) — otomatis jadi DP 1
+      - Tanggal Jatuh Tempo
+   m. Catatan
+   n. Upload Bukti Faktur (file atau kamera)
+5. Klik "Tambah Faktur"
+6. Frontend (handleSaveFaktur):
+   a. Update dulu data produk: PUT /api/products/:id
+      (harga beli, harga jual, unit, purchase_unit, unit_multiplier, supplier_id)
+   b. Kirim batch: POST /api/inventory/batches (FormData: image + fields)
+7. Backend (routes/inventory.js POST):
+   a. Hitung qtyInBaseUnit = quantity × unit_multiplier
+   b. Hitung totalAmount = qtyInBaseUnit × cost_price
+   c. Cek approval:
+      - Jika totalAmount > 2.000.000 → status = 'pending'
+      - Jika ≤ 2.000.000 → status = 'approved'
+   d. INSERT batch
+   e. Jika tipe DP dan dp_amount diisi:
+      - Auto-create batch_dp_payments (DP 1):
+        INSERT INTO batch_dp_payments (batch_id, amount, payment_date, 'cash')
+   f. Jika status = 'approved':
+      - UPDATE products SET stock = stock + initial_quantity
+      - Buat jurnal akuntansi:
+        * Debit Persediaan (110) = totalAmount
+        * Jika Lunas: Credit Kas (101) = totalAmount
+        * Jika DP: Credit Kas (101) = dp_amount, Credit Hutang (201) = sisa
+        * Jika Belum Bayar/Konsinyasi: Credit Hutang (201) = totalAmount
+   g. Audit trail
+   h. Return { success, data: { id, status } }
+8. Frontend:
+   - Jika status = 'pending' → toast "Persetujuan Diperlukan"
+   - Jika status = 'approved' → toast sukses
+   - Reset form, refresh faktur list, refresh produk
+
+--- 4c. Edit Faktur ---
+1. Klik edit pada faktur → form terbuka dengan data existing
+2. Ubah field, klik "Simpan Faktur"
+3. PUT /api/inventory/batches/:id
 4. Backend:
-   - Cek apakah `stock_type == 'lunas'` (jika tidak, tolak permintaan)
-   - Ubah `is_archived` di tabel `batches` menjadi `true`
-   - Buat catatan audit trail
-   - Kembalikan response sukses
+   a. Ambil batch lama (remaining_quantity, status, product_id)
+   b. Hitung ulang totalAmount → re-evaluasi approval
+   c. UPDATE batches
+   d. Handle stock changes:
+      - Jika oldStatus=approved & newStatus=approved:
+        stock += (newRemaining - oldRemaining)
+      - Jika oldStatus≠approved & newStatus=approved:
+        stock += newRemaining
+      - Jika oldStatus=approved & newStatus≠approved:
+        stock -= oldRemaining
+   e. Handle jurnal ulang jika perlu
+   f. Audit trail
+
+--- 4d. Hapus Faktur ---
+1. Klik ikon hapus → ConfirmModal
+2. DELETE /api/inventory/batches/:id
+3. Backend: HAPUS batch (cascade ke batch_dp_payments) + audit trail
+
+--- 4e. Manajemen DP ---
+1. Di Ringkasan Pembayaran (hanya muncul di mode edit & tipe DP):
+   a. Total Faktur (cost_price × initial_quantity)
+   b. Daftar DP yang sudah dibayar:
+      - DP 1: RpXXX (tanggal) [Cash/TF] [tombol hapus]
+      - DP 2: RpXXX (tanggal) [Cash/TF] [tombol hapus]
+   c. Total DP
+   d. Sisa Hutang (atau Lunas jika sudah lunas)
+2. Tambah DP:
+   a. Klik "Tambah DP"
+   b. Form: Jumlah DP, Tanggal Bayar, Metode Pembayaran (Cash / Transfer)
+   c. Klik "Simpan DP"
+   d. POST /api/inventory/batches/:batchId/dp-payments
+      - Body: { amount, payment_date, payment_method }
+   e. Backend: INSERT batch_dp_payments + audit trail
+   f. Refresh faktur list
+3. Hapus DP:
+   a. Klik ikon hapus → ConfirmModal "Yakin ingin menghapus DP RpXXX?"
+   b. DELETE /api/inventory/batches/:batchId/dp-payments/:paymentId
+   c. Backend: DELETE + audit trail
+
+--- 4f. Arsipkan Faktur ---
+1. Klik "Arsipkan" (hanya muncul jika stock_type = 'lunas')
+2. Konfirmasi
+3. PUT /api/inventory/batches/:id/archive → { is_archived: true }
+4. Backend: cek stock_type = 'lunas', lalu UPDATE is_archived = 1
+5. Jika tidak lunas → return 400 "Hanya faktur dengan tipe stok lunas..."
+
+--- 4g. Upload Bukti Faktur ---
+1. Pilih file dari galeri atau ambil foto via kamera (capture="environment")
+2. Preview image muncul
+3. Dikirim sebagai FormData bersama data batch lainnya
 
 
-## Alur 6: Melihat Riwayat Pembelian
-1. Akses halaman Purchase History
-2. Lihat semua faktur yang pernah dibuat
-3. Bisa sortir berdasarkan tanggal, total harga, dll.
+================================================================================
+                    ALUR 5: APPROVAL FAKTUR
+================================================================================
+
+1. Akses /approvals
+2. Frontend fetch GET /api/inventory/pending-batches
+   - Backend: SELECT batches JOIN suppliers JOIN products
+     WHERE status IN ('pending', 'revision', 'rejected')
+3. Tabel: produk, supplier, tgl, total harga, status, tombol aksi
+4. Untuk setiap faktur:
+   a. Approve:
+      - PUT /api/inventory/batches/:id/approve
+      - Backend:
+        * UPDATE status = 'approved'
+        * UPDATE products SET stock = stock + initial_quantity
+        * Buat jurnal akuntansi (sama seperti create)
+        * Audit trail
+   b. Revisi:
+      - Modal input catatan perbaikan
+      - PUT /api/inventory/batches/:id/revision
+      - Backend:
+        * UPDATE status = 'revision', notes = (catatan approver)
+        * Audit trail
+   c. Tolak:
+      - PUT /api/inventory/batches/:id/reject
+      - Backend:
+        * UPDATE status = 'rejected'
+        * Audit trail
+5. Approver juga bisa langsung edit faktur (jika perlu)
 
 
-## Alur 7: Manajemen Akuntansi (Opsional)
-1. Membuat jurnal manual
-2. Melihat laporan keuangan
-3. Melihat buku besar
-4. dll.
+================================================================================
+              ALUR 6: SUPPLIER MANAGEMENT
+================================================================================
+
+--- 6a. Daftar Supplier ---
+1. Akses /suppliers
+2. Fetch GET /api/suppliers?page=&limit=&search=
+3. Tabel: nama, telepon, aksi (view, edit, delete)
+4. Search + pagination
+
+--- 6b. Tambah Supplier ---
+1. Klik "Add Supplier" → OffCanvas
+2. Form: Nama, Contact Person, Telepon, Alamat
+3. POST /api/suppliers
+4. Backend: INSERT + audit trail
+
+--- 6c. Edit Supplier ---
+1. Klik edit → OffCanvas dengan data terisi
+2. PUT /api/suppliers/:id
+
+--- 6d. Hapus Supplier ---
+1. Klik hapus → ConfirmModal
+2. DELETE /api/suppliers/:id (hard delete)
+
+--- 6e. Detail Supplier ---
+1. Klik view → OffCanvas (lebar 400px)
+2. Fetch GET /api/suppliers/:id
+3. Backend:
+   a. SELECT supplier by id
+   b. SELECT purchases by supplier_id
+   c. SELECT batches JOIN products by supplier_id
+   d. Untuk tiap batch, fetch batch_dp_payments
+   e. SELECT distinct products from batches & purchases
+4. Tampilkan:
+   a. Info supplier
+   b. Daftar Bukti Faktur Pembelian (batches):
+      - Nama produk, status (Disetujui/Menunggu/Ditolak/Revisi)
+      - Tanggal pembelian, kadaluarsa, jatuh tempo
+      - Jumlah stok masuk, sisa stok, harga satuan, total harga
+      - Tipe pembayaran (Lunas/DP/Konsinyasi/Belum Lunas)
+      - Detail DP: DP 1: RpXXX (tanggal) [Cash/TF], sisa hutang
+      - Catatan, lampiran bukti
 
 
-## Catatan Penting untuk FEFO!
-- **FEFO HANYA BERKERJA JIKA KITA MENGURANGI `remaining_quantity` DI TABEL `batches` SECARA URUT BERDASARKAN `expired_date ASC`!**
-- Jangan cuma mengurangi total stok di `products` tanpa mengelola `batches`!
-- Setiap transaksi harus mencatat batch mana saja yang digunakan!
+================================================================================
+            ALUR 7: TRANSAKSI PENJUALAN (POS) — DENGAN FEFO!
+================================================================================
+
+--- 7a. Persiapan Transaksi ---
+1. Akses /transactions
+2. State:
+   - cart: array of { product, batchId, quantity, sellingPrice, costPrice }
+   - paymentMethod: 'cash' | 'midtrans'
+   - amountTendered, discount, ppnRate
+
+--- 7b. Memilih Produk ---
+1. Search produk (by nama atau kode)
+2. Klik produk → tambah ke cart
+3. Atur jumlah (qty)
+4. Jika stok tidak cukup → error toast
+5. Lihat subtotal, diskon, PPN, total
+
+--- 7c. FEFO (First Expired First Out) — Backend ---
+1. POST /api/transactions
+2. Backend (routes/transactions.js):
+   a. Validasi: stock_type harus 'OBAT' punya batch, total qty > 0
+   b. Untuk setiap produk:
+      i. Query: SELECT * FROM batches WHERE product_id = ?
+         AND remaining_quantity > 0 AND is_archived = FALSE
+         ORDER BY expired_date ASC, created_at ASC
+      ii. Loop batch (FEFO):
+          - Ambil dari batch dengan expired_date TERKECIL (paling cepat kadaluarsa)
+          - Jika batch tidak cukup, lanjut ke batch berikutnya
+          - Contoh: butuh 10 pcs
+            Batch A (exp 2026-06-10, sisa 4) → ambil 4, sisa butuh 6
+            Batch B (exp 2026-06-15, sisa 8) → ambil 6, sisa butuh 0
+      iii. Simpan transaksi_items per batch
+   c. Insert header transaksi
+   d. Update remaining_quantity tiap batch
+   e. Update stock produk (total)
+   f. Buat jurnal:
+      - D: Kas (101) / Piutang Midtrans ( jika midtrans )
+      - C: Penjualan OBAT ( jika produk kategori OBAT )
+      - C: Penjualan NON_OBAT ( jika produk kategori NON_OBAT )
+      - C: PPN Keluaran ( jika ada PPN )
+      - D: HPP OBAT (cost_price untuk produk OBAT)
+      - C: Persediaan OBAT (cost_price untuk produk OBAT)
+      - D: HPP NON_OBAT (cost_price untuk produk NON_OBAT)
+      - C: Persediaan NON_OBAT (cost_price untuk produk NON_OBAT)
+
+--- 7d. Pembayaran Tunai ---
+1. Input jumlah dibayar
+2. Hitung kembalian
+3. Klik "Bayar"
+4. POST /api/transactions dengan payment_method = 'cash'
+5. Backend: langsung complete + jurnal
+6. Tampilkan struk (modal receipt)
+
+--- 7e. Pembayaran Midtrans ---
+1. Pilih metode: Kartu Kredit / Debit / QRIS
+2. POST /api/transactions dengan payment_method = 'midtrans'
+3. Backend:
+   a. Insert transaksi (payment_status = 'pending')
+   b. Panggil Midtrans Snap API → dapatkan redirect_url + token
+   c. Return { snap_token, ... }
+4. Frontend: snap.pay(snap_token, ...)
+5. User bayar di popup Midtrans
+6. Callback dari Midtrans → POST /api/midtrans/notification
+7. Backend update payment_status = 'settlement'/'capture'
+8. Frontend polling atau callback → tampilkan struk
+
+--- 7f. Cetak Struk ---
+1. Modal receipt muncul
+2. Info: nama apotek, tgl, item, total, bayar, kembalian
+3. Klik "Cetak" → window.print()
+
+
+================================================================================
+            ALUR 8: STOCK OPNAME
+================================================================================
+
+1. Akses /stock-opname
+2. Fetch daftar produk + batch (GET /api/products + GET /api/inventory/batches/:productId)
+3. Tampilkan tabel: produk, batch, stok sistem, stok fisik (input), selisih
+4. User input stok fisik
+5. Klik "Submit Opname"
+6. POST /api/inventory/opname
+7. Backend:
+   a. Insert stock_opname: product_id, batch_id, system_stock, physical_stock,
+      difference = physical - system, notes, user_id
+   b. Jika ada selisih → UPDATE batches.remaining_quantity = physical_stock
+   c. Rekalkulasi total stock produk dari semua batch
+   d. Audit trail
+8. Riwayat opname bisa dilihat di tab "History"
+
+
+================================================================================
+              ALUR 9: PEMBELIAN / RIWAYAT PEMBELIAN
+================================================================================
+
+1. Akses /purchase-history
+2. Fetch GET /api/inventory/history
+   - Backend: SELECT batches JOIN suppliers JOIN products
+     + attach dp_payments tiap batch
+3. Tabel: tanggal, produk, batch, supplier, stok (sisa/awal), total harga,
+   DP (daftar DP + sisa hutang), status, lampiran
+4. Fitur:
+   - Search by product name
+   - Filter: tipe pembayaran, status approval
+   - Sort by: tanggal, total harga
+   - Sorting: ascending/descending per kolom (klik header)
+5. Setiap baris:
+   - Stok: "Sisa / Awal (X terjual)"
+   - Total harga: "RpX (Y pcs @ RpZ)"
+   - DP: "DP 1: RpX (tanggal)", "DP 2: RpY (tanggal)", "Sisa hutang: RpZ"
+   - Status approval badge
+   - Tombol "Lihat" untuk preview bukti faktur (modal image)
+
+
+================================================================================
+            ALUR 10: MANAJEMEN PENGGUNA (USERS)
+================================================================================
+
+1. Akses /users
+2. Fetch GET /api/users?page=&limit=&search=
+   - Backend: SELECT id, username, full_name, email, phone, role, status FROM users
+     (password TIDAK dikirim)
+3. Tabel: username, nama, email, role, status (active/inactive), aksi
+
+--- 10a. Tambah User ---
+1. Klik "Add User" → OffCanvas
+2. Form: username, password, full_name, email, phone, role (superadmin/admin/kasir/gudang)
+3. POST /api/users
+4. Backend: hash password + INSERT + audit trail
+
+--- 10b. Edit User ---
+1. Klik edit → OffCanvas (password opsional, kosongi jika tidak ganti)
+2. PUT /api/users/:id
+
+--- 10c. Hapus User ---
+1. ConfirmModal → DELETE /api/users/:id
+2. Backend: UPDATE status = 'inactive' (soft delete)
+
+--- 10d. Nonaktifkan User ---
+1. Toggle switch "Aktif" → PUT /api/users/:id/toggle-status
+
+
+================================================================================
+            ALUR 11: MANAJEMEN RESEP DOKTER (PRESCRIPTIONS)
+================================================================================
+
+1. Akses /prescriptions
+2. Fetch GET /api/prescriptions?page=&limit=&search=
+3. Tabel: nomor resep, dokter, pasien, status, tgl
+
+--- 11a. Tambah Resep ---
+1. Klik "Add Prescription" → OffCanvas
+2. Form:
+   a. Nomor Resep
+   b. Nama Dokter, Nama Pasien
+   c. Upload foto resep (file/camera)
+   d. Daftar item obat (nama, jumlah) — bisa tambah baris
+   e. Catatan
+3. POST /api/prescriptions
+
+--- 11b. Edit / Hapus Resep ---
+1. Edit → PUT /api/prescriptions/:id
+2. Hapus → DELETE /api/prescriptions/:id (ConfirmModal)
+
+--- 11c. Proses Resep ke POS ---
+1. Klik "Process" → buka halaman POS dengan cart sudah terisi item dari resep
+
+
+================================================================================
+            ALUR 12: SUBSTITUTIONS (REKOMENDASI OBAT ALTERNATIF)
+================================================================================
+
+1. Akses /substitutions
+2. Masukkan nama obat di search
+3. Klik "Cari Alternatif"
+4. POST /api/substitutions
+5. Backend:
+   a. Cek cache di substitutions_cache (berdasarkan product_name)
+   b. Jika ada cache & belum expired → return cache
+   c. Jika tidak ada:
+      - Panggil OpenRouter API dengan prompt untuk cari substitusi
+      - Simpan hasil di cache
+      - Return hasil
+6. Tampilkan daftar rekomendasi: nama obat, sumber, advice
+7. Pagination hasil (10/20/50 per halaman)
+
+
+================================================================================
+            ALUR 13: REKOMENDASI & FORECAST STOK
+================================================================================
+
+1. Akses /recommendations
+2. Fetch GET /api/stock-forecast
+3. Backend (routes/stock-forecast.js):
+   a. Ambil data riwayat penjualan per produk (30-90 hari terakhir)
+   b. Metode 1 — Google Gemini AI:
+      - Kirim data + prompt ke Gemini API
+      - Parse response → forecast_qty + confidence
+   c. Metode 2 — Holt-Winters (fallback jika Gemini gagal):
+      - Exponential smoothing dengan trend + seasonal
+   d. Jika data kurang → imputasi (LOCF / linear interpolation / mean)
+   e. Simpan hasil di stock_forecasts
+   f. Return forecast + rekomendasi pembelian
+4. Tampilkan: produk, peramalan, confidence, rekomendasi stok tambahan
+
+
+================================================================================
+            ALUR 14: REPORTS / LAPORAN
+================================================================================
+
+--- 14a. Laporan Keuangan (Profit & Loss) ---
+1. Akses /reports/financial
+2. Pilih bulan & tahun
+3. GET /api/financial/profit-loss-accounting?month=X&year=Y
+4. Backend (routes/reports.js):
+   a. Sum jurnal_items untuk akun revenue (4xx) dan expense (5xx)
+   b. Hitung: Total Pendapatan - Total Beban = Laba/Rugi
+5. Tampilkan: pendapatan (per akun), beban (per akun), laba/rugi bersih
+6. Bisa download PDF (jsPDF)
+
+--- 14b. Neraca Keuangan ---
+1. Akses /reports/balance
+2. GET /api/financial/balance
+3. Backend: Tampilkan semua akun dengan saldo (asset = liability + equity)
+
+--- 14c. Laporan Transaksi ---
+1. Akses /reports/transactions
+2. Filter tanggal
+3. GET /api/financial/transactions
+4. Tabel: tgl, invoice, produk, qty, total, kasir
+
+--- 14d. Jurnal Umum ---
+1. Akses /reports/general-journal
+2. GET /api/financial/general-journal?startDate=&endDate=
+3. Tabel: tgl, deskripsi, akun (debit/credit)
+
+--- 14e. Buku Besar ---
+1. Akses /reports/general-ledger
+2. Pilih akun
+3. GET /api/financial/general-ledger?accountId=X
+4. Tabel: tgl, deskripsi, debit, kredit, saldo berjalan
+
+--- 14f. Transaksi Keuangan (Pencatatan Manual) ---
+1. Akses /reports/financial-transactions
+2. Tiga tab form wizard:
+   a. Biaya Operasional: tgl, akun beban, dibayar pakai (kas/bank), nominal, deskripsi
+   b. Modal & Prive: tgl, jenis (setor/tarik), akun tujuan, nominal, deskripsi
+   c. Aset Tetap: tgl, jenis aset, metode bayar (tunai/kredit), nominal, deskripsi
+3. Setiap form submit:
+   a. Validasi field
+   b. POST /api/accounting/journal-entries
+      - Body: { date, description, items: [{ account_id, debit, credit }] }
+   c. Backend (routes/reports.js):
+      - Validasi total debit = total credit
+      - Buat journal_entry + journal_items dalam transaksi database
+      - Audit trail
+   d. Frontend: toast sukses, reset form
+4. Tombol submit di-disable jika user tidak punya permission 'create' di Sales Report
+   - Tampilkan "Akses Ditolak" + icon Ban
+
+
+================================================================================
+            ALUR 15: PENGATURAN (SETTINGS)
+================================================================================
+
+--- 15a. Role & Permissions ---
+1. Akses /settings/role-permissions
+2. Dua panel:
+   Kiri   : Daftar role (tabel: nama, aksi hapus)
+   Kanan  : Tabel permissions (module → create/edit/delete/show toggle)
+3. Pilih role → fetch GET /api/rbac/permissions?roleId=X
+4. Toggle permission → update state lokal
+5. Klik "Save Changes" → PUT /api/rbac/permissions
+   - Body: { roleId, permissions: [{ module, action, allowed }] }
+6. Backend: UPSERT ke role_permissions + audit trail
+
+--- 15b. Tambah Role ---
+1. Klik "Add Role & Permissions" → OffCanvas
+2. Input nama role
+3. POST /api/rbac/roles
+
+--- 15c. Hapus Role ---
+1. ConfirmModal → DELETE /api/rbac/roles/:id
+2. Tidak bisa hapus superadmin
+
+--- 15d. Transaction Settings ---
+1. Akses /settings/transaction-settings
+2. Form: PPN Rate (%), Diskon Default (%)
+3. GET /api/settings → tampilkan nilai existing
+4. Save → PUT /api/settings
+   - Backend: UPDATE system_settings WHERE setting_key = ?
+
+
+================================================================================
+            ALUR 16: AUDIT TRAIL
+================================================================================
+
+1. Akses /audit-trails
+2. Fetch GET /api/audit-trails?page=&limit=&module=&action=&userId=&startDate=&endDate=
+3. Tabel: waktu, user, modul, aksi, deskripsi
+4. Filter: modul, aksi, user, rentang tanggal
+5. Pagination
+6. Backend: SELECT FROM audit_trails dengan filter opsional, ORDER BY created_at DESC
+
+
+================================================================================
+            ALUR 17: PROFIL USER
+================================================================================
+
+1. Akses /profile (dari dropdown user di header)
+2. Tampilkan data user saat ini:
+   - Username, Nama, Email, Telepon, Role
+3. Edit profil:
+   - PUT /api/profile → update full_name, email, phone
+4. Ganti password:
+   - POST /api/profile/change-password
+   - Body: { current_password, new_password }
+   - Backend: verifikasi current_password (bcrypt), lalu update
+
+
+================================================================================
+            ALUR 18: OFFCANVAS (UI SYSTEM)
+================================================================================
+
+1. OffCanvas adalah panel slide-in dari kanan, digunakan untuk form add/edit/view
+2. Mekanisme:
+   a. Setiap halaman punya state is*OffCanvasOpen
+   b. Render <OffCanvas isOpen={...} width="400px" onClose={...}>
+   c. OffCanvas (OffCanvas.tsx):
+      - Effect: saat isOpen=true → setIsAnyOffCanvasOpen(true) + setOffCanvasWidth(width)
+      - Render children via createPortal ke #offcanvas-root
+      - Saat isOpen=false → closeOffCanvas()
+      - Cleanup: saat unmount → closeOffCanvas()
+   d. MainLayout.tsx:
+      - #offcanvas-root: position absolute, right 0, width = offCanvasWidth
+      - transform: translateX(0) saat open, translateX(100%) saat closed
+      - marginRight konten utama = offCanvasWidth saat open
+      - Drag handle di kiri offcanvas untuk resize manual (min 300px, max 800px)
+      - Sidebar auto-collapse saat offcanvas open (bisa di-toggle manual)
+
+
+================================================================================
+            ALUR 19: LAPORAN STOK (STOK OPNAME HISTORY)
+================================================================================
+
+Belum ada halaman khusus — data opname bisa dilihat dari halaman stock-opname
+tab "History".
+
+
+================================================================================
+            ALUR 20: KEYBOARD SHORTCUTS (GLOBAL)
+================================================================================
+
+Diimplementasikan di KeyboardShortcutsContext.tsx:
+- Ctrl/Cmd + B → toggle sidebar
+- 1 → Dashboard
+- 2 → Products
+- 3 → Stock Opname
+- 4 → Suppliers
+- 5 → Prescriptions
+- 6 → Transactions
+- 7 → Users
+- 8 → Recommendations
+- / atau Ctrl/Cmd + K → fokus search input (di beberapa halaman)
+- Setiap huruf (a-z, A-Z) → fokus search input
+
+
+================================================================================
+                        CATATAN PENTING
+================================================================================
+
+1. FEFO: Stok batch dengan expired_date paling awal harus dijual duluan.
+   Query: ORDER BY expired_date ASC, created_at ASC.
+   Jangan cuma update total stock produk — harus kelola remaining_quantity
+   per batch!
+
+2. Approval: Faktur dengan total > Rp2.000.000 otomatis pending.
+   Approver harus approve dulu sebelum stok masuk.
+
+3. DP Payment: Auto-create "DP 1" saat create faktur dengan tipe dp + dp_amount.
+   DP berikutnya ditambahkan manual via "Tambah DP" di Ringkasan Pembayaran.
+
+4. Arsip: Hanya faktur dengan tipe 'lunas' bisa diarsipkan.
+
+5. Superadmin: Bypass permission cuma berlaku jika record permission TIDAK ADA.
+   Jika record ada dengan allowed=0, superadmin pun ditolak.
+
+6. Jurnal Akuntansi:
+   - Pembelian: D Persediaan, K Kas/Hutang (tergantung tipe)
+   - Penjualan: D Kas, K Penjualan + PPN, D HPP, K Persediaan
+   - Transaksi Keuangan (manual): via Transaksi Keuangan wizard

@@ -44,10 +44,42 @@ function registerInventoryRoutes(app, pool, authenticate, checkPermission, uploa
         return res.status(400).json({ success: false, message: 'Jumlah DP harus lebih dari 0' });
       }
 
-      await pool.query(
-        'INSERT INTO batch_dp_payments (batch_id, amount, payment_date, notes, payment_method) VALUES (?, ?, ?, ?, ?)',
-        [batchId, amount, payment_date || new Date().toISOString().split('T')[0], notes, payment_method || 'cash']
-      );
+      const connection = await pool.getConnection();
+      try {
+        await connection.beginTransaction();
+
+        const paymentDate = payment_date || new Date().toISOString().split('T')[0];
+        const method = payment_method || 'cash';
+
+        await connection.query(
+          'INSERT INTO batch_dp_payments (batch_id, amount, payment_date, notes, payment_method) VALUES (?, ?, ?, ?, ?)',
+          [batchId, amount, paymentDate, notes, method]
+        );
+
+        // Get batch & product info for journal description
+        const [batchRows] = await connection.query(
+          'SELECT b.product_id, p.name as product_name FROM batches b JOIN products p ON b.product_id = p.id WHERE b.id = ?',
+          [batchId]
+        );
+        const productName = batchRows[0]?.product_name || `Batch #${batchId}`;
+
+        // Create journal: Debit Hutang Usaha, Credit Kas/Bank
+        const creditCode = method === 'transfer' ? '102' : '101';
+        await createJournalEntry(connection, null, paymentDate,
+          `Pembayaran DP supplier: ${productName} (Rp ${Number(amount).toLocaleString('id-ID')})`,
+          [
+            { accountCode: '201', debit: Number(amount) },
+            { accountCode: creditCode, credit: Number(amount) }
+          ]
+        );
+
+        await connection.commit();
+      } catch (err) {
+        await connection.rollback();
+        throw err;
+      } finally {
+        connection.release();
+      }
 
       await createAuditTrail({
         user_id: req.user.id,
