@@ -115,6 +115,10 @@ interface FakturFormData {
   purchase_date: string;
   quantity: string;
   cost_price: string;
+  selling_price: string;
+  purchase_unit: string;
+  unit: string;
+  unit_multiplier: string;
   stock_type: 'belum_bayar' | 'konsinyasi' | 'dp' | 'lunas';
   dp_amount: string;
   due_date: string;
@@ -190,6 +194,10 @@ export default function ProductsPage() {
     purchase_date: new Date().toISOString().split('T')[0],
     quantity: '',
     cost_price: '',
+    selling_price: '',
+    purchase_unit: 'Box',
+    unit: 'Tablet',
+    unit_multiplier: '1',
     stock_type: 'belum_bayar',
     dp_amount: '',
     due_date: '',
@@ -344,6 +352,10 @@ export default function ProductsPage() {
       purchase_date: new Date().toISOString().split('T')[0],
       quantity: '',
       cost_price: selectedProduct?.cost_price.toString() || '',
+      selling_price: selectedProduct?.selling_price.toString() || '',
+      purchase_unit: selectedProduct?.purchase_unit || 'Box',
+      unit: selectedProduct?.unit || 'Tablet',
+      unit_multiplier: (selectedProduct?.unit_multiplier || 1).toString(),
       stock_type: selectedProduct?.stock_type || 'belum_bayar',
       dp_amount: '',
       due_date: '',
@@ -378,6 +390,10 @@ export default function ProductsPage() {
       purchase_date: formatDateForInput(faktur.purchase_date),
       quantity: (faktur.quantity / multiplier).toString(),
       cost_price: faktur.cost_price.toString(),
+      selling_price: activeProduct?.selling_price.toString() || '',
+      purchase_unit: activeProduct?.purchase_unit || 'Box',
+      unit: activeProduct?.unit || 'Tablet',
+      unit_multiplier: (activeProduct?.unit_multiplier || 1).toString(),
       stock_type: faktur.stock_type as any,
       dp_amount: faktur.dp_amount?.toString() || '',
       due_date: formatDateForInput(faktur.due_date),
@@ -479,6 +495,42 @@ export default function ProductsPage() {
     if (!selectedProduct) return;
 
     try {
+      // Helper function to format date for MySQL (YYYY-MM-DD)
+      const formatDate = (date: string | Date | null) => {
+        if (!date) return null;
+        const d = new Date(date);
+        if (isNaN(d.getTime())) return null;
+        return d.toISOString().split('T')[0];
+      };
+
+      // First, update the product's details
+      const productUpdateRes = await fetch(`http://localhost:5000/api/products/${selectedProduct.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          ...authHeaders
+        },
+        body: JSON.stringify({
+          name: selectedProduct.name,
+          cost_price: Number(fakturFormData.cost_price) || selectedProduct.cost_price,
+          selling_price: Number(fakturFormData.selling_price) || selectedProduct.selling_price,
+          stock: selectedProduct.stock,
+          unit: fakturFormData.unit || selectedProduct.unit,
+          expired_date: formatDate(selectedProduct.expired_date),
+          location_code: selectedProduct.location_code,
+          supplier_id: fakturFormData.supplier_id ? Number(fakturFormData.supplier_id) : selectedProduct.supplier_id,
+          purchase_unit: fakturFormData.purchase_unit || selectedProduct.purchase_unit,
+          unit_multiplier: Number(fakturFormData.unit_multiplier) || selectedProduct.unit_multiplier || 1,
+          product_category: selectedProduct.product_category || 'OBAT'
+        })
+      });
+
+      if (!productUpdateRes.ok) {
+        goeyToast.error('Gagal memperbarui produk');
+        return;
+      }
+
+      // Then, save the batch/faktur
       const url = fakturModalMode === 'add'
         ? 'http://localhost:5000/api/inventory/batches'
         : `http://localhost:5000/api/inventory/batches/${selectedFaktur?.id}`;
@@ -486,7 +538,7 @@ export default function ProductsPage() {
 
       // Convert from purchase unit (box) to base unit (tablet)
       // e.g. 20 Box × 2 tablet/box = 40 tablet
-      const multiplier = selectedProduct.unit_multiplier || 1;
+      const multiplier = Number(fakturFormData.unit_multiplier) || 1;
       const qtyInBaseUnit = (Number(fakturFormData.quantity) || 0) * multiplier;
 
       const formData = new FormData();
@@ -538,6 +590,10 @@ export default function ProductsPage() {
           purchase_date: new Date().toISOString().split('T')[0],
           quantity: '',
           cost_price: '',
+          selling_price: '',
+          purchase_unit: 'Box',
+          unit: 'Tablet',
+          unit_multiplier: '1',
           stock_type: 'belum_bayar',
           dp_amount: '',
           due_date: '',
@@ -2022,6 +2078,10 @@ export default function ProductsPage() {
               purchase_date: new Date().toISOString().split('T')[0],
               quantity: '',
               cost_price: '',
+              selling_price: '',
+              purchase_unit: 'Box',
+              unit: 'Tablet',
+              unit_multiplier: '1',
               stock_type: 'belum_bayar',
               dp_amount: '',
               due_date: '',
@@ -2233,7 +2293,55 @@ export default function ProductsPage() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Jumlah (dalam {selectedProduct?.purchase_unit || 'Box'})
+                    Unit Pembelian
+                  </label>
+                  <select
+                    name="purchase_unit"
+                    value={fakturFormData.purchase_unit}
+                    onChange={handleFakturInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  >
+                    <option value="Box">Box</option>
+                    <option value="Strip">Strip</option>
+                    <option value="Botol">Botol</option>
+                    <option value="Tube">Tube</option>
+                    <option value="Pcs">Pcs</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Unit Dasar</label>
+                  <select
+                    name="unit"
+                    value={fakturFormData.unit}
+                    onChange={handleFakturInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  >
+                    <option value="Tablet">Tablet</option>
+                    <option value="Kapsul">Kapsul</option>
+                    <option value="Kaplet">Kaplet</option>
+                    <option value="Pil">Pil</option>
+                    <option value="Lozenges (hisap)">Lozenges (hisap)</option>
+                    <option value="Sachet (serbuk)">Sachet (serbuk)</option>
+                    <option value="Tube">Tube</option>
+                    <option value="Botol">Botol</option>
+                    <option value="Pcs">Pcs</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Isi per Unit Pembelian</label>
+                  <input
+                    type="number"
+                    name="unit_multiplier"
+                    min="1"
+                    value={fakturFormData.unit_multiplier}
+                    onChange={handleFakturInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    placeholder="1"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Jumlah (dalam {fakturFormData.purchase_unit || 'Box'})
                   </label>
                   <input
                     type="number"
@@ -2244,9 +2352,9 @@ export default function ProductsPage() {
                     placeholder="0"
                     min="0"
                   />
-                  {(selectedProduct?.unit_multiplier || 1) > 1 && fakturFormData.quantity && (
+                  {Number(fakturFormData.unit_multiplier || 1) > 1 && fakturFormData.quantity && (
                     <p className="text-xs text-blue-600 mt-1">
-                      = {Number(fakturFormData.quantity) * (selectedProduct?.unit_multiplier || 1)} {selectedProduct?.unit || 'Tablet'} (total satuan dasar)
+                      = {Number(fakturFormData.quantity) * Number(fakturFormData.unit_multiplier || 1)} {fakturFormData.unit || 'Tablet'} (total satuan dasar)
                     </p>
                   )}
                 </div>
@@ -2256,6 +2364,17 @@ export default function ProductsPage() {
                     type="number"
                     name="cost_price"
                     value={fakturFormData.cost_price}
+                    onChange={handleFakturInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    placeholder="0"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Harga Jual</label>
+                  <input
+                    type="number"
+                    name="selling_price"
+                    value={fakturFormData.selling_price}
                     onChange={handleFakturInputChange}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                     placeholder="0"
@@ -2386,6 +2505,10 @@ export default function ProductsPage() {
                       purchase_date: new Date().toISOString().split('T')[0],
                       quantity: '',
                       cost_price: '',
+                      selling_price: '',
+                      purchase_unit: 'Box',
+                      unit: 'Tablet',
+                      unit_multiplier: '1',
                       stock_type: 'belum_bayar',
                       dp_amount: '',
                       due_date: '',

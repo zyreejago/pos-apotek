@@ -35,7 +35,8 @@ Laporan ini fokus pada aktivitas operasional penjualan kasir sehari-hari.
   5. Total Penerimaan Kasir (Gross Sales) = Subtotal Penjualan + Pajak - Diskon
 
 * Hubungan dengan Akuntansi:
-  Total Penerimaan Kasir inilah yang akan dicatat sebagai Debit pada akun KAS (101) atau BANK (102).
+  Total Penerimaan Kasir akan dicatat sebagai Debit pada akun KAS (101) atau BANK (102), 
+  namun PPN harus dipisahkan sebagai Hutang Pajak.
 
 --------------------------------------------------------------------------------
 3. LAPORAN 2: JURNAL UMUM (GENERAL JOURNAL)
@@ -46,9 +47,10 @@ menggunakan format Debit dan Kredit. Setiap entri jurnal harus seimbang (Total D
 * Asal Data: Tabel `journal_entries` (header) dan `journal_items` (items)
 * Aturan Pencatatan:
   - Transaksi Penjualan Tunai:
-    - [Debit] Kas / Bank (101/102) -> Uang masuk sebesar Total Bayar Pelanggan
+    - [Debit] Kas / Bank (101/102) -> Uang masuk sebesar Total Bayar Pelanggan (termasuk PPN)
     - [Debit] HPP Obat / Non-Obat (501/502) -> Beban pokok modal barang terjual
-    - [Kredit] Penjualan Obat / Non-Obat (401/402) -> Pendapatan diakui sebelum pajak
+    - [Kredit] Penjualan Obat / Non-Obat (401/402) -> Pendapatan bersih (tidak termasuk PPN)
+    - [Kredit] Hutang Pajak (202) -> PPN yang dikutip, merupakan kewajiban yang harus disetor
     - [Kredit] Persediaan Obat / Non-Obat (103/104) -> Stok obat keluar/berkurang senilai harga pokok
   
   - Transaksi Pengeluaran Biaya (Biaya Operasional):
@@ -86,8 +88,9 @@ tertentu untuk melihat apakah apotek menghasilkan Laba atau Rugi Bersih.
 
 * Asal Data: Akumulasi saldo akhir akun Pendapatan (4xx) dan Beban (5xx) dari Buku Besar.
 * Rumus-Rumus Laporan Laba Rugi:
-  1. TOTAL PENDAPATAN OPERASIONAL:
+  1. TOTAL PENDAPATAN OPERASIONAL (Penjualan Bersih):
      Rumus = Saldo Akhir (Penjualan Obat [401] + Penjualan Non-Obat [402])
+     * Catatan: Pendapatan TIDAK termasuk PPN (PPN dicatat sebagai Hutang Pajak)
   2. TOTAL BEBAN POKOK PENJUALAN (HPP):
      Rumus = Saldo Akhir (HPP Obat [501] + HPP Non-Obat [502])
   3. LABA KOTOR (Gross Profit):

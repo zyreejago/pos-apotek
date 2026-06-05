@@ -79,15 +79,23 @@ function registerInventoryRoutes(app, pool, authenticate, checkPermission, uploa
     }
   });
 
+  // Helper function to format date for MySQL (YYYY-MM-DD)
+  const formatDate = (date) => {
+    if (!date) return null;
+    const d = new Date(date);
+    if (isNaN(d.getTime())) return null;
+    return d.toISOString().split('T')[0];
+  };
+
   // Create a new batch
   app.post('/api/inventory/batches', authenticate, checkPermission('Management Product', 'create'), upload.single('image'), async (req, res) => {
     try {
       const { product_id, supplier_id, batch_number, stock_type, purchase_date, initial_quantity, cost_price, expired_date, dp_amount, due_date, notes } = req.body;
       const image_url = req.file ? `/uploads/${req.file.filename}` : null;
 
-      const formattedPurchaseDate = purchase_date && purchase_date !== '' ? purchase_date.substring(0, 10) : null;
-      const formattedExpiredDate = expired_date && expired_date !== '' ? expired_date.substring(0, 10) : null;
-      const formattedDueDate = due_date && due_date !== '' ? due_date.substring(0, 10) : null;
+      const formattedPurchaseDate = formatDate(purchase_date);
+      const formattedExpiredDate = formatDate(expired_date);
+      const formattedDueDate = formatDate(due_date);
 
       // Approval Logic: Check if total amount > 2,000,000
       const totalAmount = Number(initial_quantity) * Number(cost_price);
@@ -196,9 +204,9 @@ function registerInventoryRoutes(app, pool, authenticate, checkPermission, uploa
       const new_image_url = req.file ? `/uploads/${req.file.filename}` : null;
       const image_url = new_image_url || current_image_url;
 
-      const formattedPurchaseDate = purchase_date && purchase_date !== '' ? purchase_date.substring(0, 10) : null;
-      const formattedExpiredDate = expired_date && expired_date !== '' ? expired_date.substring(0, 10) : null;
-      const formattedDueDate = due_date && due_date !== '' ? due_date.substring(0, 10) : null;
+      const formattedPurchaseDate = formatDate(purchase_date);
+      const formattedExpiredDate = formatDate(expired_date);
+      const formattedDueDate = formatDate(due_date);
 
       // Re-evaluate approval
       const totalAmount = Number(initial_quantity) * Number(cost_price);

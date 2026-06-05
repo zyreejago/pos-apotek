@@ -79,13 +79,29 @@ module.exports = function registerTransactionRoutes(app, pool, authenticate, che
           ['completed', transactionId]
         );
 
-        // Create journal entry: Debit Kas, Credit Penjualan (Obat/Non-Obat), Debit HPP (Obat/Non-Obat), Credit Persediaan (Obat/Non-Obat)
+        // Calculate sales without PPN (for income accounts) and separate PPN for Hutang Pajak
+        const salesTotalWithoutTax = subtotal || 0;
+        const taxAmountValue = tax_amount || 0;
+
+        // Create journal entry: Debit Kas, Credit Penjualan (Obat/Non-Obat - tanpa PPN), Credit Hutang Pajak (PPN), Debit HPP (Obat/Non-Obat), Credit Persediaan (Obat/Non-Obat)
         const journalItems = [
           { accountCode: '101', debit: total_amount }
         ];
 
-        if (obatSalesTotal > 0) journalItems.push({ accountCode: '401', credit: obatSalesTotal });
-        if (nonObatSalesTotal > 0) journalItems.push({ accountCode: '402', credit: nonObatSalesTotal });
+        // Split sales without tax proportionally between OBAT and NON_OBAT
+        const totalSalesWithTax = obatSalesTotal + nonObatSalesTotal;
+        let obatSalesWithoutTax = 0;
+        let nonObatSalesWithoutTax = 0;
+
+        if (totalSalesWithTax > 0 && salesTotalWithoutTax > 0) {
+          obatSalesWithoutTax = (obatSalesTotal / totalSalesWithTax) * salesTotalWithoutTax;
+          nonObatSalesWithoutTax = (nonObatSalesTotal / totalSalesWithTax) * salesTotalWithoutTax;
+        }
+
+        if (obatSalesWithoutTax > 0) journalItems.push({ accountCode: '401', credit: Math.round(obatSalesWithoutTax) });
+        if (nonObatSalesWithoutTax > 0) journalItems.push({ accountCode: '402', credit: Math.round(nonObatSalesWithoutTax) });
+        if (taxAmountValue > 0) journalItems.push({ accountCode: '202', credit: Math.round(taxAmountValue) });
+        
         if (obatCOGSTotal > 0) {
           journalItems.push({ accountCode: '501', debit: obatCOGSTotal });
           journalItems.push({ accountCode: '103', credit: obatCOGSTotal });
@@ -226,6 +242,10 @@ module.exports = function registerTransactionRoutes(app, pool, authenticate, che
           }
         }
 
+        // Calculate sales without PPN (for income accounts) and separate PPN for Hutang Pajak
+        const salesTotalWithoutTax = transaction.subtotal || 0;
+        const taxAmountValue = transaction.tax_amount || 0;
+
         // Create journal entry for midtrans payment (bank)
         const today = new Date().toISOString().split('T')[0];
         const [accResult] = await connection.query('SELECT id FROM accounts WHERE code = ?', ['102']);
@@ -241,8 +261,20 @@ module.exports = function registerTransactionRoutes(app, pool, authenticate, che
             { accountCode: '102', debit: transaction.total_amount }
           ];
 
-          if (obatSalesTotal > 0) journalItems.push({ accountCode: '401', credit: obatSalesTotal });
-          if (nonObatSalesTotal > 0) journalItems.push({ accountCode: '402', credit: nonObatSalesTotal });
+          // Split sales without tax proportionally between OBAT and NON_OBAT
+          const totalSalesWithTax = obatSalesTotal + nonObatSalesTotal;
+          let obatSalesWithoutTax = 0;
+          let nonObatSalesWithoutTax = 0;
+
+          if (totalSalesWithTax > 0 && salesTotalWithoutTax > 0) {
+            obatSalesWithoutTax = (obatSalesTotal / totalSalesWithTax) * salesTotalWithoutTax;
+            nonObatSalesWithoutTax = (nonObatSalesTotal / totalSalesWithTax) * salesTotalWithoutTax;
+          }
+
+          if (obatSalesWithoutTax > 0) journalItems.push({ accountCode: '401', credit: Math.round(obatSalesWithoutTax) });
+          if (nonObatSalesWithoutTax > 0) journalItems.push({ accountCode: '402', credit: Math.round(nonObatSalesWithoutTax) });
+          if (taxAmountValue > 0) journalItems.push({ accountCode: '202', credit: Math.round(taxAmountValue) });
+
           if (obatCOGSTotal > 0) {
             journalItems.push({ accountCode: '501', debit: obatCOGSTotal });
             journalItems.push({ accountCode: '103', credit: obatCOGSTotal });

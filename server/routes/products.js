@@ -85,6 +85,14 @@ module.exports = function registerProductRoutes(app, pool, authenticate, checkPe
         .json({ message: 'Name and cost price are required' });
     }
 
+    // Helper function to format date for MySQL (YYYY-MM-DD)
+    const formatDate = (date) => {
+      if (!date) return null;
+      const d = new Date(date);
+      if (isNaN(d.getTime())) return null;
+      return d.toISOString().split('T')[0];
+    };
+
     try {
       // Check if this product is being created via "Add to List" with a high value
       // We'll pass a flag from the frontend if it needs approval
@@ -101,7 +109,7 @@ module.exports = function registerProductRoutes(app, pool, authenticate, checkPe
           category || 'General',
           product_category || 'OBAT',
           unit || 'pcs',
-          expired_date || null,
+          formatDate(expired_date),
           location_code || null,
           purchase_unit || 'Box',
           unit_multiplier || 1,
@@ -150,6 +158,14 @@ module.exports = function registerProductRoutes(app, pool, authenticate, checkPe
     const { name, cost_price, selling_price, stock, category, product_category, unit, expired_date, location_code, purchase_unit, unit_multiplier } =
       req.body;
 
+    // Helper function to format date for MySQL (YYYY-MM-DD)
+    const formatDate = (date) => {
+      if (!date) return null;
+      const d = new Date(date);
+      if (isNaN(d.getTime())) return null;
+      return d.toISOString().split('T')[0];
+    };
+
     try {
       const connection = await pool.getConnection();
       
@@ -158,7 +174,7 @@ module.exports = function registerProductRoutes(app, pool, authenticate, checkPe
       
       await connection.query(
         'UPDATE products SET name = ?, cost_price = ?, selling_price = ?, stock = ?, category = ?, product_category = ?, unit = ?, expired_date = ?, location_code = ?, purchase_unit = ?, unit_multiplier = ? WHERE id = ?',
-        [name, cost_price, selling_price, stock, category, product_category || 'OBAT', unit, expired_date, location_code || null, purchase_unit || 'Box', unit_multiplier || 1, id]
+        [name, cost_price, selling_price, stock, category, product_category || 'OBAT', unit, formatDate(expired_date), location_code || null, purchase_unit || 'Box', unit_multiplier || 1, id]
       );
       connection.release();
 
