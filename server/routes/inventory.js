@@ -38,15 +38,15 @@ function registerInventoryRoutes(app, pool, authenticate, checkPermission, uploa
   app.post('/api/inventory/batches/:batchId/dp-payments', authenticate, checkPermission('Management Product', 'edit'), async (req, res) => {
     try {
       const { batchId } = req.params;
-      const { amount, payment_date, notes } = req.body;
+      const { amount, payment_date, notes, payment_method } = req.body;
 
       if (!amount || amount <= 0) {
         return res.status(400).json({ success: false, message: 'Jumlah DP harus lebih dari 0' });
       }
 
       await pool.query(
-        'INSERT INTO batch_dp_payments (batch_id, amount, payment_date, notes) VALUES (?, ?, ?, ?)',
-        [batchId, amount, payment_date || new Date().toISOString().split('T')[0], notes]
+        'INSERT INTO batch_dp_payments (batch_id, amount, payment_date, notes, payment_method) VALUES (?, ?, ?, ?, ?)',
+        [batchId, amount, payment_date || new Date().toISOString().split('T')[0], notes, payment_method || 'cash']
       );
 
       await createAuditTrail({

@@ -294,11 +294,23 @@ const initDB = async () => {
         batch_id INT NOT NULL,
         amount DECIMAL(15,2) NOT NULL,
         payment_date DATE NOT NULL,
+        payment_method VARCHAR(50) DEFAULT 'cash',
         notes TEXT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (batch_id) REFERENCES batches(id) ON DELETE CASCADE
       )
     `);
+
+    // Add payment_method column if not exists (migration)
+    try {
+      await connection.query(`
+        ALTER TABLE batch_dp_payments 
+        ADD COLUMN payment_method VARCHAR(50) DEFAULT 'cash'
+      `);
+      console.log('Added payment_method column to batch_dp_payments');
+    } catch (e) {
+      // Column already exists, ignore
+    }
 
     // Migrate existing dp_amount from batches to batch_dp_payments
     try {

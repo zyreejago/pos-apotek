@@ -566,6 +566,11 @@ export default function SuppliersPage() {
                                     {dpList.map((dp: any, idx: number) => (
                                       <div key={dp.id} className="text-sm">
                                         <span className="font-medium text-yellow-600">DP {idx + 1}:</span>
+                                        <span className={`ml-1.5 text-xs font-medium px-1.5 py-0.5 rounded ${
+                                          dp.payment_method === 'transfer' ? 'bg-purple-100 text-purple-700' : 'bg-green-100 text-green-700'
+                                        }`}>
+                                          {dp.payment_method === 'transfer' ? 'TF' : 'Cash'}
+                                        </span>
                                         <span className="text-blue-600 font-semibold ml-1">{new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format(dp.amount)}</span>
                                         {dp.payment_date && (
                                           <span className="text-gray-400 ml-2">({new Date(dp.payment_date).toLocaleDateString('id-ID')})</span>

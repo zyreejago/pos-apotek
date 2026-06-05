@@ -221,6 +221,7 @@ export default function ProductsPage() {
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
   const [newDPAmount, setNewDPAmount] = useState('');
   const [newDPDate, setNewDPDate] = useState(new Date().toISOString().split('T')[0]);
+  const [newDPPaymentMethod, setNewDPPaymentMethod] = useState('cash');
   const [showAddDPForm, setShowAddDPForm] = useState(false);
 
   // Form State
@@ -471,13 +472,15 @@ export default function ProductsPage() {
         },
         body: JSON.stringify({
           amount: Number(newDPAmount),
-          payment_date: newDPDate
+          payment_date: newDPDate,
+          payment_method: newDPPaymentMethod
         })
       });
 
       if (res.ok) {
         goeyToast.success('DP berhasil ditambahkan!');
         setNewDPAmount('');
+        setNewDPPaymentMethod('cash');
         setShowAddDPForm(false);
         if (selectedProduct) fetchFakturs(selectedProduct.id);
       } else {
@@ -2560,16 +2563,23 @@ export default function ProductsPage() {
 
                       return dpList.map((dp, index) => (
                         <div key={dp.id} className="flex justify-between items-center py-2 border-b border-gray-100">
-                          <span className="text-gray-600">DP {index + 1}</span>
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium text-blue-700">
-                              {formatCurrency(Number(dp.amount))}
-                            </span>
+                          <div>
+                            <span className="text-gray-600">DP {index + 1}</span>
                             {dp.payment_date && (
-                              <span className="text-xs text-gray-400">
+                              <span className="text-xs text-gray-400 ml-2">
                                 {new Date(dp.payment_date).toLocaleDateString('id-ID')}
                               </span>
                             )}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className={`text-xs font-medium px-1.5 py-0.5 rounded ${
+                              dp.payment_method === 'transfer' ? 'bg-purple-100 text-purple-700' : 'bg-green-100 text-green-700'
+                            }`}>
+                              {dp.payment_method === 'transfer' ? 'TF' : 'Cash'}
+                            </span>
+                            <span className="font-medium text-blue-700">
+                              {formatCurrency(Number(dp.amount))}
+                            </span>
                             {dp.id !== -1 && (
                               <button
                                 type="button"
@@ -2659,11 +2669,22 @@ export default function ProductsPage() {
                               className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                             />
                           </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Metode Pembayaran</label>
+                            <select
+                              value={newDPPaymentMethod}
+                              onChange={(e) => setNewDPPaymentMethod(e.target.value)}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                            >
+                              <option value="cash">Cash</option>
+                              <option value="transfer">Transfer</option>
+                            </select>
+                          </div>
                         </div>
                         <div className="flex gap-2">
                           <button
                             type="button"
-                            onClick={() => { setShowAddDPForm(false); setNewDPAmount(''); }}
+                            onClick={() => { setShowAddDPForm(false); setNewDPAmount(''); setNewDPPaymentMethod('cash'); }}
                             className="flex-1 py-2 px-4 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
                           >
                             Batal
