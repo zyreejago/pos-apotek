@@ -16,6 +16,7 @@ const registerProfileRoutes = require('./routes/profile');
 const registerStockForecastRoutes = require('./routes/stock-forecast');
 const registerStockForecastOpenRouterRoutes = require('./routes/stock-forecast-openrouter');
 const registerInventoryRoutes = require('./routes/inventory');
+const registerReturnRoutes = require('./routes/returns');
 const { registerAuditTrailRoutes, createAuditTrail } = require('./routes/audit-trails');
 
 const envPath = path.join(__dirname, '..', '.env');
@@ -242,7 +243,9 @@ const RBAC_MODULES = [
   'System Settings',
   'Audit Trail',
   'Approval Faktur',
-  'Riwayat Pembelian'
+  'Riwayat Pembelian',
+  'Retur Pembelian',
+  'Retur Penjualan'
 ];
 
 app.get('/api/rbac/modules', authenticate, (req, res) => {
@@ -399,6 +402,7 @@ registerReportRoutes(app, pool, authenticate, checkPermission);
 registerStockForecastRoutes(app, pool, authenticate, checkPermission);
 registerStockForecastOpenRouterRoutes(app, pool, authenticate, checkPermission);
 registerInventoryRoutes(app, pool, authenticate, checkPermission, upload, (params) => createAuditTrail(pool, params));
+registerReturnRoutes(app, pool, authenticate, checkPermission, (params) => createAuditTrail(pool, params));
 
 async function startServer() {
   await initDB();

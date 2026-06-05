@@ -18,7 +18,8 @@ import {
   ChevronRight,
   Activity,
   Search,
-  CheckCircle
+  CheckCircle,
+  RotateCcw
 } from 'lucide-react';
 import { useSidebar } from '@/context/SidebarContext';
 import { useOffCanvas } from '@/context/OffCanvasContext';
@@ -35,6 +36,7 @@ export default function Sidebar() {
   const router = useRouter();
   const [isReportOpen, setIsReportOpen] = useState(true);
   const [isSettingsOpen, setIsSettingsOpen] = useState(true);
+  const [isReturnsOpen, setIsReturnsOpen] = useState(true);
   const { isCollapsed, toggleSidebar, setIsCollapsed, userCollapsedState, setUserCollapsedState } = useSidebar();
   const { isAnyOffCanvasOpen } = useOffCanvas();
   const [permissions, setPermissions] = useState<Permission[]>([]);
@@ -251,6 +253,44 @@ export default function Sidebar() {
 
         {canShow('Riwayat Pembelian') && (
           <NavItem href="/purchase-history" icon={<Repeat size={20} />} label="Riwayat Pembelian" active={isActive('/purchase-history')} isCollapsed={isCollapsed} />
+        )}
+
+        {(canShow('Retur Pembelian') || canShow('Retur Penjualan')) && (
+          <div>
+            <button
+              onClick={() => {
+                if (isCollapsed) toggleSidebar();
+                setIsReturnsOpen(!isReturnsOpen);
+              }}
+              className={`w-full flex items-center ${isCollapsed ? 'justify-center' : 'justify-between'} px-3 py-2.5 rounded-lg transition-colors group ${pathname.startsWith('/purchase-returns') || pathname.startsWith('/sale-returns') ? 'bg-gray-50' : 'hover:bg-gray-50'}`}
+              title={isCollapsed ? "Retur" : ""}
+            >
+              <div className="flex items-center gap-3">
+                <span className={`group-hover:text-slate-600 ${pathname.startsWith('/purchase-returns') || pathname.startsWith('/sale-returns') ? 'text-slate-600' : 'text-slate-400'}`}>
+                  <RotateCcw size={20} />
+                </span>
+                {!isCollapsed && <span className={`font-medium ${pathname.startsWith('/purchase-returns') || pathname.startsWith('/sale-returns') ? 'text-slate-800' : 'text-slate-600'}`}>Retur</span>}
+              </div>
+              {!isCollapsed && <span className="text-slate-400 text-lg leading-none">{isReturnsOpen ? '−' : '+'}</span>}
+            </button>
+
+            {isReturnsOpen && !isCollapsed && (
+              <div className="ml-4 mt-1 space-y-1 border-l border-gray-100 pl-2">
+                {canShow('Retur Pembelian') && (
+                  <Link href="/purchase-returns" className={`flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer ${isActive('/purchase-returns') ? 'bg-blue-50 text-blue-600' : 'text-slate-500 hover:text-slate-700 hover:bg-gray-50'}`}>
+                    <div className={`w-1.5 h-1.5 rounded-full ${isActive('/purchase-returns') ? 'bg-blue-600' : 'bg-transparent border border-slate-400'}`}></div>
+                    <span className="font-medium text-sm">Retur Pembelian</span>
+                  </Link>
+                )}
+                {canShow('Retur Penjualan') && (
+                  <Link href="/sale-returns" className={`flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer ${isActive('/sale-returns') ? 'bg-blue-50 text-blue-600' : 'text-slate-500 hover:text-slate-700 hover:bg-gray-50'}`}>
+                    <div className={`w-1.5 h-1.5 rounded-full ${isActive('/sale-returns') ? 'bg-blue-600' : 'bg-transparent border border-slate-400'}`}></div>
+                    <span className="font-medium text-sm">Retur Penjualan</span>
+                  </Link>
+                )}
+              </div>
+            )}
+          </div>
         )}
 
         {canShow('Approval Faktur') && (

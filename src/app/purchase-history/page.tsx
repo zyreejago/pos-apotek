@@ -25,7 +25,7 @@ interface HistoryFaktur {
   initial_quantity: number;
   remaining_quantity: number;
   cost_price: number;
-  stock_type: 'belum_bayar' | 'konsinyasi' | 'dp' | 'lunas';
+  stock_type: 'belum_bayar' | 'konsinyasi' | 'dp' | 'lunas' | 'retur';
   dp_amount: number | null;
   due_date: string | null;
   expired_date: string | null;
@@ -325,7 +325,7 @@ export default function PurchaseHistoryPage() {
                             ) : null}
                           </div>
                         ) : (
-                          <span className="text-xs text-gray-400 italic">{faktur.stock_type === 'lunas' ? 'Lunas' : '-'}</span>
+                          <span className="text-xs text-gray-400 italic">{faktur.stock_type === 'lunas' ? 'Lunas' : faktur.stock_type === 'retur' ? 'Retur' : '-'}</span>
                         )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">

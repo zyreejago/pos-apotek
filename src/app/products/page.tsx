@@ -21,7 +21,7 @@ interface Product {
   location_code: string;
   supplier_id: number | null;
   supplier_name: string | null;
-  stock_type: 'belum_bayar' | 'konsinyasi' | 'dp' | 'lunas' | null;
+  stock_type: 'belum_bayar' | 'konsinyasi' | 'dp' | 'lunas' | 'retur' | null;
   purchase_date: string | null;
   dp_amount?: number;
   due_date?: string | null;
@@ -56,7 +56,7 @@ interface Faktur {
   remaining_quantity: number;
   cost_price: number;
   total_amount: number;
-  stock_type: 'belum_bayar' | 'konsinyasi' | 'dp' | 'lunas';
+  stock_type: 'belum_bayar' | 'konsinyasi' | 'dp' | 'lunas' | 'retur';
   dp_amount: number | null;
   due_date: string | null;
   expired_date: string | null;
@@ -65,6 +65,7 @@ interface Faktur {
   status: 'approved' | 'pending' | 'rejected' | 'revision';
   created_at: string;
   dp_payments?: DpPayment[];
+  qty_returned?: number;
 }
 
 interface DbBatch {
@@ -77,7 +78,7 @@ interface DbBatch {
   initial_quantity: number;
   remaining_quantity: number;
   cost_price: number;
-  stock_type: 'belum_bayar' | 'konsinyasi' | 'dp' | 'lunas';
+  stock_type: 'belum_bayar' | 'konsinyasi' | 'dp' | 'lunas' | 'retur';
   dp_amount: number | null;
   due_date: string | null;
   expired_date: string | null;
@@ -103,7 +104,7 @@ interface ProductFormData {
   expired_date: string;
   location_code: string;
   supplier_id: string;
-  stock_type: 'belum_bayar' | 'konsinyasi' | 'dp' | 'lunas';
+  stock_type: 'belum_bayar' | 'konsinyasi' | 'dp' | 'lunas' | 'retur';
   purchase_date: string;
   dp_amount?: string;
   due_date?: string;
@@ -131,7 +132,7 @@ interface FakturFormData {
   purchase_unit: string;
   unit: string;
   unit_multiplier: string;
-  stock_type: 'belum_bayar' | 'konsinyasi' | 'dp' | 'lunas';
+  stock_type: 'belum_bayar' | 'konsinyasi' | 'dp' | 'lunas' | 'retur';
   dp_amount: string;
   due_date: string;
   expired_date: string;
@@ -778,8 +779,15 @@ export default function ProductsPage() {
   };
 
   const handleArchiveFaktur = async (faktur: Faktur) => {
-    if (faktur.stock_type !== 'lunas') {
-      goeyToast.error('Hanya faktur dengan tipe stok \"lunas\" yang dapat diarsipkan!');
+    if (faktur.stock_type !== 'lunas' && faktur.stock_type !== 'retur') {
+      goeyToast.error('Hanya faktur dengan tipe stok \"lunas\" atau \"retur\" yang dapat diarsipkan!');
+      return;
+    }
+
+    if (faktur.stock_type === 'retur' && (faktur.qty_returned ?? 0) < faktur.initial_quantity) {
+      goeyToast.error('Barang retur belum lengkap', {
+        description: `Arsip hanya bisa dilakukan setelah semua qty diretur (${faktur.qty_returned ?? 0}/${faktur.initial_quantity})`,
+      });
       return;
     }
     
@@ -1375,19 +1383,22 @@ export default function ProductsPage() {
                     <td className="px-6 py-4">
                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                         product.stock_type === 'lunas' 
-                          ? 'bg-green-100 text-green-700' 
+                          ? 'bg-green-100 text-green-700 border border-green-200'
                           : product.stock_type === 'belum_bayar'
-                          ? 'bg-yellow-100 text-yellow-700'
+                          ? 'bg-yellow-100 text-yellow-700 border border-yellow-200'
                           : product.stock_type === 'konsinyasi'
-                          ? 'bg-purple-100 text-purple-700'
+                          ? 'bg-purple-100 text-purple-700 border border-purple-200'
                           : product.stock_type === 'dp'
-                          ? 'bg-blue-100 text-blue-700'
-                          : 'bg-gray-100 text-gray-700'
-                      }`}>
+                          ? 'bg-blue-100 text-blue-700 border border-blue-200'
+                          : product.stock_type === 'retur'
+                          ? 'bg-red-100 text-red-700 border border-red-200'
+                          : 'bg-gray-100 text-gray-500 border border-gray-200'
+                        }`}>
                         {product.stock_type === 'lunas' ? 'Lunas' : 
                          product.stock_type === 'belum_bayar' ? 'Belum Bayar' : 
                          product.stock_type === 'konsinyasi' ? 'Konsinyasi' : 
-                         product.stock_type === 'dp' ? 'DP' : '-'}
+                         product.stock_type === 'dp' ? 'DP' : 
+                         product.stock_type === 'retur' ? 'Retur' : '-'}
                       </span>
                     </td>
                     <td className="px-6 py-4 text-gray-600">{formatCurrency(product.cost_price)}</td>
@@ -2123,7 +2134,8 @@ export default function ProductsPage() {
                                   belum_bayar: 'Belum Bayar',
                                   konsinyasi: 'Konsinyasi',
                                   dp: 'DP',
-                                  lunas: 'Lunas'
+                                  lunas: 'Lunas',
+                                  retur: 'Retur'
                                 };
                                 return typeMap[item.stock_type] || item.stock_type;
                               })()}
@@ -2225,6 +2237,7 @@ export default function ProductsPage() {
                     <th className="px-4 py-3">Qty Awal</th>
                     <th className="px-4 py-3">Qty Tersisa</th>
                     <th className="px-4 py-3">Qty Terjual</th>
+                    <th className="px-4 py-3">Qty Retur</th>
                     <th className="px-4 py-3">Expired Date</th>
                     <th className="px-4 py-3">Harga Beli</th>
                     <th className="px-4 py-3">Total</th>
@@ -2317,6 +2330,13 @@ export default function ProductsPage() {
                         </td>
                         <td className="px-4 py-3">
                           <span className={soldQty > 0 ? 'text-blue-600' : ''}>{soldQty} {selectedProduct?.unit || 'Tablet'}</span>
+                        </td>
+                        <td className="px-4 py-3">
+                          {(faktur.qty_returned ?? 0) > 0 ? (
+                            <span className="text-red-600 font-medium">{faktur.qty_returned ?? 0} {selectedProduct?.unit || 'Tablet'}</span>
+                          ) : (
+                            <span className="text-gray-300">0</span>
+                          )}
                         </td>
                         <td className="px-4 py-3">
                           {faktur.expired_date ? new Date(faktur.expired_date).toLocaleDateString('id-ID') : '-'}

@@ -539,12 +539,14 @@ export default function SuppliersPage() {
                                 batch.stock_type === 'lunas' ? 'text-green-600' : 
                                 (batch.stock_type === 'dp' || batch.stock_type === 'DP') ? 'text-yellow-600' : 
                                 (batch.stock_type === 'consignment' || batch.stock_type === 'konsinyasi') ? 'text-blue-600' :
+                                batch.stock_type === 'retur' ? 'text-red-600' :
                                 'text-gray-600'
                               }`}>
                                 {batch.stock_type === 'lunas' ? 'Lunas' : 
-                                 (batch.stock_type === 'dp' || batch.stock_type === 'DP') ? 'DP' : 
-                                 (batch.stock_type === 'consignment' || batch.stock_type === 'konsinyasi') ? 'Konsinyasi' : 
-                                 'Belum Lunas'}
+                                  (batch.stock_type === 'dp' || batch.stock_type === 'DP') ? 'DP' : 
+                                  (batch.stock_type === 'consignment' || batch.stock_type === 'konsinyasi') ? 'Konsinyasi' : 
+                                  batch.stock_type === 'retur' ? 'Retur' :
+                                  'Belum Lunas'}
                               </span>
                             </div>
                           </div>

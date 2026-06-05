@@ -346,7 +346,13 @@ const initDB = async () => {
     } catch (e) {}
 
     try {
-      await connection.query(`ALTER TABLE suppliers ADD COLUMN is_deleted BOOLEAN DEFAULT FALSE`);
+      await connection.query(`ALTER TABLE suppliers ADD COLUMN accepts_return BOOLEAN DEFAULT TRUE`);
+    } catch (e) {}
+    try {
+      await connection.query(`ALTER TABLE suppliers ADD COLUMN return_notes TEXT NULL`);
+    } catch (e) {}
+    try {
+      await connection.query(`ALTER TABLE purchases ADD COLUMN invoice_no VARCHAR(100) NULL`);
     } catch (e) {}
 
     // Prescriptions table
@@ -420,6 +426,90 @@ const initDB = async () => {
         notes TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (purchase_id) REFERENCES purchases(id) ON DELETE CASCADE
+      )
+    `);
+
+    // Purchase Returns table
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS purchase_returns (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        return_no VARCHAR(50) NOT NULL UNIQUE,
+        original_purchase_id INT NOT NULL,
+        supplier_id INT NOT NULL,
+        reason TEXT,
+        handling ENUM('reduce_payable', 'credit_note', 'write_off_loss') NOT NULL,
+        total_value DECIMAL(15,2) NOT NULL,
+        status VARCHAR(50) DEFAULT 'completed',
+        notes TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (original_purchase_id) REFERENCES purchases(id) ON DELETE CASCADE,
+        FOREIGN KEY (supplier_id) REFERENCES suppliers(id) ON DELETE CASCADE
+      )
+    `);
+
+    // Purchase Return Items table
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS purchase_return_items (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        return_id INT NOT NULL,
+        purchase_item_id INT NULL,
+        batch_id INT NOT NULL,
+        product_id INT NOT NULL,
+        qty_returned INT NOT NULL,
+        buy_price DECIMAL(15,2) NOT NULL,
+        \`condition\` ENUM('damaged', 'expired', 'wrong_item') NOT NULL,
+        FOREIGN KEY (return_id) REFERENCES purchase_returns(id) ON DELETE CASCADE,
+        FOREIGN KEY (purchase_item_id) REFERENCES purchase_items(id) ON DELETE SET NULL,
+        FOREIGN KEY (batch_id) REFERENCES batches(id) ON DELETE CASCADE,
+        FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+      )
+    `);
+
+    // Supplier Credits table
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS supplier_credits (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        supplier_id INT NOT NULL,
+        purchase_return_id INT NOT NULL,
+        amount DECIMAL(15,2) NOT NULL,
+        used_amount DECIMAL(15,2) DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (supplier_id) REFERENCES suppliers(id) ON DELETE CASCADE,
+        FOREIGN KEY (purchase_return_id) REFERENCES purchase_returns(id) ON DELETE CASCADE
+      )
+    `);
+
+    // Sale Returns table
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS sale_returns (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        return_no VARCHAR(50) NOT NULL UNIQUE,
+        original_sale_id INT NOT NULL,
+        returned_by INT NULL,
+        reason TEXT,
+        refund_method ENUM('cash', 'credit_note') NOT NULL,
+        total_refund DECIMAL(15,2) NOT NULL,
+        status ENUM('draft', 'completed') DEFAULT 'completed',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (original_sale_id) REFERENCES transactions(id) ON DELETE CASCADE,
+        FOREIGN KEY (returned_by) REFERENCES users(id) ON DELETE SET NULL
+      )
+    `);
+
+    // Sale Return Items table
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS sale_return_items (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        return_id INT NOT NULL,
+        sale_item_id INT NOT NULL,
+        batch_id INT NOT NULL,
+        product_id INT NOT NULL,
+        qty_returned INT NOT NULL,
+        price DECIMAL(15,2) NOT NULL,
+        FOREIGN KEY (return_id) REFERENCES sale_returns(id) ON DELETE CASCADE,
+        FOREIGN KEY (sale_item_id) REFERENCES transaction_items(id) ON DELETE CASCADE,
+        FOREIGN KEY (batch_id) REFERENCES batches(id) ON DELETE CASCADE,
+        FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
       )
     `);
 
@@ -500,6 +590,9 @@ const initDB = async () => {
     try {
       await connection.query(`ALTER TABLE transactions ADD FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL`);
     } catch (e) {}
+    try {
+      await connection.query(`ALTER TABLE transactions ADD COLUMN is_fully_returned BOOLEAN DEFAULT FALSE`);
+    } catch (e) {}
 
     // Seed Chart of Accounts
     const accounts = [
@@ -508,6 +601,8 @@ const initDB = async () => {
       { code: '102', name: 'Bank', type: 'aktiva', normal_balance: 'debit' },
       { code: '103', name: 'Persediaan Obat', type: 'aktiva', normal_balance: 'debit' },
       { code: '104', name: 'Persediaan Non-Obat', type: 'aktiva', normal_balance: 'debit' },
+      { code: '105', name: 'Piutang Kredit Supplier', type: 'aktiva', normal_balance: 'debit' },
+      { code: '106', name: 'Piutang Usaha', type: 'aktiva', normal_balance: 'debit' },
       { code: '121', name: 'Peralatan Apotek', type: 'aktiva', normal_balance: 'debit' },
       { code: '122', name: 'Peralatan Komputer', type: 'aktiva', normal_balance: 'debit' },
       { code: '123', name: 'Kendaraan Operasional', type: 'aktiva', normal_balance: 'debit' },
@@ -526,6 +621,7 @@ const initDB = async () => {
       // Revenues (pendapatan)
       { code: '401', name: 'Penjualan Obat', type: 'pendapatan', normal_balance: 'kredit' },
       { code: '402', name: 'Penjualan Non-Obat', type: 'pendapatan', normal_balance: 'kredit' },
+      { code: '403', name: 'Retur Penjualan', type: 'pendapatan', normal_balance: 'debit' },
       
       // Cost of Goods Sold (beban)
       { code: '501', name: 'HPP Obat', type: 'beban', normal_balance: 'debit' },
@@ -548,6 +644,7 @@ const initDB = async () => {
       { code: '525', name: 'Beban Keamanan', type: 'beban', normal_balance: 'debit' },
       { code: '526', name: 'Beban Obat Expired', type: 'beban', normal_balance: 'debit' },
       { code: '527', name: 'Beban Selisih Stok', type: 'beban', normal_balance: 'debit' },
+      { code: '528', name: 'Beban Kerugian Barang Rusak', type: 'beban', normal_balance: 'debit' },
       { code: '529', name: 'Beban Lain-lain', type: 'beban', normal_balance: 'debit' }
     ];
 

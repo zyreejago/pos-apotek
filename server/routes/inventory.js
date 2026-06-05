@@ -14,7 +14,7 @@ function registerInventoryRoutes(app, pool, authenticate, checkPermission, uploa
         ORDER BY b.expired_date ASC, b.id ASC
       `, [productId]);
 
-      // For each batch, try to get its DP payments (handle if table doesn't exist yet)
+      // For each batch, try to get its DP payments and return qty
       for (const batch of rows) {
         try {
           const [dpPayments] = await pool.query(
@@ -23,7 +23,16 @@ function registerInventoryRoutes(app, pool, authenticate, checkPermission, uploa
           );
           batch.dp_payments = dpPayments;
         } catch (dpErr) {
-          batch.dp_payments = []; // If table doesn't exist yet, just set empty array
+          batch.dp_payments = [];
+        }
+        try {
+          const [retRows] = await pool.query(
+            'SELECT COALESCE(SUM(qty_returned), 0) as qty FROM purchase_return_items WHERE batch_id = ?',
+            [batch.id]
+          );
+          batch.qty_returned = Number(retRows[0].qty);
+        } catch (retErr) {
+          batch.qty_returned = 0;
         }
       }
 
@@ -158,14 +167,29 @@ function registerInventoryRoutes(app, pool, authenticate, checkPermission, uploa
       const { is_archived } = req.body;
       
       // Get the batch first to check stock_type
-      const [batch] = await pool.query('SELECT stock_type FROM batches WHERE id = ?', [id]);
+      const [batch] = await pool.query('SELECT stock_type, initial_quantity FROM batches WHERE id = ?', [id]);
       if (batch.length === 0) {
         return res.status(404).json({ success: false, message: 'Batch tidak ditemukan' });
       }
       
-      // If trying to archive, check if stock_type is 'lunas'
-      if (is_archived && batch[0].stock_type !== 'lunas') {
-        return res.status(400).json({ success: false, message: 'Hanya faktur dengan tipe stok \"lunas\" yang dapat diarsipkan' });
+      // If trying to archive, check if stock_type is 'lunas' or 'retur'
+      if (is_archived && batch[0].stock_type !== 'lunas' && batch[0].stock_type !== 'retur') {
+        return res.status(400).json({ success: false, message: 'Hanya faktur dengan tipe stok \"lunas\" atau \"retur\" yang dapat diarsipkan' });
+      }
+
+      // For 'retur' stock_type, only allow archive if all qty has been returned
+      if (is_archived && batch[0].stock_type === 'retur') {
+        const [retRows] = await pool.query(
+          'SELECT COALESCE(SUM(qty_returned), 0) as qty FROM purchase_return_items WHERE batch_id = ?',
+          [id]
+        );
+        const totalReturned = Number(retRows[0].qty);
+        if (totalReturned < batch[0].initial_quantity) {
+          return res.status(400).json({
+            success: false,
+            message: `Barang retur belum lengkap (${totalReturned}/${batch[0].initial_quantity}). Arsip hanya bisa dilakukan setelah semua qty diretur.`
+          });
+        }
       }
       
       await pool.query('UPDATE batches SET is_archived = ? WHERE id = ?', [is_archived ? 1 : 0, id]);
@@ -330,10 +354,18 @@ function registerInventoryRoutes(app, pool, authenticate, checkPermission, uploa
       const { id } = req.params;
       const { supplier_id, batch_number, stock_type, purchase_date, initial_quantity, remaining_quantity, cost_price, expired_date, dp_amount, due_date, notes } = req.body;
       
-      // Get the old remaining_quantity first to calculate the difference
-      const [oldBatch] = await pool.query('SELECT remaining_quantity, product_id, image_url, status FROM batches WHERE id = ?', [id]);
+      // Get the old batch first
+      const [oldBatch] = await pool.query('SELECT remaining_quantity, product_id, image_url, status, stock_type FROM batches WHERE id = ?', [id]);
       if (oldBatch.length === 0) {
         return res.status(404).json({ success: false, message: 'Batch not found' });
+      }
+
+      // Prevent manual edit of 'retur' stock_type
+      if (oldBatch[0].stock_type === 'retur' && stock_type !== 'retur') {
+        return res.status(400).json({ success: false, message: 'Batch dengan tipe stok "retur" tidak dapat diubah secara manual' });
+      }
+      if (stock_type === 'retur' && oldBatch[0].stock_type !== 'retur') {
+        return res.status(400).json({ success: false, message: 'Tipe stok "retur" hanya dapat diatur oleh sistem' });
       }
       const oldQty = oldBatch[0].remaining_quantity;
       const product_id = oldBatch[0].product_id;
