@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { Search, Filter, Edit, Trash2 } from 'lucide-react';
+import { Search, Filter, Edit, Trash2, Eye, FileText, ShoppingBag } from 'lucide-react';
 import { goeyToast } from "@/components/ui/goey-toaster";
 import ConfirmModal from '@/components/ConfirmModal';
 import OffCanvas from '@/components/OffCanvas';
@@ -50,8 +50,9 @@ export default function SuppliersPage() {
 
   // OffCanvas States
   const [isOffCanvasOpen, setIsOffCanvasOpen] = useState(false);
-  const [offCanvasMode, setOffCanvasMode] = useState<'add' | 'edit'>('add');
+  const [offCanvasMode, setOffCanvasMode] = useState<'add' | 'edit' | 'view'>('add');
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
+  const [supplierDetails, setSupplierDetails] = useState<any>(null);
 
   // Confirm Modal State
   const [confirmModal, setConfirmModal] = useState({
@@ -146,6 +147,25 @@ export default function SuppliersPage() {
       address: supplier.address || ''
     });
     setIsOffCanvasOpen(true);
+  };
+
+  const openViewOffCanvas = async (supplier: Supplier) => {
+    setOffCanvasMode('view');
+    setSelectedSupplier(supplier);
+    setIsOffCanvasOpen(true);
+    
+    try {
+      const res = await fetch(`http://localhost:5000/api/suppliers/${supplier.id}`, {
+        headers: authHeaders
+      });
+      if (res.ok) {
+        const data = await res.json();
+        console.log('Supplier details:', data); // Debug log
+        setSupplierDetails(data);
+      }
+    } catch (error) {
+      console.error('Error fetching supplier details:', error);
+    }
   };
 
   const openDeleteModal = (supplier: Supplier) => {
@@ -319,6 +339,13 @@ export default function SuppliersPage() {
                     <td className="px-6 py-4 text-gray-600">{supplier.phone || '-'}</td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button 
+                          onClick={() => openViewOffCanvas(supplier)}
+                          className="p-1 text-gray-600 hover:bg-gray-50 rounded"
+                          title="View Details"
+                        >
+                          <Eye size={16} />
+                        </button>
                         {checkActionPermission('edit') && (
                           <button 
                             onClick={() => openEditOffCanvas(supplier)}
@@ -404,74 +431,305 @@ export default function SuppliersPage() {
       <OffCanvas
         isOpen={isOffCanvasOpen}
         onClose={() => setIsOffCanvasOpen(false)}
-        title={offCanvasMode === 'add' ? 'Add Supplier' : 'Edit Supplier'}
+        title={offCanvasMode === 'add' ? 'Add Supplier' : offCanvasMode === 'edit' ? 'Edit Supplier' : 'Supplier Details'}
       >
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Supplier Name</label>
-            <input 
-              type="text" 
-              name="name"
-              required
-              className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="e.g. PT. Sumber Makmur"
-              value={formData.name}
-              onChange={handleInputChange}
-            />
-          </div>
+        {offCanvasMode === 'view' ? (
+          <div className="space-y-6">
+            {supplierDetails && (
+              <>
+                {/* Supplier Info */}
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <h3 className="font-semibold text-lg mb-3">{supplierDetails.supplier.name}</h3>
+                  <p className="text-gray-600 mb-1">
+                    <span className="font-medium">Contact Person:</span> {supplierDetails.supplier.contact_person || '-'}
+                  </p>
+                  <p className="text-gray-600 mb-1">
+                    <span className="font-medium">Phone:</span> {supplierDetails.supplier.phone || '-'}
+                  </p>
+                  <p className="text-gray-600">
+                    <span className="font-medium">Address:</span> {supplierDetails.supplier.address || '-'}
+                  </p>
+                </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Contact Person</label>
-            <input 
-              type="text" 
-              name="contact_person"
-              className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="e.g. John Doe"
-              value={formData.contact_person}
-              onChange={handleInputChange}
-            />
-          </div>
+                {/* Products List */}
+                {/* <div>
+                  <h3 className="font-semibold text-lg mb-3 flex items-center gap-2">
+                    <ShoppingBag size={20} className="text-blue-600" />
+                    Products from This Supplier
+                  </h3>
+                  {supplierDetails.products && supplierDetails.products.length > 0 ? (
+                    <div className="grid grid-cols-1 gap-2">
+                      {supplierDetails.products.map((product: any) => (
+                        <div key={product.id} className="border border-gray-200 p-3 rounded-lg flex justify-between items-center">
+                          <div>
+                            <p className="font-medium">{product.name}</p>
+                            <p className="text-sm text-gray-500">Stock: {product.stock} {product.unit}</p>
+                          </div>
+                          <p className="font-medium text-blue-600">
+                            {new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format(product.selling_price)}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-gray-500 italic">No products from this supplier yet.</p>
+                  )}
+                </div> */}
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
-            <input 
-              type="text" 
-              name="phone"
-              className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="e.g. 08123456789"
-              value={formData.phone}
-              onChange={handleInputChange}
-            />
-          </div>
+                {/* Batches (Bukti Faktur Pembelian) */}
+                <div>
+                  <h3 className="font-semibold text-lg mb-3 flex items-center gap-2">
+                    <FileText size={20} className="text-purple-600" />
+                    Bukti Faktur Pembelian 
+                  </h3>
+                  {(() => {
+                    console.log('supplierDetails.batches:', supplierDetails.batches);
+                    return supplierDetails.batches && supplierDetails.batches.length > 0;
+                  })() ? (
+                    <div className="space-y-3">
+                      {supplierDetails.batches.map((batch: any) => (
+                        <div key={batch.id} className="border border-gray-200 p-4 rounded-lg">
+                          <div className="flex justify-between items-center mb-2">
+                            <p className="font-medium">{batch.product_name}</p>
+                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                              batch.status === 'approved' ? 'bg-green-100 text-green-700' : 
+                              batch.status === 'pending' ? 'bg-yellow-100 text-yellow-700' : 
+                              batch.status === 'rejected' ? 'bg-red-100 text-red-700' : 
+                              'bg-gray-100 text-gray-700'
+                            }`}>
+                              {batch.status === 'approved' ? 'Disetujui' : 
+                               batch.status === 'pending' ? 'Menunggu' : 
+                               batch.status === 'rejected' ? 'Ditolak' : 
+                               'Revisi'}
+                            </span>
+                          </div>
+                          <p className="text-sm text-gray-500 mb-1">
+                            Tanggal Pembelian: {new Date(batch.purchase_date || batch.created_at).toLocaleDateString('id-ID')}
+                          </p>
+                          {batch.expired_date && (
+                            <p className="text-sm text-orange-600 mb-1">
+                              Tanggal Kadaluarsa: {new Date(batch.expired_date).toLocaleDateString('id-ID')}
+                            </p>
+                          )}
+                          {batch.due_date && (
+                            <p className="text-sm text-red-600 mb-1">
+                              Jatuh Tempo Pembayaran: {new Date(batch.due_date).toLocaleDateString('id-ID')}
+                            </p>
+                          )}
+                          <div className="grid grid-cols-2 gap-2 mb-2 text-sm mt-2">
+                            <div>
+                              <span className="text-gray-500">Jumlah Stok Masuk:</span>
+                              <span className="ml-1 font-medium">{batch.initial_quantity}</span>
+                            </div>
+                            <div>
+                              <span className="text-gray-500">Sisa Stok:</span>
+                              <span className="ml-1 font-medium">{batch.remaining_quantity}</span>
+                            </div>
+                            <div>
+                              <span className="text-gray-500">Harga Satuan:</span>
+                              <span className="ml-1 font-medium">{new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format(batch.cost_price)}</span>
+                            </div>
+                            <div>
+                              <span className="text-gray-500">Total Harga:</span>
+                              <span className="ml-1 font-medium">{new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format(batch.cost_price * batch.initial_quantity)}</span>
+                            </div>
+                            <div className="col-span-2">
+                              <span className="text-gray-500">Tipe Pembayaran:</span>
+                              <span className={`ml-1 font-medium ${
+                                batch.stock_type === 'lunas' ? 'text-green-600' : 
+                                (batch.stock_type === 'dp' || batch.stock_type === 'DP') ? 'text-yellow-600' : 
+                                (batch.stock_type === 'consignment' || batch.stock_type === 'konsinyasi') ? 'text-blue-600' :
+                                'text-gray-600'
+                              }`}>
+                                {batch.stock_type === 'lunas' ? 'Lunas' : 
+                                 (batch.stock_type === 'dp' || batch.stock_type === 'DP') ? 'DP' : 
+                                 (batch.stock_type === 'consignment' || batch.stock_type === 'konsinyasi') ? 'Konsinyasi' : 
+                                 'Belum Lunas'}
+                              </span>
+                            </div>
+                          </div>
+                          {batch.notes && (
+                            <p className="text-sm text-gray-500 italic">
+                              Catatan: {batch.notes}
+                            </p>
+                          )}
+                          {batch.image_url && (
+                            <div className="mt-3">
+                              <p className="text-sm font-medium mb-2 text-gray-700">Lampiran Bukti:</p>
+                              <a href={`http://localhost:5000${batch.image_url}`} target="_blank" rel="noopener noreferrer">
+                                <img 
+                                  src={`http://localhost:5000${batch.image_url}`} 
+                                  alt="Bukti Faktur" 
+                                  className="h-32 w-auto object-cover rounded border border-gray-200 hover:opacity-90 transition-opacity" 
+                                />
+                              </a>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-gray-500 italic">Belum ada bukti faktur pembelian dari supplier ini.</p>
+                  )}
+                </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
-            <textarea 
-              name="address"
-              className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="e.g. Jl. Sudirman No. 1"
-              rows={3}
-              value={formData.address}
-              onChange={handleInputChange}
-            />
+                {/* Purchases List */}
+                {/* <div className="mt-6">
+                  <h3 className="font-semibold text-lg mb-3 flex items-center gap-2">
+                    <FileText size={20} className="text-green-600" />
+                    Purchase Invoices
+                  </h3>
+                  {supplierDetails.purchases && supplierDetails.purchases.length > 0 ? (
+                    <div className="space-y-3">
+                      {supplierDetails.purchases.map((purchase: any) => (
+                        <div key={purchase.id} className="border border-gray-200 p-4 rounded-lg">
+                          <div className="flex justify-between items-center mb-2">
+                            <p className="font-medium">Invoice #{purchase.id}</p>
+                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                              purchase.payment_status === 'lunas' ? 'bg-green-100 text-green-700' : 
+                              purchase.payment_status === 'dp' ? 'bg-yellow-100 text-yellow-700' : 
+                              'bg-gray-100 text-gray-700'
+                            }`}>
+                              {purchase.payment_status === 'lunas' ? 'Lunas' : 
+                               purchase.payment_status === 'dp' ? 'DP' : 
+                               purchase.payment_status === 'cicilan' ? 'Cicilan' : 'Belum Lunas'}
+                            </span>
+                          </div>
+                          <p className="text-sm text-gray-500 mb-2">
+                            Date: {new Date(purchase.created_at).toLocaleDateString('id-ID')}
+                          </p>
+                          {purchase.due_date && (
+                            <p className="text-sm text-orange-600 mb-2">
+                              Due Date: {new Date(purchase.due_date).toLocaleDateString('id-ID')}
+                            </p>
+                          )}
+                          <div className="grid grid-cols-2 gap-2 mb-2 text-sm">
+                            <div>
+                              <span className="text-gray-500">Total:</span>
+                              <span className="ml-1 font-medium">{new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format(purchase.total_amount)}</span>
+                            </div>
+                            <div>
+                              <span className="text-gray-500">DP:</span>
+                              <span className="ml-1 font-medium">{new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format(purchase.down_payment || 0)}</span>
+                            </div>
+                            <div className="col-span-2">
+                              <span className="text-gray-500">Remaining Debt:</span>
+                              <span className={`ml-1 font-medium ${purchase.remaining_debt > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                                {new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format(purchase.remaining_debt || 0)}
+                              </span>
+                            </div>
+                          </div>
+                          
+                          {purchase.items && purchase.items.length > 0 && (
+                            <div className="mt-3 pt-3 border-t border-gray-100">
+                              <p className="text-sm font-medium mb-2">Items:</p>
+                              <div className="space-y-1">
+                                {purchase.items.map((item: any) => (
+                                  <div key={item.id} className="flex justify-between text-sm">
+                                    <span>{item.product_name} x {item.quantity}</span>
+                                    <span>{new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format(item.cost_price * item.quantity)}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          
+                          {purchase.payments && purchase.payments.length > 0 && (
+                            <div className="mt-3 pt-3 border-t border-gray-100">
+                              <p className="text-sm font-medium mb-2">Payment History:</p>
+                              <div className="space-y-2">
+                                {purchase.payments.map((payment: any) => (
+                                  <div key={payment.id} className="flex justify-between text-sm bg-gray-50 p-2 rounded">
+                                    <div>
+                                      <p className="font-medium">{new Date(payment.payment_date).toLocaleDateString('id-ID')}</p>
+                                      <p className="text-gray-500">{payment.payment_method}</p>
+                                    </div>
+                                    <p className="font-medium text-green-600">
+                                      +{new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format(payment.amount)}
+                                    </p>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-gray-500 italic">No purchases from this supplier yet.</p>
+                  )}
+                </div> */}
+              </>
+            )}
           </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Supplier Name</label>
+              <input 
+                type="text" 
+                name="name"
+                required
+                className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="e.g. PT. Sumber Makmur"
+                value={formData.name}
+                onChange={handleInputChange}
+              />
+            </div>
 
-          <div className="flex gap-3 mt-6">
-            <button 
-              type="button"
-              onClick={() => setIsOffCanvasOpen(false)}
-              className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 font-medium rounded-lg hover:bg-gray-200 transition-colors"
-            >
-              Cancel
-            </button>
-            <button 
-              type="submit"
-              className="flex-1 px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors shadow-sm shadow-blue-200"
-            >
-              {offCanvasMode === 'add' ? 'Add Supplier' : 'Save Changes'}
-            </button>
-          </div>
-        </form>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Contact Person</label>
+              <input 
+                type="text" 
+                name="contact_person"
+                className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="e.g. John Doe"
+                value={formData.contact_person}
+                onChange={handleInputChange}
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+              <input 
+                type="text" 
+                name="phone"
+                className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="e.g. 08123456789"
+                value={formData.phone}
+                onChange={handleInputChange}
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
+              <textarea 
+                name="address"
+                className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="e.g. Jl. Sudirman No. 1"
+                rows={3}
+                value={formData.address}
+                onChange={handleInputChange}
+              />
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button 
+                type="button"
+                onClick={() => setIsOffCanvasOpen(false)}
+                className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 font-medium rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                Cancel
+              </button>
+              <button 
+                type="submit"
+                className="flex-1 px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors shadow-sm shadow-blue-200"
+              >
+                {offCanvasMode === 'add' ? 'Add Supplier' : 'Save Changes'}
+              </button>
+            </div>
+          </form>
+        )}
       </OffCanvas>
 
       {/* Confirm Modal */}

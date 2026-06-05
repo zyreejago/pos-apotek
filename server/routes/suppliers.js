@@ -1,5 +1,80 @@
 module.exports = function registerSupplierRoutes(app, pool, authenticate, checkPermission, createAuditTrail) {
   app.get(
+    '/api/suppliers/:id',
+    authenticate,
+    checkPermission('Suppliers', 'show'),
+    async (req, res) => {
+      const { id } = req.params;
+      try {
+        const connection = await pool.getConnection();
+        
+        // Get supplier details
+        const [suppliers] = await connection.query('SELECT * FROM suppliers WHERE id = ?', [id]);
+        if (suppliers.length === 0) {
+          connection.release();
+          return res.status(404).json({ message: 'Supplier not found' });
+        }
+        
+        // Get purchases for this supplier
+        const [purchases] = await connection.query(
+          'SELECT * FROM purchases WHERE supplier_id = ? ORDER BY created_at DESC',
+          [id]
+        );
+        
+        // Get all batches (stok masuk) from this supplier
+        const [batches] = await connection.query(`
+          SELECT b.*, pr.name as product_name 
+          FROM batches b
+          JOIN products pr ON b.product_id = pr.id
+          WHERE b.supplier_id = ?
+          ORDER BY b.created_at DESC
+        `, [id]);
+        
+        // Get unique products from this supplier (from batches and purchase items)
+        const [products] = await connection.query(`
+          SELECT DISTINCT p.* 
+          FROM products p
+          LEFT JOIN batches b ON p.id = b.product_id
+          LEFT JOIN purchase_items pi ON p.id = pi.product_id
+          LEFT JOIN purchases pur ON pi.purchase_id = pur.id
+          WHERE b.supplier_id = ? OR pur.supplier_id = ?
+        `, [id, id]);
+        
+        // Get purchase items and payments for each purchase
+        const purchasesWithDetails = [];
+        for (const purchase of purchases) {
+          const [items] = await connection.query(`
+            SELECT pi.*, pr.name as product_name 
+            FROM purchase_items pi
+            JOIN products pr ON pi.product_id = pr.id
+            WHERE pi.purchase_id = ?
+          `, [purchase.id]);
+          
+          const [payments] = await connection.query(`
+            SELECT * 
+            FROM purchase_payments 
+            WHERE purchase_id = ? 
+            ORDER BY created_at DESC
+          `, [purchase.id]);
+          
+          purchasesWithDetails.push({ ...purchase, items, payments });
+        }
+        
+        connection.release();
+        
+        res.json({
+          supplier: suppliers[0],
+          purchases: purchasesWithDetails,
+          batches,
+          products
+        });
+      } catch (error) {
+        console.error('Error fetching supplier details:', error);
+        res.status(500).json({ message: 'Server error' });
+      }
+    }
+  );
+  app.get(
     '/api/suppliers',
     authenticate,
     checkPermission('Suppliers', 'show'),
