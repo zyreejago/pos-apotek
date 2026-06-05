@@ -25,6 +25,15 @@ interface CartItem extends Product {
   quantity: number;
 }
 
+interface PrescriptionItem {
+  id: number;
+  prescription_id: number;
+  product_id: number;
+  quantity: number;
+  selling_price: number;
+  product_name: string;
+}
+
 interface Prescription {
   id: number;
   prescription_code: string | null;
@@ -35,6 +44,7 @@ interface Prescription {
   notes: string | null;
   created_at: string;
   entered_by_name: string | null;
+  items: PrescriptionItem[];
 }
 
 interface PrescriptionFormData {
@@ -91,6 +101,10 @@ export default function PrescriptionsPage() {
   const [settings, setSettings] = useState({ ppn_rate: 0, discount_rate: 0 });
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'midtrans'>('cash');
   const [processing, setProcessing] = useState(false);
+  const [saveOption, setSaveOption] = useState<'save_only' | 'save_and_pay'>('save_and_pay');
+  const [isPayModalOpen, setIsPayModalOpen] = useState(false);
+  const [prescriptionToPay, setPrescriptionToPay] = useState<Prescription | null>(null);
+  const [payModalPaymentMethod, setPayModalPaymentMethod] = useState<'cash' | 'midtrans'>('cash');
 
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
   const userStr = typeof window !== 'undefined' ? localStorage.getItem('user') : null;
@@ -249,6 +263,7 @@ export default function PrescriptionsPage() {
     });
     setCart([]);
     setImagePreview(null);
+    setSaveOption('save_and_pay');
     setIsOffCanvasOpen(true);
   };
 
@@ -262,7 +277,21 @@ export default function PrescriptionsPage() {
       prescription_date: prescription.prescription_date || new Date().toISOString().split('T')[0],
       notes: prescription.notes || ''
     });
-    setCart([]);
+    
+    // Load prescription items into cart
+    const cartItems = prescription.items.map(pi => {
+      const product = products.find(p => p.id === pi.product_id);
+      if (!product) return null;
+      return {
+        ...product,
+        quantity: pi.quantity
+      };
+    }).filter(item => item !== null) as CartItem[];
+    setCart(cartItems);
+    
+    // Set save option: if already has transaction, default to save_only, otherwise save_and_pay
+    setSaveOption(prescription.transaction_id ? 'save_only' : 'save_and_pay');
+    
     setImagePreview(prescription.image_url ? `http://localhost:5000${prescription.image_url}` : null);
     setIsOffCanvasOpen(true);
   };
@@ -367,6 +396,131 @@ export default function PrescriptionsPage() {
     printWindow.document.close();
   };
 
+  const handleEditPrescription = async () => {
+    if (!selectedPrescription) return;
+    setProcessing(true);
+    try {
+      let transactionId: number | null = selectedPrescription.transaction_id;
+
+      // First, prepare prescription items
+      const prescriptionItems = cart.map(item => ({
+        id: item.id,
+        product_id: item.id,
+        quantity: item.quantity,
+        selling_price: item.selling_price
+      }));
+
+      // Only create transaction if save_and_pay option is selected and there are items and no existing transaction yet
+      if (saveOption === 'save_and_pay' && cart.length > 0 && !transactionId) {
+        const transactionPayload = {
+          items: cart.map(item => ({
+            id: item.id,
+            quantity: item.quantity,
+            price: item.selling_price
+          })),
+          total_amount: total,
+          subtotal: subtotal,
+          tax_amount: ppn,
+          discount_amount: discount,
+          payment_method: paymentMethod
+        };
+
+        const transactionRes = await fetch('http://localhost:5000/api/transactions', {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json', 
+            ...(token ? { Authorization: `Bearer ${token}` } : {}) 
+          },
+          body: JSON.stringify(transactionPayload)
+        });
+
+        if (transactionRes.status === 401) {
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+          router.push('/login');
+          return;
+        }
+
+        const transactionData = await transactionRes.json();
+        if (!transactionRes.ok) {
+          goeyToast.error('Transaksi gagal', { description: transactionData.message || 'Terjadi kesalahan saat memproses transaksi.' });
+          return;
+        }
+
+        transactionId = transactionData.id;
+
+        // If using Midtrans, handle payment flow
+        if (paymentMethod === 'midtrans' && transactionData.redirect_url) {
+          const snapToken = transactionData.redirect_url.split('/').pop();
+          ((window as unknown) as Window & { snap: { pay: (token: string, options: Record<string, unknown>) => void } }).snap.pay(snapToken || '', {
+            onSuccess: async () => {
+              goeyToast.success('Transaksi Berhasil', { description: `Pembayaran senilai ${formatCurrency(total)} berhasil diproses.` });
+              printReceiptFunction({ id: transactionData.id, items: cart, subtotal, ppn, discount, total });
+              setIsOffCanvasOpen(false);
+              fetchPrescriptions();
+              fetchProductsAndSettings();
+            },
+            onPending: () => {
+              goeyToast.info('Menunggu Pembayaran', { description: 'Silakan selesaikan pembayaran Anda.' });
+              setIsOffCanvasOpen(false);
+              fetchPrescriptions();
+            },
+            onError: () => {
+              goeyToast.error('Pembayaran Gagal', { description: 'Terjadi kesalahan saat memproses pembayaran.' });
+            },
+            onClose: () => {
+              goeyToast.info('Pembayaran Ditutup', { description: 'Anda menutup halaman pembayaran.' });
+              setIsOffCanvasOpen(false);
+              fetchPrescriptions();
+            }
+          });
+          return; // Stop here to wait for Midtrans callback
+        } else {
+          goeyToast.success('Resep & Transaksi Berhasil', { description: `Pembayaran senilai ${formatCurrency(total)} berhasil diproses.` });
+          printReceiptFunction({ id: transactionData.id, items: cart, subtotal, ppn, discount, total });
+        }
+      }
+
+      // Now update the prescription
+      const formDataToSend = new FormData();
+      formDataToSend.append('prescription_code', formData.prescription_code);
+      formDataToSend.append('prescription_date', formData.prescription_date);
+      formDataToSend.append('notes', formData.notes);
+      formDataToSend.append('entered_by', currentUser?.id || '');
+      if (transactionId) {
+        formDataToSend.append('transaction_id', transactionId.toString());
+      }
+      if (formData.image) {
+        formDataToSend.append('image', formData.image);
+      }
+      if (prescriptionItems.length > 0) {
+        formDataToSend.append('items', JSON.stringify(prescriptionItems));
+      }
+
+      const res = await fetch(`http://localhost:5000/api/inventory/prescriptions/${selectedPrescription.id}`, {
+        method: 'PUT',
+        headers: authHeaders,
+        body: formDataToSend
+      });
+
+      if (res.ok) {
+        setIsOffCanvasOpen(false);
+        fetchPrescriptions();
+        if (transactionId) {
+          fetchProductsAndSettings();
+        }
+        goeyToast.success('Resep berhasil diperbarui', { description: 'Data resep telah berhasil diperbarui.' });
+      } else {
+        goeyToast.error('Gagal Memperbarui Resep', { description: 'Terjadi kesalahan saat menyimpan data.' });
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      goeyToast.error('Gagal memproses', { description: 'Periksa koneksi internet Anda dan coba lagi.' });
+    } finally {
+      setProcessing(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -382,33 +536,7 @@ export default function PrescriptionsPage() {
     if (offCanvasMode === 'add') {
       await handlePaymentAndCreatePrescription();
     } else {
-      try {
-        const formDataToSend = new FormData();
-        formDataToSend.append('prescription_code', formData.prescription_code);
-        formDataToSend.append('prescription_date', formData.prescription_date);
-        formDataToSend.append('notes', formData.notes);
-        formDataToSend.append('entered_by', currentUser?.id || '');
-        if (formData.image) {
-          formDataToSend.append('image', formData.image);
-        }
-
-        const res = await fetch(`http://localhost:5000/api/inventory/prescriptions/${selectedPrescription?.id}`, {
-          method: 'PUT',
-          headers: authHeaders,
-          body: formDataToSend
-        });
-
-        if (res.ok) {
-          setIsOffCanvasOpen(false);
-          fetchPrescriptions();
-          goeyToast.success('Resep berhasil diperbarui', { description: 'Data resep telah berhasil diperbarui.' });
-        } else {
-          goeyToast.error('Gagal Memperbarui Resep', { description: 'Terjadi kesalahan saat menyimpan data.' });
-        }
-      } catch (error) {
-        console.error('Error saving prescription:', error);
-        goeyToast.error('Terjadi kesalahan sistem', { description: 'Gagal terhubung ke server.' });
-      }
+      await handleEditPrescription();
     }
   };
 
@@ -417,8 +545,16 @@ export default function PrescriptionsPage() {
     try {
       let transactionId: number | null = null;
 
-      // Only create transaction if there are items in the cart
-      if (cart.length > 0) {
+      // First, prepare prescription items
+      const prescriptionItems = cart.map(item => ({
+        id: item.id,
+        product_id: item.id,
+        quantity: item.quantity,
+        selling_price: item.selling_price
+      }));
+
+      // Only create transaction if save_and_pay option is selected and there are items
+      if (saveOption === 'save_and_pay' && cart.length > 0) {
         const transactionPayload = {
           items: cart.map(item => ({
             id: item.id,
@@ -503,6 +639,10 @@ export default function PrescriptionsPage() {
       if (formData.image) {
         prescriptionFormData.append('image', formData.image);
       }
+      // Add items to FormData as JSON string
+      if (prescriptionItems.length > 0) {
+        prescriptionFormData.append('items', JSON.stringify(prescriptionItems));
+      }
 
       const prescriptionRes = await fetch('http://localhost:5000/api/inventory/prescriptions', {
         method: 'POST',
@@ -513,7 +653,7 @@ export default function PrescriptionsPage() {
       if (prescriptionRes.ok) {
         // If no transaction was needed, just show success message
         if (!transactionId) {
-          goeyToast.success('Resep Berhasil Disimpan', { description: 'Resep dokter telah berhasil disimpan.' });
+          goeyToast.success('Resep Berhasil Disimpan', { description: 'Resep dokter telah berhasil disimpan. Anda bisa membayarnya nanti.' });
         }
         setIsOffCanvasOpen(false);
         setCart([]);
@@ -523,6 +663,127 @@ export default function PrescriptionsPage() {
         }
       } else {
         goeyToast.error('Gagal Membuat Resep', { description: 'Terjadi kesalahan saat menyimpan data resep.' });
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      goeyToast.error('Gagal memproses', { description: 'Periksa koneksi internet Anda dan coba lagi.' });
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const handlePayForPrescription = (prescription: Prescription) => {
+    setPrescriptionToPay(prescription);
+    setPayModalPaymentMethod('cash');
+    setIsPayModalOpen(true);
+  };
+
+  const processPaymentForPrescription = async () => {
+    if (!prescriptionToPay) return;
+
+    // Prepare cart items from prescription items
+    const cartItems = prescriptionToPay.items.map(pi => {
+      const product = products.find(p => p.id === pi.product_id);
+      if (!product) return null;
+      return {
+        ...product,
+        quantity: pi.quantity
+      };
+    }).filter(item => item !== null) as CartItem[];
+
+    // Calculate totals
+    const subtotal = cartItems.reduce((sum, item) => sum + (item.selling_price * item.quantity), 0);
+    const ppn = settings.ppn_rate > 0 ? (subtotal * settings.ppn_rate / 100) : 0;
+    const discount = settings.discount_rate > 0 ? (subtotal * settings.discount_rate / 100) : 0;
+    const totalAmount = subtotal + ppn - discount;
+
+    setProcessing(true);
+    try {
+      const transactionPayload = {
+        items: cartItems.map(item => ({
+          id: item.id,
+          quantity: item.quantity,
+          price: item.selling_price
+        })),
+        total_amount: totalAmount,
+        subtotal: subtotal,
+        tax_amount: ppn,
+        discount_amount: discount,
+        payment_method: payModalPaymentMethod
+      };
+
+      const transactionRes = await fetch('http://localhost:5000/api/transactions', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json', 
+          ...(token ? { Authorization: `Bearer ${token}` } : {}) 
+        },
+        body: JSON.stringify(transactionPayload)
+      });
+
+      if (transactionRes.status === 401) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        router.push('/login');
+        return;
+      }
+
+      const transactionData = await transactionRes.json();
+      if (!transactionRes.ok) {
+        goeyToast.error('Transaksi gagal', { description: transactionData.message || 'Terjadi kesalahan saat memproses transaksi.' });
+        return;
+      }
+
+      // Update the prescription with transaction_id
+      const updateFormData = new FormData();
+      updateFormData.append('transaction_id', transactionData.id.toString());
+      updateFormData.append('prescription_code', prescriptionToPay.prescription_code || '');
+      updateFormData.append('prescription_date', prescriptionToPay.prescription_date || new Date().toISOString().split('T')[0]);
+      updateFormData.append('notes', prescriptionToPay.notes || '');
+      updateFormData.append('entered_by', prescriptionToPay.entered_by?.toString() || currentUser?.id.toString() || '');
+
+      const updateRes = await fetch(`http://localhost:5000/api/inventory/prescriptions/${prescriptionToPay.id}`, {
+        method: 'PUT',
+        headers: authHeaders,
+        body: updateFormData
+      });
+
+      if (!updateRes.ok) {
+        goeyToast.error('Gagal memperbarui resep', { description: 'Terjadi kesalahan saat memperbarui data resep.' });
+        return;
+      }
+
+      // Close the modal first
+      setIsPayModalOpen(false);
+
+      // If using Midtrans, handle payment flow
+      if (payModalPaymentMethod === 'midtrans' && transactionData.redirect_url) {
+        const snapToken = transactionData.redirect_url.split('/').pop();
+        ((window as unknown) as Window & { snap: { pay: (token: string, options: Record<string, unknown>) => void } }).snap.pay(snapToken || '', {
+          onSuccess: async () => {
+            goeyToast.success('Transaksi Berhasil', { description: `Pembayaran senilai ${formatCurrency(totalAmount)} berhasil diproses.` });
+            printReceiptFunction({ id: transactionData.id, items: cartItems, subtotal, ppn, discount, total: totalAmount });
+            fetchPrescriptions();
+            fetchProductsAndSettings();
+          },
+          onPending: () => {
+            goeyToast.info('Menunggu Pembayaran', { description: 'Silakan selesaikan pembayaran Anda.' });
+            fetchPrescriptions();
+          },
+          onError: () => {
+            goeyToast.error('Pembayaran Gagal', { description: 'Terjadi kesalahan saat memproses pembayaran.' });
+          },
+          onClose: () => {
+            goeyToast.info('Pembayaran Ditutup', { description: 'Anda menutup halaman pembayaran.' });
+            fetchPrescriptions();
+          }
+        });
+        return; // Stop here to wait for Midtrans callback
+      } else {
+        goeyToast.success('Pembayaran Berhasil', { description: `Pembayaran senilai ${formatCurrency(totalAmount)} berhasil diproses.` });
+        printReceiptFunction({ id: transactionData.id, items: cartItems, subtotal, ppn, discount, total: totalAmount });
+        fetchPrescriptions();
+        fetchProductsAndSettings();
       }
     } catch (error) {
       console.error('Error:', error);
@@ -601,24 +862,25 @@ export default function PrescriptionsPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-sm text-left">
               <thead className="bg-gray-50 text-gray-500 font-medium">
-                <tr>
-                  <th className="px-6 py-4">Kode Resep</th>
-                  <th className="px-6 py-4">Tanggal</th>
-                  <th className="px-6 py-4">Diupload Oleh</th>
-                  <th className="px-6 py-4">Gambar</th>
-                  <th className="px-6 py-4 text-right">Aksi</th>
-                </tr>
-              </thead>
+                        <tr>
+                          <th className="px-6 py-4">Kode Resep</th>
+                          <th className="px-6 py-4">Tanggal</th>
+                          <th className="px-6 py-4">Diupload Oleh</th>
+                          <th className="px-6 py-4">Gambar</th>
+                          <th className="px-6 py-4">Items</th>
+                          <th className="px-6 py-4 text-right">Aksi</th>
+                        </tr>
+                      </thead>
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={5} className="px-6 py-8 text-center text-gray-500">
+                    <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
                       Memuat resep...
                     </td>
                   </tr>
                 ) : prescriptions.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="px-6 py-8 text-center text-gray-500">
+                    <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
                       Belum ada resep yang ditambahkan
                     </td>
                   </tr>
@@ -649,12 +911,32 @@ export default function PrescriptionsPage() {
                           '-'
                         )}
                       </td>
+                      <td className="px-6 py-4">
+                        {prescription.items && prescription.items.length > 0 ? (
+                          <div className="text-sm text-slate-700">
+                            {prescription.items.length} item
+                            {prescription.items.length > 1 ? 's' : ''}
+                          </div>
+                        ) : (
+                          '-'
+                        )}
+                      </td>
                       <td className="px-6 py-4 text-right">
                         <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                          {!prescription.transaction_id && prescription.items && prescription.items.length > 0 && checkActionPermission('edit') && (
+                            <button 
+                              onClick={() => handlePayForPrescription(prescription)}
+                              className="p-2 bg-green-100 text-green-700 hover:bg-green-200 rounded font-medium text-sm flex items-center gap-1"
+                              title="Bayar"
+                            >
+                              <CreditCard size={14} />
+                              Bayar
+                            </button>
+                          )}
                           {checkActionPermission('edit') && (
                             <button 
                               onClick={() => handleOpenEditOffCanvas(prescription)}
-                              className="p-1 text-blue-600 hover:bg-blue-50 rounded"
+                              className="p-2 bg-blue-100 text-blue-700 hover:bg-blue-200 rounded"
                               title="Edit"
                             >
                               <Edit size={16} />
@@ -663,7 +945,7 @@ export default function PrescriptionsPage() {
                           {checkActionPermission('delete') && (
                             <button 
                               onClick={() => handleOpenDeleteModal(prescription)}
-                              className="p-1 text-red-600 hover:bg-red-50 rounded"
+                              className="p-2 bg-red-100 text-red-700 hover:bg-red-200 rounded"
                               title="Delete"
                             >
                               <Trash2 size={16} />
@@ -950,43 +1232,83 @@ export default function PrescriptionsPage() {
                         </div>
                       </div>
 
-                      <div className="flex flex-col">
-                        <h4 className="text-sm font-semibold text-slate-700 mb-3 uppercase tracking-wider">Metode Pembayaran</h4>
+                      <div className="flex flex-col gap-4">
+                        <h4 className="text-sm font-semibold text-slate-700 mb-1 uppercase tracking-wider">Opsi Simpan</h4>
                         <div className="grid grid-cols-2 gap-4">
                           <button
                             type="button"
                             onClick={(e) => {
                               e.preventDefault();
                               e.stopPropagation();
-                              setPaymentMethod('cash');
+                              setSaveOption('save_only');
                             }}
                             className={`flex flex-col items-center justify-center p-4 rounded-xl border-2 transition-all ${
-                              paymentMethod === 'cash' 
-                                ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-sm' 
+                              saveOption === 'save_only' 
+                                ? 'border-gray-500 bg-gray-50 text-gray-700 shadow-sm' 
                                 : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50'
                             }`}
                           >
-                            <span className="font-semibold mb-1 text-center">Tunai</span>
-                            <span className="text-xs opacity-80 text-center">Bayar di Kasir</span>
+                            <span className="font-semibold mb-1 text-center">Simpan Resep</span>
+                            {/* <span className="text-xs opacity-80 text-center">Bayar nanti</span> */}
                           </button>
                           <button
                             type="button"
                             onClick={(e) => {
                               e.preventDefault();
                               e.stopPropagation();
-                              setPaymentMethod('midtrans');
+                              setSaveOption('save_and_pay');
                             }}
                             className={`flex flex-col items-center justify-center p-4 rounded-xl border-2 transition-all ${
-                              paymentMethod === 'midtrans' 
-                                ? 'border-green-500 bg-green-50 text-green-700 shadow-sm' 
+                              saveOption === 'save_and_pay' 
+                                ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-sm' 
                                 : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50'
                             }`}
                           >
-                            <span className="font-semibold mb-1 text-center">Midtrans</span>
-                            <span className="text-xs opacity-80 text-center">QRIS / Transfer</span>
+                            <span className="font-semibold mb-1 text-center">Simpan & Bayar</span>
+                            <span className="text-xs opacity-80 text-center">Bayar sekarang</span>
                           </button>
                         </div>
                       </div>
+
+                      {saveOption === 'save_and_pay' && (
+                        <div className="flex flex-col">
+                          <h4 className="text-sm font-semibold text-slate-700 mb-3 uppercase tracking-wider">Metode Pembayaran</h4>
+                          <div className="grid grid-cols-2 gap-4">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setPaymentMethod('cash');
+                              }}
+                              className={`flex flex-col items-center justify-center p-4 rounded-xl border-2 transition-all ${
+                                paymentMethod === 'cash' 
+                                  ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-sm' 
+                                  : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50'
+                              }`}
+                            >
+                              <span className="font-semibold mb-1 text-center">Tunai</span>
+                              <span className="text-xs opacity-80 text-center">Bayar di Kasir</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setPaymentMethod('midtrans');
+                              }}
+                              className={`flex flex-col items-center justify-center p-4 rounded-xl border-2 transition-all ${
+                                paymentMethod === 'midtrans' 
+                                  ? 'border-green-500 bg-green-50 text-green-700 shadow-sm' 
+                                  : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50'
+                              }`}
+                            >
+                              <span className="font-semibold mb-1 text-center">Midtrans</span>
+                              <span className="text-xs opacity-80 text-center">QRIS / Transfer</span>
+                            </button>
+                          </div>
+                        </div>
+                      )}
 
                     </div>
                   </div>
@@ -1023,6 +1345,108 @@ export default function PrescriptionsPage() {
             </button>
           </div>
         </form>
+      </OffCanvas>
+
+      <OffCanvas
+        isOpen={isPayModalOpen}
+        onClose={() => setIsPayModalOpen(false)}
+        title="Bayar Resep"
+        width="500px"
+      >
+        {prescriptionToPay && (
+          <div className="space-y-6">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">Kode Resep</label>
+              <div className="text-lg font-semibold">{prescriptionToPay.prescription_code || '-'}</div>
+            </div>
+
+            {/* Items List */}
+            <div className="bg-slate-50 rounded-xl p-4">
+              <h4 className="text-sm font-semibold text-slate-700 mb-3">Item Obat</h4>
+              <div className="space-y-2">
+                {prescriptionToPay.items.map((item, idx) => (
+                  <div key={idx} className="flex justify-between items-center">
+                    <div>
+                      <div className="font-medium text-slate-800">{item.product_name}</div>
+                      <div className="text-xs text-slate-500">x{item.quantity}</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-medium text-slate-800">{formatCurrency(item.selling_price * item.quantity)}</div>
+                      <div className="text-xs text-slate-500">{formatCurrency(item.selling_price)}/pcs</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Total */}
+              <div className="border-t border-slate-200 mt-4 pt-4">
+                <div className="flex justify-between items-center font-bold text-lg text-slate-900">
+                  <span>Total</span>
+                  <span>
+                    {formatCurrency(
+                      prescriptionToPay.items.reduce((sum, item) => sum + (item.selling_price * item.quantity), 0)
+                    )}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Payment Method */}
+            <div>
+              <h4 className="text-sm font-semibold text-slate-700 mb-3">Metode Pembayaran</h4>
+              <div className="grid grid-cols-2 gap-4">
+                <button
+                  type="button"
+                  onClick={() => setPayModalPaymentMethod('cash')}
+                  className={`flex flex-col items-center justify-center p-4 rounded-xl border-2 transition-all ${
+                    payModalPaymentMethod === 'cash'
+                      ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-sm'
+                      : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50'
+                  }`}
+                >
+                  <span className="font-semibold mb-1">Tunai</span>
+                  <span className="text-xs opacity-80">Bayar di Kasir</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPayModalPaymentMethod('midtrans')}
+                  className={`flex flex-col items-center justify-center p-4 rounded-xl border-2 transition-all ${
+                    payModalPaymentMethod === 'midtrans'
+                      ? 'border-green-500 bg-green-50 text-green-700 shadow-sm'
+                      : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50'
+                  }`}
+                >
+                  <span className="font-semibold mb-1">Midtrans</span>
+                  <span className="text-xs opacity-80">QRIS / Transfer</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex gap-3 pt-4 border-t border-gray-200">
+              <button
+                type="button"
+                onClick={() => setIsPayModalOpen(false)}
+                className="flex-1 px-4 py-2.5 bg-gray-100 text-gray-700 font-semibold rounded-xl hover:bg-gray-200 transition-colors"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={processPaymentForPrescription}
+                disabled={processing}
+                className="flex-1 px-4 py-2.5 bg-green-600 text-white font-semibold rounded-xl hover:bg-green-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {processing ? 'Memproses...' : (
+                  <>
+                    <CreditCard size={18} />
+                    Bayar Sekarang
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        )}
       </OffCanvas>
 
       <ConfirmModal

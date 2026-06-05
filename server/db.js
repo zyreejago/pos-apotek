@@ -320,6 +320,20 @@ const initDB = async () => {
       )
     `);
 
+    // Prescription items table
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS prescription_items (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        prescription_id INT NOT NULL,
+        product_id INT NOT NULL,
+        quantity INT NOT NULL,
+        selling_price DECIMAL(10, 2) NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (prescription_id) REFERENCES prescriptions(id) ON DELETE CASCADE,
+        FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+      )
+    `);
+
     // Purchases table
     await connection.query(`
       CREATE TABLE IF NOT EXISTS purchases (

@@ -511,6 +511,18 @@ function registerInventoryRoutes(app, pool, authenticate, checkPermission, uploa
         LEFT JOIN transactions t ON p.transaction_id = t.id
         ORDER BY p.created_at DESC
       `);
+
+      // Fetch items for each prescription
+      for (const prescription of rows) {
+        const [items] = await pool.query(`
+          SELECT pi.*, pr.name as product_name 
+          FROM prescription_items pi 
+          LEFT JOIN products pr ON pi.product_id = pr.id 
+          WHERE pi.prescription_id = ?
+        `, [prescription.id]);
+        prescription.items = items;
+      }
+
       res.json({ success: true, data: rows });
     } catch (err) {
       console.error('Error fetching prescriptions:', err);
@@ -521,12 +533,23 @@ function registerInventoryRoutes(app, pool, authenticate, checkPermission, uploa
   // Create a prescription
   app.post('/api/inventory/prescriptions', authenticate, checkPermission('Resep Dokter', 'create'), upload.single('image'), async (req, res) => {
     try {
-      const { prescription_code, prescription_date, entered_by, transaction_id, notes } = req.body;
+      const { prescription_code, prescription_date, entered_by, transaction_id, notes, items } = req.body;
       const image_url = req.file ? `/uploads/${req.file.filename}` : null;
       const [result] = await pool.query(`
         INSERT INTO prescriptions (prescription_code, image_url, prescription_date, entered_by, transaction_id, notes)
         VALUES (?, ?, ?, ?, ?, ?)
       `, [prescription_code, image_url, prescription_date, entered_by, transaction_id, notes]);
+
+      // Save prescription items if provided
+      if (items) {
+        const parsedItems = typeof items === 'string' ? JSON.parse(items) : items;
+        for (const item of parsedItems) {
+          await pool.query(`
+            INSERT INTO prescription_items (prescription_id, product_id, quantity, selling_price)
+            VALUES (?, ?, ?, ?)
+          `, [result.insertId, item.product_id || item.id, item.quantity, item.selling_price]);
+        }
+      }
 
       await createAuditTrail({
         user_id: req.user.id,
@@ -548,7 +571,7 @@ function registerInventoryRoutes(app, pool, authenticate, checkPermission, uploa
   app.put('/api/inventory/prescriptions/:id', authenticate, checkPermission('Resep Dokter', 'edit'), upload.single('image'), async (req, res) => {
     try {
       const { id } = req.params;
-      const { prescription_code, prescription_date, entered_by, transaction_id, notes } = req.body;
+      const { prescription_code, prescription_date, entered_by, transaction_id, notes, items } = req.body;
       
       // Get existing image_url if no new file uploaded
       const [existing] = await pool.query('SELECT image_url FROM prescriptions WHERE id = ?', [id]);
@@ -563,6 +586,21 @@ function registerInventoryRoutes(app, pool, authenticate, checkPermission, uploa
         SET prescription_code = ?, image_url = ?, prescription_date = ?, entered_by = ?, transaction_id = ?, notes = ?
         WHERE id = ?
       `, [prescription_code, image_url, prescription_date, entered_by, transaction_id, notes, id]);
+
+      // Update prescription items if provided
+      if (items) {
+        // Delete existing items first
+        await pool.query('DELETE FROM prescription_items WHERE prescription_id = ?', [id]);
+        
+        // Insert new items
+        const parsedItems = typeof items === 'string' ? JSON.parse(items) : items;
+        for (const item of parsedItems) {
+          await pool.query(`
+            INSERT INTO prescription_items (prescription_id, product_id, quantity, selling_price)
+            VALUES (?, ?, ?, ?)
+          `, [id, item.product_id || item.id, item.quantity, item.selling_price]);
+        }
+      }
 
       await createAuditTrail({
         user_id: req.user.id,
@@ -584,6 +622,9 @@ function registerInventoryRoutes(app, pool, authenticate, checkPermission, uploa
   app.delete('/api/inventory/prescriptions/:id', authenticate, checkPermission('Resep Dokter', 'delete'), async (req, res) => {
     try {
       const { id } = req.params;
+      // Delete items first
+      await pool.query('DELETE FROM prescription_items WHERE prescription_id = ?', [id]);
+      // Then delete prescription
       await pool.query('DELETE FROM prescriptions WHERE id = ?', [id]);
 
       await createAuditTrail({
