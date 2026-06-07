@@ -18,22 +18,32 @@ async function processBatch(items, batchSize, processFn) {
 }
 
 function imputeMissingValues(series, windowSize = 3) {
+  if (!series) return [];
   const result = [...series];
 
   for (let i = 0; i < result.length; i++) {
     if (Number.isFinite(result[i])) continue;
 
     const prev = [];
-
     for (let j = Math.max(0, i - windowSize); j < i; j++) {
       if (Number.isFinite(result[j])) {
         prev.push(result[j]);
       }
     }
 
-    if (prev.length > 0) {
-      const avg = prev.reduce((a, b) => a + b, 0) / prev.length;
-      result[i] = Math.max(0, Math.round(avg));
+    const next = [];
+    for (let j = i + 1; j < Math.min(result.length, i + 1 + windowSize); j++) {
+      if (Number.isFinite(result[j])) {
+        next.push(result[j]);
+      }
+    }
+
+    if (prev.length > 0 && next.length > 0) {
+      result[i] = Math.max(0, Math.round((prev[prev.length - 1] + next[0]) / 2));
+    } else if (prev.length > 0) {
+      result[i] = Math.max(0, Math.round(prev.reduce((a, b) => a + b, 0) / prev.length));
+    } else if (next.length > 0) {
+      result[i] = next[0];
     } else {
       result[i] = 0;
     }

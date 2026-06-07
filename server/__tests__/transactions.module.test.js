@@ -29,14 +29,15 @@ function buildApp({ pool, user }) {
     next();
   };
   const checkPermission = () => (_req, _res, next) => next();
+  const createAuditTrail = jest.fn().mockResolvedValue(undefined);
 
-  registerTransactionRoutes(app, pool, authenticate, checkPermission);
+  registerTransactionRoutes(app, pool, authenticate, checkPermission, createAuditTrail);
   return app;
 }
 
 function buildConnection() {
   return {
-    query: jest.fn(),
+    query: jest.fn().mockResolvedValue([[], []]),
     beginTransaction: jest.fn().mockResolvedValue(undefined),
     commit: jest.fn().mockResolvedValue(undefined),
     rollback: jest.fn().mockResolvedValue(undefined),
@@ -63,8 +64,8 @@ describe('transactions module', () => {
     connection.query
       .mockResolvedValueOnce([{ insertId: 10 }, []])
       .mockResolvedValueOnce([{}, []])
-      .mockResolvedValueOnce([{}, []])
-      .mockResolvedValueOnce([{}, []]);
+      .mockResolvedValueOnce([[{ cost_price: 0, product_category: 'NON_OBAT' }], []])
+      .mockResolvedValueOnce([[], []]);
 
     const pool = { getConnection: jest.fn().mockResolvedValue(connection) };
     const app = buildApp({ pool });
@@ -211,8 +212,8 @@ describe('transactions module', () => {
     connection.query
       .mockResolvedValueOnce([[{ id: 3, payment_status: 'pending' }], []])
       .mockResolvedValueOnce([{}, []])
-      .mockResolvedValueOnce([[{ quantity: 1, product_id: 1 }], []])
-      .mockResolvedValueOnce([{}, []]);
+      .mockResolvedValueOnce([[{ quantity: 1, product_id: 1, cost_price: 0, product_category: 'NON_OBAT' }], []])
+      .mockResolvedValueOnce([[], []]);
 
     midtransClient.Snap._status.mockResolvedValueOnce({ transaction_status: 'settlement', fraud_status: 'accept' });
 
@@ -290,7 +291,7 @@ describe('transactions module', () => {
     expect(res.status).toBe(500);
   });
 
-  test('POST /api/midtrans/callback transaction not found returns 404', async () => {
+  test('POST /api/midtrans/callback transaction not found returns 200', async () => {
     const connection = buildConnection();
     connection.query.mockResolvedValueOnce([[], []]);
     const pool = { getConnection: jest.fn().mockResolvedValue(connection) };
@@ -301,7 +302,7 @@ describe('transactions module', () => {
       transaction_status: 'settlement',
       fraud_status: 'accept',
     });
-    expect(res.status).toBe(404);
+    expect(res.status).toBe(200);
   });
 
   test('POST /api/midtrans/callback settlement updates items', async () => {
@@ -309,8 +310,8 @@ describe('transactions module', () => {
     connection.query
       .mockResolvedValueOnce([[{ id: 10, payment_status: 'pending' }], []])
       .mockResolvedValueOnce([{}, []])
-      .mockResolvedValueOnce([[{ quantity: 1, product_id: 1 }], []])
-      .mockResolvedValueOnce([{}, []]);
+      .mockResolvedValueOnce([[{ quantity: 1, product_id: 1, cost_price: 0, product_category: 'NON_OBAT' }], []])
+      .mockResolvedValueOnce([[], []]);
     const pool = { getConnection: jest.fn().mockResolvedValue(connection) };
     const app = buildApp({ pool });
 
@@ -461,5 +462,333 @@ describe('transactions module', () => {
 
     const res = await request(app).get('/api/dashboard');
     expect(res.status).toBe(500);
+  });
+
+  test('POST /api/transactions cash with OBAT/NON_OBAT triggers proportional split and COGS', async () => {
+    const connection = buildConnection();
+    connection.query
+      .mockResolvedValueOnce([{ insertId: 13 }, []])
+      .mockResolvedValueOnce([{}, []])
+      .mockResolvedValueOnce([[{ cost_price: 500, product_category: 'OBAT' }], []])
+      .mockResolvedValueOnce([[], []])
+      .mockResolvedValueOnce([{}, []])
+      .mockResolvedValueOnce([{}, []])
+      .mockResolvedValueOnce([[{ cost_price: 300, product_category: 'NON_OBAT' }], []])
+      .mockResolvedValueOnce([[], []])
+      .mockResolvedValueOnce([{}, []])
+      .mockResolvedValueOnce([{}, []]);
+
+    const pool = { getConnection: jest.fn().mockResolvedValue(connection) };
+    const app = buildApp({ pool });
+
+    const res = await request(app).post('/api/transactions').send({
+      items: [
+        { id: 1, quantity: 1, price: 5000 },
+        { id: 2, quantity: 1, price: 5000 },
+      ],
+      total_amount: 10000,
+      tax_amount: 1000,
+      subtotal: 9000,
+      payment_method: 'cash',
+    });
+    expect(res.status).toBe(201);
+  });
+
+  test('GET /api/midtrans/status/:orderId completed with items creates journal entries', async () => {
+    const connection = {
+      query: jest.fn().mockImplementation((sql) => {
+        if (sql.includes('SELECT * FROM transactions')) {
+          return Promise.resolve([[{ id: 5, payment_status: 'pending', subtotal: 9000, tax_amount: 1000, total_amount: 10000 }], []]);
+        }
+        if (sql.includes('SELECT ti.*')) {
+          return Promise.resolve([[
+            { quantity: 1, product_id: 1, cost_price: 500, product_category: 'OBAT', price: 5000 },
+            { quantity: 1, product_id: 2, cost_price: 300, product_category: 'NON_OBAT', price: 5000 },
+          ], []]);
+        }
+        if (sql.includes('SELECT id FROM accounts')) {
+          return Promise.resolve([[{ id: 1 }], []]);
+        }
+        if (sql.includes('INSERT INTO journal_entries')) {
+          return Promise.resolve([{ insertId: 1 }, []]);
+        }
+        if (sql.includes('SELECT')) {
+          return Promise.resolve([[], []]);
+        }
+        return Promise.resolve([{}, []]);
+      }),
+      beginTransaction: jest.fn().mockResolvedValue(undefined),
+      commit: jest.fn().mockResolvedValue(undefined),
+      rollback: jest.fn().mockResolvedValue(undefined),
+      release: jest.fn(),
+    };
+
+    midtransClient.Snap._status.mockResolvedValueOnce({ transaction_status: 'settlement', fraud_status: 'accept' });
+
+    const pool = { getConnection: jest.fn().mockResolvedValue(connection) };
+    const app = buildApp({ pool });
+
+    const res = await request(app).get('/api/midtrans/status/ORDER-5');
+    expect(res.status).toBe(200);
+    expect(res.body.payment_status).toBe('completed');
+  });
+
+  test('POST /api/transactions cash with FEFO batch reduction and journal entries', async () => {
+    const connection = buildConnection();
+    connection.query
+      .mockResolvedValueOnce([{ insertId: 20 }, []])
+      .mockResolvedValueOnce([{}, []])
+      .mockResolvedValueOnce([[{ cost_price: 500, product_category: 'OBAT' }], []])
+      .mockResolvedValueOnce([[{ id: 1, remaining_quantity: 2 }, { id: 2, remaining_quantity: 10 }], []])
+      .mockResolvedValueOnce([{}, []])
+      .mockResolvedValueOnce([{}, []])
+      .mockResolvedValueOnce([{}, []])
+      .mockResolvedValueOnce([{}, []])
+      .mockResolvedValueOnce([{ insertId: 1 }, []])
+      .mockResolvedValueOnce([[{ id: 1 }], []])
+      .mockResolvedValueOnce([{}, []])
+      .mockResolvedValueOnce([[{ id: 2 }], []])
+      .mockResolvedValueOnce([{}, []])
+      .mockResolvedValueOnce([[{ id: 3 }], []])
+      .mockResolvedValueOnce([{}, []]);
+
+    const pool = { getConnection: jest.fn().mockResolvedValue(connection) };
+    const app = buildApp({ pool });
+
+    const res = await request(app).post('/api/transactions').send({
+      items: [{ id: 1, quantity: 2, price: 5000 }],
+      total_amount: 10000,
+      payment_method: 'cash',
+    });
+    expect(res.status).toBe(201);
+  });
+
+  test('GET /api/midtrans/status/:orderId completed with FEFO batch reduction', async () => {
+    const connection = {
+      query: jest.fn().mockImplementation((sql) => {
+        if (sql.includes('SELECT * FROM transactions')) {
+          return Promise.resolve([[{ id: 30, payment_status: 'pending', subtotal: 9000, tax_amount: 1000, total_amount: 10000 }], []]);
+        }
+        if (sql.includes('SELECT ti.*')) {
+          return Promise.resolve([[
+            { quantity: 2, product_id: 1, cost_price: 500, product_category: 'OBAT', price: 5000 },
+          ], []]);
+        }
+        if (sql.includes('SELECT id, remaining_quantity FROM batches')) {
+          return Promise.resolve([[{ id: 1, remaining_quantity: 2 }, { id: 2, remaining_quantity: 10 }], []]);
+        }
+        if (sql.includes('SELECT id FROM accounts')) {
+          return Promise.resolve([[{ id: 1 }], []]);
+        }
+        if (sql.includes('INSERT INTO journal_entries')) {
+          return Promise.resolve([{ insertId: 1 }, []]);
+        }
+        if (sql.includes('SELECT')) {
+          return Promise.resolve([[], []]);
+        }
+        return Promise.resolve([{}, []]);
+      }),
+      beginTransaction: jest.fn().mockResolvedValue(undefined),
+      commit: jest.fn().mockResolvedValue(undefined),
+      rollback: jest.fn().mockResolvedValue(undefined),
+      release: jest.fn(),
+    };
+
+    midtransClient.Snap._status.mockResolvedValueOnce({ transaction_status: 'settlement', fraud_status: 'accept' });
+
+    const pool = { getConnection: jest.fn().mockResolvedValue(connection) };
+    const app = buildApp({ pool });
+
+    const res = await request(app).get('/api/midtrans/status/ORDER-BATCH');
+    expect(res.status).toBe(200);
+  });
+
+  test('GET /api/midtrans/status/:orderId completed with NON_OBAT covers obatCOGS false branch', async () => {
+    const connection = {
+      query: jest.fn().mockImplementation((sql) => {
+        if (sql.includes('SELECT * FROM transactions')) {
+          return Promise.resolve([[{ id: 31, payment_status: 'pending', subtotal: 5000, tax_amount: 0, total_amount: 5000 }], []]);
+        }
+        if (sql.includes('SELECT ti.*')) {
+          return Promise.resolve([[
+            { quantity: 1, product_id: 1, cost_price: 300, product_category: 'NON_OBAT', price: 5000 },
+          ], []]);
+        }
+        if (sql.includes('SELECT id, remaining_quantity FROM batches')) {
+          return Promise.resolve([[{ id: 1, remaining_quantity: 1 }], []]);
+        }
+        if (sql.includes('SELECT id FROM accounts')) {
+          return Promise.resolve([[{ id: 1 }], []]);
+        }
+        if (sql.includes('INSERT INTO journal_entries')) {
+          return Promise.resolve([{ insertId: 1 }, []]);
+        }
+        if (sql.includes('SELECT')) {
+          return Promise.resolve([[], []]);
+        }
+        return Promise.resolve([{}, []]);
+      }),
+      beginTransaction: jest.fn().mockResolvedValue(undefined),
+      commit: jest.fn().mockResolvedValue(undefined),
+      rollback: jest.fn().mockResolvedValue(undefined),
+      release: jest.fn(),
+    };
+
+    midtransClient.Snap._status.mockResolvedValueOnce({ transaction_status: 'settlement', fraud_status: 'accept' });
+
+    const pool = { getConnection: jest.fn().mockResolvedValue(connection) };
+    const app = buildApp({ pool });
+
+    const res = await request(app).get('/api/midtrans/status/ORDER-NONOBAT');
+    expect(res.status).toBe(200);
+  });
+
+  test('POST /api/midtrans/callback completed with FEFO batch reduction', async () => {
+    const connection = {
+      query: jest.fn().mockImplementation((sql) => {
+        if (sql.includes('SELECT * FROM transactions')) {
+          return Promise.resolve([[{ id: 40, payment_status: 'pending', midtrans_transaction_id: null, subtotal: 9000, tax_amount: 1000, total_amount: 10000 }], []]);
+        }
+        if (sql.includes('SELECT ti.*')) {
+          return Promise.resolve([[
+            { quantity: 2, product_id: 1, cost_price: 500, product_category: 'OBAT', price: 5000 },
+          ], []]);
+        }
+        if (sql.includes('SELECT id, remaining_quantity FROM batches')) {
+          return Promise.resolve([[{ id: 1, remaining_quantity: 2 }, { id: 2, remaining_quantity: 10 }], []]);
+        }
+        if (sql.includes('SELECT id FROM accounts')) {
+          return Promise.resolve([[{ id: 1 }], []]);
+        }
+        if (sql.includes('INSERT INTO journal_entries')) {
+          return Promise.resolve([{ insertId: 1 }, []]);
+        }
+        if (sql.includes('SELECT')) {
+          return Promise.resolve([[], []]);
+        }
+        return Promise.resolve([{}, []]);
+      }),
+      beginTransaction: jest.fn().mockResolvedValue(undefined),
+      commit: jest.fn().mockResolvedValue(undefined),
+      rollback: jest.fn().mockResolvedValue(undefined),
+      release: jest.fn(),
+    };
+
+    const pool = { getConnection: jest.fn().mockResolvedValue(connection) };
+    const app = buildApp({ pool });
+
+    const res = await request(app).post('/api/midtrans/callback').send({
+      order_id: 'ORDER-CB-BATCH',
+      transaction_status: 'settlement',
+      fraud_status: 'accept',
+    });
+    expect(res.status).toBe(200);
+  });
+
+  test('POST /api/midtrans/callback completed with NON_OBAT covers obatCOGS false branch', async () => {
+    const connection = {
+      query: jest.fn().mockImplementation((sql) => {
+        if (sql.includes('SELECT * FROM transactions')) {
+          return Promise.resolve([[{ id: 41, payment_status: 'pending', midtrans_transaction_id: null, subtotal: 5000, tax_amount: 0, total_amount: 5000 }], []]);
+        }
+        if (sql.includes('SELECT ti.*')) {
+          return Promise.resolve([[
+            { quantity: 1, product_id: 1, cost_price: 300, product_category: 'NON_OBAT', price: 5000 },
+          ], []]);
+        }
+        if (sql.includes('SELECT id, remaining_quantity FROM batches')) {
+          return Promise.resolve([[{ id: 1, remaining_quantity: 1 }], []]);
+        }
+        if (sql.includes('SELECT id FROM accounts')) {
+          return Promise.resolve([[{ id: 1 }], []]);
+        }
+        if (sql.includes('INSERT INTO journal_entries')) {
+          return Promise.resolve([{ insertId: 1 }, []]);
+        }
+        if (sql.includes('SELECT')) {
+          return Promise.resolve([[], []]);
+        }
+        return Promise.resolve([{}, []]);
+      }),
+      beginTransaction: jest.fn().mockResolvedValue(undefined),
+      commit: jest.fn().mockResolvedValue(undefined),
+      rollback: jest.fn().mockResolvedValue(undefined),
+      release: jest.fn(),
+    };
+
+    const pool = { getConnection: jest.fn().mockResolvedValue(connection) };
+    const app = buildApp({ pool });
+
+    const res = await request(app).post('/api/midtrans/callback').send({
+      order_id: 'ORDER-CB-NONOBAT',
+      transaction_status: 'settlement',
+      fraud_status: 'accept',
+    });
+    expect(res.status).toBe(200);
+  });
+
+  test('POST /api/midtrans/callback without order_id returns 400', async () => {
+    const pool = { getConnection: jest.fn() };
+    const app = buildApp({ pool });
+
+    const res = await request(app).post('/api/midtrans/callback').send({
+      transaction_status: 'settlement',
+      fraud_status: 'accept',
+    });
+    expect(res.status).toBe(400);
+  });
+
+  test('POST /api/midtrans/callback already completed skips processing', async () => {
+    const connection = buildConnection();
+    connection.query.mockResolvedValueOnce([[{ id: 99, payment_status: 'completed' }], []]);
+    const pool = { getConnection: jest.fn().mockResolvedValue(connection) };
+    const app = buildApp({ pool });
+
+    const res = await request(app).post('/api/midtrans/callback').send({
+      order_id: 'ORDER-DONE',
+      transaction_status: 'settlement',
+      fraud_status: 'accept',
+    });
+    expect(res.status).toBe(200);
+  });
+
+  test('POST /api/midtrans/callback completed with OBAT/NON_OBAT creates journal entries', async () => {
+    const connection = {
+      query: jest.fn().mockImplementation((sql) => {
+        if (sql.includes('SELECT * FROM transactions')) {
+          return Promise.resolve([[{ id: 20, payment_status: 'pending', subtotal: 9000, tax_amount: 1000, total_amount: 10000 }], []]);
+        }
+        if (sql.includes('SELECT ti.*')) {
+          return Promise.resolve([[
+            { quantity: 1, product_id: 1, cost_price: 500, product_category: 'OBAT', price: 5000 },
+            { quantity: 1, product_id: 2, cost_price: 300, product_category: 'NON_OBAT', price: 5000 },
+          ], []]);
+        }
+        if (sql.includes('SELECT id FROM accounts')) {
+          return Promise.resolve([[{ id: 1 }], []]);
+        }
+        if (sql.includes('INSERT INTO journal_entries')) {
+          return Promise.resolve([{ insertId: 1 }, []]);
+        }
+        if (sql.includes('SELECT')) {
+          return Promise.resolve([[], []]);
+        }
+        return Promise.resolve([{}, []]);
+      }),
+      beginTransaction: jest.fn().mockResolvedValue(undefined),
+      commit: jest.fn().mockResolvedValue(undefined),
+      rollback: jest.fn().mockResolvedValue(undefined),
+      release: jest.fn(),
+    };
+
+    const pool = { getConnection: jest.fn().mockResolvedValue(connection) };
+    const app = buildApp({ pool });
+
+    const res = await request(app).post('/api/midtrans/callback').send({
+      order_id: 'ORDER-CB-FULL',
+      transaction_status: 'settlement',
+      fraud_status: 'accept',
+    });
+    expect(res.status).toBe(200);
   });
 });

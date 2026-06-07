@@ -2,6 +2,33 @@ import React from 'react';
 import { render, waitFor, fireEvent, screen, act } from '@testing-library/react';
 import UsersPage from '../page';
 import { goeyToast } from '@/components/ui/goey-toaster';
+import { OffCanvasProvider } from '@/context/OffCanvasContext';
+import { SidebarProvider } from '@/context/SidebarContext';
+import { HeaderProvider, useHeader } from '@/context/HeaderContext';
+
+function HeaderDisplay() {
+  const { headerState } = useHeader();
+  return (
+    <div data-testid="header">
+      <h1>{headerState.title}</h1>
+      {headerState.subtitle && <p>{headerState.subtitle}</p>}
+      {headerState.rightContent}
+    </div>
+  );
+}
+
+function renderWithProviders(ui: React.ReactElement) {
+  return render(
+    <OffCanvasProvider>
+      <SidebarProvider>
+        <HeaderProvider>
+          <HeaderDisplay />
+          {ui}
+        </HeaderProvider>
+      </SidebarProvider>
+    </OffCanvasProvider>
+  );
+}
 
 jest.setTimeout(30000);
 
@@ -46,6 +73,18 @@ jest.mock('@/components/Header', () => ({
       {rightContent}
     </div>
   ),
+}));
+
+jest.mock('@/components/OffCanvas', () => ({
+  __esModule: true,
+  default: ({ isOpen, onClose, title, children }: any) =>
+    isOpen ? (
+      <div data-testid="offcanvas">
+        <h2>{title}</h2>
+        {children}
+        <button type="button" onClick={onClose}>close-offcanvas</button>
+      </div>
+    ) : null,
 }));
 
 jest.mock('@/components/ConfirmModal', () => ({
@@ -119,7 +158,7 @@ const usersPayload = {
 };
 
 function renderUsersPage() {
-  return render(<UsersPage />);
+  return renderWithProviders(<UsersPage />);
 }
 
 beforeEach(() => {
@@ -876,5 +915,236 @@ describe('users module', () => {
 
     expect(await screen.findByText('??')).toBeInTheDocument();
     expect(screen.getByText('Active')).toBeInTheDocument();
+  });
+
+  test('handles safeJson parse error on users fetch', async () => {
+    global.fetch = jest.fn((input: RequestInfo) => {
+      const url = typeof input === 'string' ? input : input.url;
+
+      if (url.includes('/api/rbac/roles')) return okJson([]);
+
+      if (url.includes('/api/users')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => { throw new Error('parse error'); },
+          text: async () => 'bad json',
+        } as Response);
+      }
+
+      return okJson({});
+    }) as unknown as typeof fetch;
+
+    renderUsersPage();
+
+    await waitFor(() => {
+      expect(screen.getByText('No users found.')).toBeInTheDocument();
+    });
+  });
+
+  test('handles save user unauthorized', async () => {
+    global.fetch = jest.fn((input: RequestInfo, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input.url;
+
+      if (url.includes('/api/rbac/roles')) return okJson([{ id: 1, name: 'Admin' }]);
+
+      if (url.endsWith('/api/users') && init?.method === 'POST') {
+        return failJson({}, 401);
+      }
+
+      if (url.includes('/api/users')) return okJson(usersPayload);
+
+      return okJson({});
+    }) as unknown as typeof fetch;
+
+    renderUsersPage();
+
+    fireEvent.click(await screen.findByText('Add Pengguna'));
+
+    fireEvent.change(screen.getByPlaceholderText('Enter username'), { target: { value: 'newuser' } });
+    fireEvent.change(screen.getByPlaceholderText('Enter email'), { target: { value: 'new@test.com' } });
+    fireEvent.change(screen.getByPlaceholderText('Enter password'), { target: { value: '123456' } });
+
+    fireEvent.click(screen.getByText('Save'));
+
+    await waitFor(() => {
+      expect(pushMock).toHaveBeenCalledWith('/login');
+    });
+  });
+
+  test('delete button hidden for own account', async () => {
+    global.fetch = jest.fn((input: RequestInfo) => {
+      const url = typeof input === 'string' ? input : input.url;
+
+      if (url.includes('/api/rbac/roles')) return okJson([]);
+
+      if (url.includes('/api/users')) {
+        return okJson({
+          data: [
+            { id: 1, username: 'admin', email: 'admin@test.com', role: 'superadmin', created_at: '2026-01-01', status: 'active' },
+          ],
+          pagination: { total: 1, page: 1, limit: 10, totalPages: 1 },
+        });
+      }
+
+      return okJson({});
+    }) as unknown as typeof fetch;
+
+    renderUsersPage();
+
+    await waitFor(() => expect(screen.getByText('admin')).toBeInTheDocument());
+    expect(screen.queryByTitle('Delete User')).not.toBeInTheDocument();
+  });
+
+  test('delete button visible when currentUser is null', async () => {
+    localStorage.removeItem('user');
+
+    global.fetch = jest.fn((input: RequestInfo) => {
+      const url = typeof input === 'string' ? input : input.url;
+
+      if (url.includes('/api/rbac/roles')) return okJson([]);
+
+      if (url.includes('/api/users')) {
+        return okJson({
+          data: [
+            { id: 1, username: 'admin', email: 'admin@test.com', role: 'superadmin', created_at: '2026-01-01', status: 'active' },
+          ],
+          pagination: { total: 1, page: 1, limit: 10, totalPages: 1 },
+        });
+      }
+
+      return okJson({});
+    }) as unknown as typeof fetch;
+
+    renderUsersPage();
+
+    await waitFor(() => expect(screen.getByText('admin')).toBeInTheDocument());
+    expect(screen.getByTitle('Delete User')).toBeInTheDocument();
+  });
+
+  test('handles delete unauthorized', async () => {
+    global.fetch = jest.fn((input: RequestInfo, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input.url;
+
+      if (url.includes('/api/rbac/roles')) return okJson([]);
+
+      if (init?.method === 'DELETE') {
+        return failJson({}, 401);
+      }
+
+      if (url.includes('/api/users')) return okJson(usersPayload);
+
+      return okJson({});
+    }) as unknown as typeof fetch;
+
+    renderUsersPage();
+
+    const deleteButtons = await screen.findAllByTitle('Delete User');
+    fireEvent.click(deleteButtons[0]);
+    fireEvent.click(screen.getByText('confirm-delete'));
+
+    await waitFor(() => {
+      expect(pushMock).toHaveBeenCalledWith('/login');
+    });
+  });
+
+  test('pagination previous button disabled on first page', async () => {
+    global.fetch = jest.fn((input: RequestInfo) => {
+      const url = typeof input === 'string' ? input : input.url;
+
+      if (url.includes('/api/rbac/roles')) return okJson([]);
+
+      if (url.includes('/api/users')) {
+        return okJson({
+          data: usersPayload.data,
+          pagination: { total: 20, page: 1, limit: 10, totalPages: 2 },
+        });
+      }
+
+      return okJson({});
+    }) as unknown as typeof fetch;
+
+    renderUsersPage();
+
+    await waitFor(() => expect(screen.getByText('john')).toBeInTheDocument());
+
+    const prevButton = screen.getByText('←').closest('button');
+    expect(prevButton).toBeDisabled();
+  });
+
+  test('pagination next button navigates to page 2', async () => {
+    global.fetch = jest.fn((input: RequestInfo) => {
+      const url = typeof input === 'string' ? input : input.url;
+
+      if (url.includes('/api/rbac/roles')) return okJson([]);
+
+      if (url.includes('/api/users')) {
+        return okJson({
+          data: usersPayload.data,
+          pagination: { total: 20, page: 1, limit: 10, totalPages: 2 },
+        });
+      }
+
+      return okJson({});
+    }) as unknown as typeof fetch;
+
+    renderUsersPage();
+
+    await waitFor(() => expect(screen.getByText('john')).toBeInTheDocument());
+
+    const nextButton = screen.getByText('→').closest('button');
+    fireEvent.click(nextButton!);
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining('page=2'),
+        expect.any(Object)
+      );
+    });
+  });
+
+  test('pagination previous button navigates back from page 2', async () => {
+    let page = 1;
+    global.fetch = jest.fn((input: RequestInfo) => {
+      const url = typeof input === 'string' ? input : input.url;
+
+      if (url.includes('/api/rbac/roles')) return okJson([]);
+
+      if (url.includes('/api/users')) {
+        const pageMatch = url.match(/page=(\d+)/);
+        if (pageMatch) page = parseInt(pageMatch[1]);
+        return okJson({
+          data: usersPayload.data,
+          pagination: { total: 20, page, limit: 10, totalPages: 2 },
+        });
+      }
+
+      return okJson({});
+    }) as unknown as typeof fetch;
+
+    renderUsersPage();
+
+    await waitFor(() => expect(screen.getByText('john')).toBeInTheDocument());
+
+    const nextButton = screen.getByText('→').closest('button');
+    fireEvent.click(nextButton!);
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining('page=2'),
+        expect.any(Object)
+      );
+    });
+
+    const prevButton = screen.getByText('←').closest('button');
+    expect(prevButton).not.toBeDisabled();
+    fireEvent.click(prevButton!);
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining('page=1'),
+        expect.any(Object)
+      );
+    });
   });
 });

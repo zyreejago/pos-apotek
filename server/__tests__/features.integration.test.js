@@ -33,7 +33,7 @@ async function loadAppWithMockedDb() {
   };
 
   const mockPool = {
-    query: jest.fn().mockResolvedValue([[], []]),
+    query: jest.fn().mockResolvedValue([[]]),
     getConnection: jest.fn().mockResolvedValue(mockConnection),
   };
 
@@ -208,6 +208,9 @@ describe('feature integration (backend)', () => {
     mockConnection.query
       .mockResolvedValueOnce([{ insertId: 123 }, []])
       .mockResolvedValueOnce([{}, []])
+      .mockResolvedValueOnce([[{ cost_price: 500, product_category: 'OBAT' }], []])
+      .mockResolvedValueOnce([[{ id: 1, remaining_quantity: 10 }], []])
+      .mockResolvedValueOnce([{}, []])
       .mockResolvedValueOnce([{}, []])
       .mockResolvedValueOnce([{}, []]);
 
@@ -237,10 +240,12 @@ describe('feature integration (backend)', () => {
   test('GET /api/forecast/latest returns list', async () => {
     const { app, mockPool, superadminToken } = await loadAppWithMockedDb();
 
-    mockPool.query.mockResolvedValueOnce([
-      [{ id: 1, name: 'Paracetamol', stock: 10, unit: 'pcs', tambahan_stok: 5 }],
-      [],
-    ]);
+    mockPool.query
+      .mockResolvedValueOnce([[]])
+      .mockResolvedValueOnce([
+        [{ id: 1, name: 'Paracetamol', stock: 10, unit: 'pcs', tambahan_stok: 5 }],
+        [],
+      ]);
 
     const res = await request(app)
       .get('/api/forecast/latest')
@@ -253,10 +258,12 @@ describe('feature integration (backend)', () => {
   test('GET /api/forecast-openrouter/products returns list', async () => {
     const { app, mockPool, superadminToken } = await loadAppWithMockedDb();
 
-    mockPool.query.mockResolvedValueOnce([
-      [{ id: 1, name: 'Paracetamol', stock: 10, unit: 'pcs' }],
-      [],
-    ]);
+    mockPool.query
+      .mockResolvedValueOnce([[]])
+      .mockResolvedValueOnce([
+        [{ id: 1, name: 'Paracetamol', stock: 10, unit: 'pcs' }],
+        [],
+      ]);
 
     const res = await request(app)
       .get('/api/forecast-openrouter/products')
@@ -354,7 +361,9 @@ describe('feature integration (backend)', () => {
 
   test('POST /api/users creates user returns 201', async () => {
     const { app, mockPool, superadminToken } = await loadAppWithMockedDb();
-    mockPool.query.mockResolvedValueOnce([{ insertId: 9 }, []]);
+    mockPool.query
+      .mockResolvedValueOnce([[]])
+      .mockResolvedValueOnce([{ insertId: 9 }, []]);
     const res = await request(app)
       .post('/api/users')
       .set('Authorization', `Bearer ${superadminToken}`)
@@ -365,7 +374,9 @@ describe('feature integration (backend)', () => {
 
   test('PUT /api/users/:id not found returns 404', async () => {
     const { app, mockPool, superadminToken } = await loadAppWithMockedDb();
-    mockPool.query.mockResolvedValueOnce([[], []]);
+    mockPool.query
+      .mockResolvedValueOnce([[]])
+      .mockResolvedValueOnce([[], []]);
     const res = await request(app)
       .put('/api/users/99')
       .set('Authorization', `Bearer ${superadminToken}`)
@@ -375,8 +386,10 @@ describe('feature integration (backend)', () => {
 
   test('PUT /api/users/:id updates user returns 200', async () => {
     const { app, mockPool, superadminToken } = await loadAppWithMockedDb();
-    mockPool.query.mockResolvedValueOnce([[{ id: 1, role: 'user' }], []]);
-    mockPool.query.mockResolvedValueOnce([{}, []]);
+    mockPool.query
+      .mockResolvedValueOnce([[]])
+      .mockResolvedValueOnce([[{ id: 1, role: 'user' }], []])
+      .mockResolvedValueOnce([{}, []]);
     const res = await request(app)
       .put('/api/users/1')
       .set('Authorization', `Bearer ${superadminToken}`)
@@ -394,8 +407,10 @@ describe('feature integration (backend)', () => {
 
   test('DELETE /api/users/:id deletes user returns 200', async () => {
     const { app, mockPool, superadminToken } = await loadAppWithMockedDb();
-    mockPool.query.mockResolvedValueOnce([[{ role: 'user' }], []]);
-    mockPool.query.mockResolvedValueOnce([{ affectedRows: 1 }, []]);
+    mockPool.query
+      .mockResolvedValueOnce([[]])
+      .mockResolvedValueOnce([[{ role: 'user' }], []])
+      .mockResolvedValueOnce([{ affectedRows: 1 }, []]);
     const res = await request(app)
       .delete('/api/users/2')
       .set('Authorization', `Bearer ${superadminToken}`);
@@ -413,7 +428,9 @@ describe('feature integration (backend)', () => {
 
   test('POST /api/suppliers creates supplier returns 201', async () => {
     const { app, mockPool, superadminToken } = await loadAppWithMockedDb();
-    mockPool.query.mockResolvedValueOnce([{ insertId: 5 }, []]);
+    mockPool.query
+      .mockResolvedValueOnce([[]])
+      .mockResolvedValueOnce([{ insertId: 5 }, []]);
     const res = await request(app)
       .post('/api/suppliers')
       .set('Authorization', `Bearer ${superadminToken}`)
@@ -424,7 +441,9 @@ describe('feature integration (backend)', () => {
 
   test('PUT /api/suppliers/:id updates supplier returns 200', async () => {
     const { app, mockPool, superadminToken } = await loadAppWithMockedDb();
-    mockPool.query.mockResolvedValueOnce([{}, []]);
+    mockPool.query
+      .mockResolvedValueOnce([[]])
+      .mockResolvedValueOnce([{}, []]);
     const res = await request(app)
       .put('/api/suppliers/1')
       .set('Authorization', `Bearer ${superadminToken}`)
@@ -434,7 +453,9 @@ describe('feature integration (backend)', () => {
 
   test('DELETE /api/suppliers/:id deletes supplier returns 200', async () => {
     const { app, mockPool, superadminToken } = await loadAppWithMockedDb();
-    mockPool.query.mockResolvedValueOnce([{}, []]);
+    mockPool.query
+      .mockResolvedValueOnce([[]])
+      .mockResolvedValueOnce([{}, []]);
     const res = await request(app)
       .delete('/api/suppliers/1')
       .set('Authorization', `Bearer ${superadminToken}`);
@@ -563,6 +584,7 @@ describe('feature integration (backend)', () => {
     mockConnection.query
       .mockResolvedValueOnce([[{ total_cash: 1000 }], []])
       .mockResolvedValueOnce([[{ total_inventory: 500 }], []])
+      .mockResolvedValueOnce([[{ total_revenue: 5000 }], []])
       .mockResolvedValueOnce([[{ total_cogs: 200 }], []]);
 
     const res = await request(app)
@@ -616,10 +638,13 @@ describe('feature integration (backend)', () => {
   test('GET /api/midtrans/status/:orderId updates payment to completed returns 200', async () => {
     const { app, mockConnection, superadminToken } = await loadAppWithMockedDb();
     mockConnection.query
-      .mockResolvedValueOnce([[{ id: 7, midtrans_order_id: 'ORDER-2', payment_status: 'pending' }], []])
+      .mockResolvedValueOnce([[{ id: 7, midtrans_order_id: 'ORDER-2', payment_status: 'pending', subtotal: null, tax_amount: null, total_amount: 10000 }], []])
       .mockResolvedValueOnce([{}, []])
-      .mockResolvedValueOnce([[{ quantity: 2, product_id: 1 }], []])
-      .mockResolvedValueOnce([{}, []]);
+      .mockResolvedValueOnce([[{ quantity: 2, product_id: 1, cost_price: 500, product_category: 'OBAT', price: 1000 }], []])
+      .mockResolvedValueOnce([[{ id: 1, remaining_quantity: 10 }], []])
+      .mockResolvedValueOnce([{}, []])
+      .mockResolvedValueOnce([{}, []])
+      .mockResolvedValueOnce([[{ id: 2 }], []]);
 
     const res = await request(app)
       .get('/api/midtrans/status/ORDER-2')
@@ -628,7 +653,7 @@ describe('feature integration (backend)', () => {
     expect(res.body.payment_status).toBe('completed');
   });
 
-  test('POST /api/midtrans/callback transaction not found returns 404', async () => {
+  test('POST /api/midtrans/callback transaction not found returns 200', async () => {
     const { app, mockConnection } = await loadAppWithMockedDb();
     mockConnection.query.mockResolvedValueOnce([[], []]);
     const res = await request(app).post('/api/midtrans/callback').send({
@@ -636,16 +661,19 @@ describe('feature integration (backend)', () => {
       transaction_status: 'settlement',
       fraud_status: 'accept',
     });
-    expect(res.status).toBe(404);
+    expect(res.status).toBe(200);
   });
 
   test('POST /api/midtrans/callback success returns 200', async () => {
     const { app, mockConnection } = await loadAppWithMockedDb();
     mockConnection.query
-      .mockResolvedValueOnce([[{ id: 9, payment_status: 'pending' }], []])
+      .mockResolvedValueOnce([[{ id: 9, payment_status: 'pending', subtotal: null, tax_amount: null, total_amount: 10000 }], []])
       .mockResolvedValueOnce([{}, []])
-      .mockResolvedValueOnce([[{ quantity: 1, product_id: 1 }], []])
-      .mockResolvedValueOnce([{}, []]);
+      .mockResolvedValueOnce([[{ quantity: 1, product_id: 1, cost_price: 500, product_category: 'OBAT' }], []])
+      .mockResolvedValueOnce([[{ id: 1, remaining_quantity: 10 }], []])
+      .mockResolvedValueOnce([{}, []])
+      .mockResolvedValueOnce([{}, []])
+      .mockResolvedValueOnce([[{ id: 2 }], []]);
 
     const res = await request(app).post('/api/midtrans/callback').send({
       order_id: 'ORDER-OK',
@@ -666,7 +694,9 @@ describe('feature integration (backend)', () => {
 
   test('POST /api/forecast/stock product not found returns 404', async () => {
     const { app, mockPool, superadminToken } = await loadAppWithMockedDb();
-    mockPool.query.mockResolvedValueOnce([[], []]);
+    mockPool.query
+      .mockResolvedValueOnce([[]])
+      .mockResolvedValueOnce([[], []]);
     const res = await request(app)
       .post('/api/forecast/stock')
       .set('Authorization', `Bearer ${superadminToken}`)
@@ -676,8 +706,10 @@ describe('feature integration (backend)', () => {
 
   test('POST /api/forecast/stock forecast not found returns 404', async () => {
     const { app, mockPool, superadminToken } = await loadAppWithMockedDb();
-    mockPool.query.mockResolvedValueOnce([[{ id: 1, name: 'P', stock: 1, unit: 'pcs' }], []]);
-    mockPool.query.mockResolvedValueOnce([[], []]);
+    mockPool.query
+      .mockResolvedValueOnce([[]])
+      .mockResolvedValueOnce([[{ id: 1, name: 'P', stock: 1, unit: 'pcs' }], []])
+      .mockResolvedValueOnce([[], []]);
     const res = await request(app)
       .post('/api/forecast/stock')
       .set('Authorization', `Bearer ${superadminToken}`)
@@ -687,8 +719,10 @@ describe('feature integration (backend)', () => {
 
   test('POST /api/forecast/stock returns recommendation', async () => {
     const { app, mockPool, superadminToken } = await loadAppWithMockedDb();
-    mockPool.query.mockResolvedValueOnce([[{ id: 1, name: 'P', stock: 1, unit: 'pcs' }], []]);
-    mockPool.query.mockResolvedValueOnce([[{ metode: 'gemini', alasan_fallback: null, lead_time: 7, kebutuhan_7_hari: 3, perkiraan_penjualan_per_hari: 1, tambahan_stok: 2, satuan: 'pcs', debug_prompt: null, debug_response: null }], []]);
+    mockPool.query
+      .mockResolvedValueOnce([[]])
+      .mockResolvedValueOnce([[{ id: 1, name: 'P', stock: 1, unit: 'pcs' }], []])
+      .mockResolvedValueOnce([[{ metode: 'gemini', alasan_fallback: null, lead_time: 7, kebutuhan_7_hari: 3, perkiraan_penjualan_per_hari: 1, tambahan_stok: 2, satuan: 'pcs', debug_prompt: null, debug_response: null }], []]);
 
     const res = await request(app)
       .post('/api/forecast/stock')
@@ -700,8 +734,10 @@ describe('feature integration (backend)', () => {
 
   test('POST /api/forecast-openrouter/stock returns recommendation', async () => {
     const { app, mockPool, superadminToken } = await loadAppWithMockedDb();
-    mockPool.query.mockResolvedValueOnce([[{ id: 1, name: 'P', stock: 1, unit: 'pcs' }], []]);
-    mockPool.query.mockResolvedValueOnce([[{ metode: 'openrouter', alasan_fallback: null, lead_time: 7, kebutuhan_7_hari: 3, perkiraan_penjualan_per_hari: 1, tambahan_stok: 2, satuan: 'pcs', debug_prompt: null, debug_response: null }], []]);
+    mockPool.query
+      .mockResolvedValueOnce([[]])
+      .mockResolvedValueOnce([[{ id: 1, name: 'P', stock: 1, unit: 'pcs' }], []])
+      .mockResolvedValueOnce([[{ metode: 'openrouter', alasan_fallback: null, lead_time: 7, kebutuhan_7_hari: 3, perkiraan_penjualan_per_hari: 1, tambahan_stok: 2, satuan: 'pcs', debug_prompt: null, debug_response: null }], []]);
 
     const res = await request(app)
       .post('/api/forecast-openrouter/stock')

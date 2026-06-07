@@ -423,4 +423,4 @@ if (require.main === module) {
   startServer().catch(err => console.error('Startup failed:', err));
 }
 
-module.exports = { app, startServer, pool };
+module.exports = { app, startServer, pool, authenticate, checkPermission, requireSuperadmin };

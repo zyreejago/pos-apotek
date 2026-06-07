@@ -1,0 +1,318 @@
+--- Uncovered Branches Analysis for src/app/products/page.tsx ---
+Total branch IDs: 361
+Total branch paths: 697
+Covered branch paths: 534
+Uncovered branch paths: 163
+Branch coverage: 76.61%
+Uncovered branch IDs count: 146
+
+Detailed List of Uncovered Branch Paths:
+Branch ID 0 on Line 252 (type: cond-expr, paths: 2):
+  - Path [1] uncovered at location: Line 252:80
+Branch ID 13 on Line 307 (type: if, paths: 2):
+  - Path [1] uncovered at location: Line undefined:undefined
+Branch ID 14 on Line 310 (type: binary-expr, paths: 2):
+  - Path [1] uncovered at location: Line 310:44
+Branch ID 16 on Line 323 (type: if, paths: 2):
+  - Path [1] uncovered at location: Line undefined:undefined
+Branch ID 17 on Line 339 (type: if, paths: 2):
+  - Path [1] uncovered at location: Line undefined:undefined
+Branch ID 20 on Line 379 (type: binary-expr, paths: 2):
+  - Path [1] uncovered at location: Line 379:60
+Branch ID 21 on Line 380 (type: binary-expr, paths: 2):
+  - Path [1] uncovered at location: Line 380:66
+Branch ID 23 on Line 382 (type: binary-expr, paths: 2):
+  - Path [1] uncovered at location: Line 382:37
+Branch ID 27 on Line 401 (type: if, paths: 2):
+  - Path [1] uncovered at location: Line undefined:undefined
+Branch ID 30 on Line 413 (type: binary-expr, paths: 2):
+  - Path [1] uncovered at location: Line 413:47
+Branch ID 31 on Line 414 (type: binary-expr, paths: 2):
+  - Path [1] uncovered at location: Line 414:53
+Branch ID 32 on Line 418 (type: binary-expr, paths: 2):
+  - Path [1] uncovered at location: Line 418:64
+Branch ID 34 on Line 420 (type: binary-expr, paths: 2):
+  - Path [1] uncovered at location: Line 420:35
+Branch ID 41 on Line 450 (type: if, paths: 2):
+  - Path [1] uncovered at location: Line undefined:undefined
+Branch ID 46 on Line 486 (type: if, paths: 2):
+  - Path [1] uncovered at location: Line undefined:undefined
+Branch ID 47 on Line 497 (type: if, paths: 2):
+  - Path [0] uncovered at location: Line 497:4
+Branch ID 48 on Line 501 (type: cond-expr, paths: 2):
+  - Path [1] uncovered at location: Line 501:133
+Branch ID 50 on Line 520 (type: if, paths: 2):
+  - Path [1] uncovered at location: Line undefined:undefined
+Branch ID 51 on Line 591 (type: if, paths: 2):
+  - Path [0] uncovered at location: Line 591:4
+Branch ID 52 on Line 596 (type: if, paths: 2):
+  - Path [0] uncovered at location: Line 596:8
+Branch ID 53 on Line 598 (type: if, paths: 2):
+  - Path [0] uncovered at location: Line 598:8
+Branch ID 54 on Line 611 (type: binary-expr, paths: 2):
+  - Path [1] uncovered at location: Line 611:59
+Branch ID 55 on Line 612 (type: binary-expr, paths: 2):
+  - Path [1] uncovered at location: Line 612:65
+Branch ID 56 on Line 614 (type: binary-expr, paths: 2):
+  - Path [1] uncovered at location: Line 614:39
+Branch ID 57 on Line 617 (type: cond-expr, paths: 2):
+  - Path [0] uncovered at location: Line 617:52
+Branch ID 58 on Line 618 (type: binary-expr, paths: 2):
+  - Path [1] uncovered at location: Line 618:57
+Branch ID 59 on Line 619 (type: binary-expr, paths: 3):
+  - Path [1] uncovered at location: Line 619:69
+  - Path [2] uncovered at location: Line 619:104
+Branch ID 62 on Line 631 (type: cond-expr, paths: 2):
+  - Path [1] uncovered at location: Line 632:10
+Branch ID 63 on Line 633 (type: cond-expr, paths: 2):
+  - Path [1] uncovered at location: Line 633:58
+Branch ID 64 on Line 637 (type: binary-expr, paths: 2):
+  - Path [1] uncovered at location: Line 637:67
+Branch ID 66 on Line 642 (type: cond-expr, paths: 2):
+  - Path [0] uncovered at location: Line 642:66
+Branch ID 68 on Line 645 (type: binary-expr, paths: 2):
+  - Path [1] uncovered at location: Line 645:71
+Branch ID 69 on Line 648 (type: binary-expr, paths: 2):
+  - Path [1] uncovered at location: Line 648:74
+Branch ID 79 on Line 678 (type: cond-expr, paths: 2):
+  - Path [1] uncovered at location: Line 678:82
+Branch ID 80 on Line 681 (type: if, paths: 2):
+  - Path [0] uncovered at location: Line 681:8
+Branch ID 81 on Line 716 (type: binary-expr, paths: 2):
+  - Path [1] uncovered at location: Line 716:77
+Branch ID 84 on Line 749 (type: binary-expr, paths: 2):
+  - Path [1] uncovered at location: Line 749:89
+Branch ID 86 on Line 759 (type: if, paths: 2):
+  - Path [1] uncovered at location: Line undefined:undefined
+Branch ID 92 on Line 784 (type: binary-expr, paths: 2):
+  - Path [1] uncovered at location: Line 784:65
+Branch ID 93 on Line 786 (type: binary-expr, paths: 2):
+  - Path [1] uncovered at location: Line 786:101
+Branch ID 94 on Line 794 (type: binary-expr, paths: 2):
+  - Path [1] uncovered at location: Line 794:87
+Branch ID 96 on Line 808 (type: if, paths: 2):
+  - Path [1] uncovered at location: Line undefined:undefined
+Branch ID 97 on Line 844 (type: binary-expr, paths: 2):
+  - Path [1] uncovered at location: Line 844:35
+Branch ID 103 on Line 880 (type: cond-expr, paths: 2):
+  - Path [1] uncovered at location: Line 880:57
+Branch ID 109 on Line 926 (type: if, paths: 2):
+  - Path [0] uncovered at location: Line 926:6
+Branch ID 112 on Line 930 (type: cond-expr, paths: 2):
+  - Path [1] uncovered at location: Line 930:56
+Branch ID 113 on Line 931 (type: cond-expr, paths: 2):
+  - Path [1] uncovered at location: Line 931:57
+Branch ID 122 on Line 987 (type: cond-expr, paths: 2):
+  - Path [1] uncovered at location: Line 987:104
+Branch ID 126 on Line 991 (type: cond-expr, paths: 2):
+  - Path [0] uncovered at location: Line 991:45
+Branch ID 128 on Line 993 (type: cond-expr, paths: 2):
+  - Path [0] uncovered at location: Line 993:35
+Branch ID 138 on Line 1051 (type: binary-expr, paths: 2):
+  - Path [1] uncovered at location: Line 1051:40
+Branch ID 139 on Line 1052 (type: binary-expr, paths: 2):
+  - Path [1] uncovered at location: Line 1052:56
+Branch ID 140 on Line 1053 (type: cond-expr, paths: 2):
+  - Path [0] uncovered at location: Line 1053:39
+Branch ID 142 on Line 1055 (type: binary-expr, paths: 2):
+  - Path [1] uncovered at location: Line 1055:62
+Branch ID 143 on Line 1056 (type: binary-expr, paths: 2):
+  - Path [1] uncovered at location: Line 1056:38
+Branch ID 144 on Line 1057 (type: cond-expr, paths: 2):
+  - Path [0] uncovered at location: Line 1057:61
+Branch ID 146 on Line 1059 (type: binary-expr, paths: 2):
+  - Path [1] uncovered at location: Line 1059:40
+Branch ID 147 on Line 1060 (type: binary-expr, paths: 2):
+  - Path [1] uncovered at location: Line 1060:56
+Branch ID 148 on Line 1061 (type: cond-expr, paths: 2):
+  - Path [0] uncovered at location: Line 1061:53
+Branch ID 155 on Line 1086 (type: binary-expr, paths: 2):
+  - Path [1] uncovered at location: Line 1086:63
+Branch ID 156 on Line 1088 (type: if, paths: 2):
+  - Path [0] uncovered at location: Line 1088:10
+Branch ID 157 on Line 1094 (type: binary-expr, paths: 2):
+  - Path [1] uncovered at location: Line 1094:59
+Branch ID 158 on Line 1096 (type: binary-expr, paths: 2):
+  - Path [1] uncovered at location: Line 1096:33
+Branch ID 160 on Line 1099 (type: binary-expr, paths: 2):
+  - Path [1] uncovered at location: Line 1099:51
+Branch ID 162 on Line 1120 (type: default-arg, paths: 1):
+  - Path [0] uncovered at location: Line 1120:91
+Branch ID 163 on Line 1126 (type: binary-expr, paths: 2):
+  - Path [1] uncovered at location: Line 1126:61
+Branch ID 166 on Line 1139 (type: binary-expr, paths: 2):
+  - Path [1] uncovered at location: Line 1139:53
+Branch ID 167 on Line 1140 (type: binary-expr, paths: 3):
+  - Path [1] uncovered at location: Line 1140:59
+  - Path [2] uncovered at location: Line 1140:92
+Branch ID 169 on Line 1142 (type: binary-expr, paths: 3):
+  - Path [1] uncovered at location: Line 1142:33
+  - Path [2] uncovered at location: Line 1142:57
+Branch ID 172 on Line 1145 (type: binary-expr, paths: 3):
+  - Path [1] uncovered at location: Line 1145:51
+  - Path [2] uncovered at location: Line 1145:84
+Branch ID 173 on Line 1156 (type: binary-expr, paths: 2):
+  - Path [1] uncovered at location: Line 1156:63
+Branch ID 174 on Line 1158 (type: binary-expr, paths: 2):
+  - Path [1] uncovered at location: Line 1158:60
+Branch ID 177 on Line 1166 (type: binary-expr, paths: 2):
+  - Path [1] uncovered at location: Line 1166:33
+Branch ID 179 on Line 1169 (type: binary-expr, paths: 2):
+  - Path [1] uncovered at location: Line 1169:51
+Branch ID 183 on Line 1189 (type: binary-expr, paths: 2):
+  - Path [1] uncovered at location: Line 1189:66
+Branch ID 184 on Line 1190 (type: if, paths: 2):
+  - Path [1] uncovered at location: Line undefined:undefined
+Branch ID 185 on Line 1193 (type: binary-expr, paths: 2):
+  - Path [1] uncovered at location: Line 1193:75
+Branch ID 186 on Line 1194 (type: if, paths: 2):
+  - Path [0] uncovered at location: Line 1194:12
+Branch ID 187 on Line 1195 (type: if, paths: 2):
+  - Path [0] uncovered at location: Line 1195:12
+Branch ID 188 on Line 1196 (type: if, paths: 2):
+  - Path [0] uncovered at location: Line 1196:12
+Branch ID 189 on Line 1197 (type: if, paths: 2):
+  - Path [0] uncovered at location: Line 1197:12
+Branch ID 190 on Line 1207 (type: if, paths: 2):
+  - Path [1] uncovered at location: Line undefined:undefined
+Branch ID 199 on Line 1370 (type: cond-expr, paths: 2):
+  - Path [0] uncovered at location: Line 1370:28
+Branch ID 200 on Line 1373 (type: cond-expr, paths: 2):
+  - Path [0] uncovered at location: Line 1373:67
+Branch ID 204 on Line 1383 (type: cond-expr, paths: 2):
+  - Path [0] uncovered at location: Line 1383:28
+Branch ID 206 on Line 1387 (type: cond-expr, paths: 2):
+  - Path [0] uncovered at location: Line 1387:28
+Branch ID 207 on Line 1389 (type: cond-expr, paths: 2):
+  - Path [0] uncovered at location: Line 1389:28
+Branch ID 209 on Line 1393 (type: cond-expr, paths: 2):
+  - Path [0] uncovered at location: Line 1393:64
+Branch ID 211 on Line 1395 (type: cond-expr, paths: 2):
+  - Path [0] uncovered at location: Line 1395:55
+Branch ID 212 on Line 1396 (type: cond-expr, paths: 2):
+  - Path [0] uncovered at location: Line 1396:58
+Branch ID 227 on Line 1560 (type: binary-expr, paths: 2):
+  - Path [1] uncovered at location: Line 1560:58
+Branch ID 234 on Line 1799 (type: binary-expr, paths: 2):
+  - Path [1] uncovered at location: Line 1799:123
+Branch ID 235 on Line 1815 (type: binary-expr, paths: 2):
+  - Path [1] uncovered at location: Line 1815:52
+Branch ID 236 on Line 2002 (type: binary-expr, paths: 2):
+  - Path [1] uncovered at location: Line 2002:58
+Branch ID 238 on Line 2007 (type: cond-expr, paths: 2):
+  - Path [1] uncovered at location: Line 2007:78
+Branch ID 239 on Line 2015 (type: binary-expr, paths: 2):
+  - Path [1] uncovered at location: Line 2015:108
+Branch ID 241 on Line 2026 (type: binary-expr, paths: 2):
+  - Path [1] uncovered at location: Line 2026:99
+Branch ID 243 on Line 2051 (type: binary-expr, paths: 2):
+  - Path [1] uncovered at location: Line 2051:56
+Branch ID 249 on Line 2126 (type: cond-expr, paths: 2):
+  - Path [0] uncovered at location: Line 2126:80
+Branch ID 251 on Line 2134 (type: binary-expr, paths: 2):
+  - Path [1] uncovered at location: Line 2134:67
+Branch ID 256 on Line 2204 (type: binary-expr, paths: 2):
+  - Path [1] uncovered at location: Line 2204:200
+Branch ID 258 on Line 2243 (type: binary-expr, paths: 2):
+  - Path [1] uncovered at location: Line 2243:66
+Branch ID 259 on Line 2244 (type: binary-expr, paths: 2):
+  - Path [1] uncovered at location: Line 2244:70
+Branch ID 262 on Line 2253 (type: binary-expr, paths: 2):
+  - Path [1] uncovered at location: Line 2253:72
+Branch ID 263 on Line 2253 (type: binary-expr, paths: 2):
+  - Path [0] uncovered at location: Line 2253:93
+  - Path [1] uncovered at location: Line 2253:120
+Branch ID 270 on Line 2275 (type: if, paths: 2):
+  - Path [1] uncovered at location: Line undefined:undefined
+Branch ID 272 on Line 2292 (type: binary-expr, paths: 2):
+  - Path [1] uncovered at location: Line 2292:75
+Branch ID 276 on Line 2306 (type: cond-expr, paths: 2):
+  - Path [1] uncovered at location: Line 2306:135
+Branch ID 278 on Line 2312 (type: cond-expr, paths: 2):
+  - Path [0] uncovered at location: Line 2312:32
+Branch ID 279 on Line 2314 (type: cond-expr, paths: 2):
+  - Path [0] uncovered at location: Line 2314:32
+Branch ID 280 on Line 2317 (type: cond-expr, paths: 2):
+  - Path [0] uncovered at location: Line 2317:59
+Branch ID 281 on Line 2318 (type: cond-expr, paths: 2):
+  - Path [0] uncovered at location: Line 2318:60
+Branch ID 283 on Line 2323 (type: binary-expr, paths: 2):
+  - Path [1] uncovered at location: Line 2323:71
+Branch ID 284 on Line 2326 (type: binary-expr, paths: 2):
+  - Path [1] uncovered at location: Line 2326:73
+Branch ID 286 on Line 2329 (type: binary-expr, paths: 2):
+  - Path [1] uncovered at location: Line 2329:115
+Branch ID 289 on Line 2333 (type: binary-expr, paths: 2):
+  - Path [1] uncovered at location: Line 2333:95
+Branch ID 290 on Line 2333 (type: binary-expr, paths: 2):
+  - Path [1] uncovered at location: Line 2333:124
+Branch ID 301 on Line 2495 (type: binary-expr, paths: 2):
+  - Path [1] uncovered at location: Line 2495:67
+Branch ID 303 on Line 2506 (type: binary-expr, paths: 2):
+  - Path [1] uncovered at location: Line 2506:60
+Branch ID 304 on Line 2508 (type: binary-expr, paths: 2):
+  - Path [1] uncovered at location: Line 2508:100
+Branch ID 305 on Line 2508 (type: binary-expr, paths: 2):
+  - Path [1] uncovered at location: Line 2508:128
+Branch ID 308 on Line 2584 (type: binary-expr, paths: 2):
+  - Path [1] uncovered at location: Line 2584:79
+Branch ID 309 on Line 2584 (type: binary-expr, paths: 2):
+  - Path [0] uncovered at location: Line 2584:108
+  - Path [1] uncovered at location: Line 2584:143
+Branch ID 311 on Line 2593 (type: if, paths: 2):
+  - Path [1] uncovered at location: Line undefined:undefined
+Branch ID 317 on Line 2638 (type: if, paths: 2):
+  - Path [1] uncovered at location: Line undefined:undefined
+Branch ID 318 on Line 2650 (type: binary-expr, paths: 2):
+  - Path [1] uncovered at location: Line 2650:85
+Branch ID 319 on Line 2650 (type: binary-expr, paths: 2):
+  - Path [0] uncovered at location: Line 2650:114
+  - Path [1] uncovered at location: Line 2650:149
+Branch ID 321 on Line 2654 (type: if, paths: 2):
+  - Path [1] uncovered at location: Line undefined:undefined
+Branch ID 322 on Line 2658 (type: cond-expr, paths: 2):
+  - Path [0] uncovered at location: Line 2658:45
+Branch ID 323 on Line 2661 (type: binary-expr, paths: 2):
+  - Path [1] uncovered at location: Line 2661:85
+Branch ID 324 on Line 2661 (type: binary-expr, paths: 2):
+  - Path [0] uncovered at location: Line 2661:114
+  - Path [1] uncovered at location: Line 2661:149
+Branch ID 326 on Line 2665 (type: if, paths: 2):
+  - Path [1] uncovered at location: Line undefined:undefined
+Branch ID 327 on Line 2669 (type: cond-expr, paths: 2):
+  - Path [0] uncovered at location: Line 2669:45
+Branch ID 342 on Line 2944 (type: binary-expr, paths: 2):
+  - Path [1] uncovered at location: Line 2944:148
+Branch ID 344 on Line 2961 (type: binary-expr, paths: 2):
+  - Path [1] uncovered at location: Line 2961:84
+Branch ID 345 on Line 2965 (type: cond-expr, paths: 2):
+  - Path [1] uncovered at location: Line 2965:123
+Branch ID 350 on Line 3007 (type: binary-expr, paths: 2):
+  - Path [1] uncovered at location: Line 3007:107
+Branch ID 351 on Line 3009 (type: binary-expr, paths: 2):
+  - Path [0] uncovered at location: Line 3009:42
+  - Path [1] uncovered at location: Line 3009:65
+Branch ID 352 on Line 3010 (type: binary-expr, paths: 2):
+  - Path [0] uncovered at location: Line 3010:48
+  - Path [1] uncovered at location: Line 3010:69
+Branch ID 353 on Line 3013 (type: binary-expr, paths: 2):
+  - Path [0] uncovered at location: Line 3013:42
+  - Path [1] uncovered at location: Line 3013:65
+Branch ID 354 on Line 3016 (type: binary-expr, paths: 2):
+  - Path [0] uncovered at location: Line 3016:49
+  - Path [1] uncovered at location: Line 3016:71
+Branch ID 355 on Line 3017 (type: binary-expr, paths: 2):
+  - Path [0] uncovered at location: Line 3017:51
+  - Path [1] uncovered at location: Line 3017:75
+Branch ID 356 on Line 3018 (type: binary-expr, paths: 2):
+  - Path [0] uncovered at location: Line 3018:48
+  - Path [1] uncovered at location: Line 3018:76
+Branch ID 357 on Line 3019 (type: binary-expr, paths: 2):
+  - Path [0] uncovered at location: Line 3019:51
+  - Path [1] uncovered at location: Line 3019:75
+Branch ID 358 on Line 3020 (type: binary-expr, paths: 2):
+  - Path [0] uncovered at location: Line 3020:51
+  - Path [1] uncovered at location: Line 3020:83
+Branch ID 359 on Line 3021 (type: binary-expr, paths: 2):
+  - Path [0] uncovered at location: Line 3021:53
+  - Path [1] uncovered at location: Line 3021:87

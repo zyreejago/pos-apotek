@@ -1,6 +1,15 @@
 import React from 'react';
 import { render, waitFor, fireEvent } from '@testing-library/react';
 import SettingstransactionsettingsPage from '../page';
+import { HeaderProvider } from '@/context/HeaderContext';
+
+function renderWithProviders(ui: React.ReactElement) {
+  return render(
+    <HeaderProvider>
+      {ui}
+    </HeaderProvider>
+  );
+}
 
 const mockPush = jest.fn();
 const mockBack = jest.fn();
@@ -109,14 +118,14 @@ afterEach(() => {
 
 describe('settings-transaction-settings module', () => {
   test('renders Settings Transaction Settings page', async () => {
-    const { getAllByText } = render(<SettingstransactionsettingsPage />);
+    const { getAllByText } = renderWithProviders(<SettingstransactionsettingsPage />);
     await waitFor(() => {
       expect(getAllByText('Transactions Settings').length).toBeGreaterThan(0);
     });
   });
 
   test('saves settings successfully', async () => {
-    const { getAllByText, getByRole, container } = render(<SettingstransactionsettingsPage />);
+    const { getAllByText, getByRole, container } = renderWithProviders(<SettingstransactionsettingsPage />);
     await waitFor(() => expect(getAllByText('Transactions Settings').length).toBeGreaterThan(0));
     
     const inputs = container.querySelectorAll('input[type="number"]');
@@ -136,7 +145,7 @@ describe('settings-transaction-settings module', () => {
 
   test('handles no token', async () => {
     localStorage.removeItem('token');
-    render(<SettingstransactionsettingsPage />);
+    renderWithProviders(<SettingstransactionsettingsPage />);
     await waitFor(() => {
       expect(mockPush).toHaveBeenCalledWith('/login');
     });
@@ -144,7 +153,7 @@ describe('settings-transaction-settings module', () => {
 
   test('handles fetchSettings error', async () => {
     global.fetch = jest.fn().mockRejectedValue('Test error');
-    render(<SettingstransactionsettingsPage />);
+    renderWithProviders(<SettingstransactionsettingsPage />);
     await waitFor(() => expect(global.fetch).toHaveBeenCalled());
   });
 
@@ -157,7 +166,7 @@ describe('settings-transaction-settings module', () => {
       return errorJson({ message: 'Test error' });
     }) as unknown as typeof fetch;
     
-    const { getAllByText, getByRole, container } = render(<SettingstransactionsettingsPage />);
+    const { getAllByText, getByRole, container } = renderWithProviders(<SettingstransactionsettingsPage />);
     await waitFor(() => expect(getAllByText('Transactions Settings').length).toBeGreaterThan(0));
     
     const inputs = container.querySelectorAll('input[type="number"]');
@@ -170,4 +179,16 @@ describe('settings-transaction-settings module', () => {
       expect(global.fetch).toHaveBeenCalled();
     });
   });
+
+  test('shows access denied when no edit permission', async () => {
+    const { getAllByText, getByRole } = renderWithProviders(<SettingstransactionsettingsPage />);
+    await waitFor(() => expect(getAllByText('Transactions Settings').length).toBeGreaterThan(0));
+    mockCheckActionPermission.mockReturnValue(false);
+    const saveBtn = getByRole('button', { name: /Save Changes/i });
+    fireEvent.click(saveBtn);
+    await waitFor(() => {
+      expect(require('@/components/ui/goey-toaster').goeyToast.error).toHaveBeenCalledWith('Akses Ditolak', expect.any(Object));
+    });
+  });
+
 });

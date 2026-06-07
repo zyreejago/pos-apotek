@@ -12,8 +12,9 @@ function buildApp({ pool, user }) {
     next();
   };
   const checkPermission = () => (_req, _res, next) => next();
+  const createAuditTrail = jest.fn().mockResolvedValue(undefined);
 
-  registerProductRoutes(app, pool, authenticate, checkPermission);
+  registerProductRoutes(app, pool, authenticate, checkPermission, createAuditTrail);
   return app;
 }
 
@@ -333,6 +334,27 @@ describe('products module', () => {
     expect(res.status).toBe(200);
   });
 
+  test('POST /api/stock-opname with OBAT product uses persediaan code 103', async () => {
+    const connection = {
+      query: jest.fn()
+        .mockResolvedValue([{}, []])
+        .mockResolvedValueOnce([{}, []])
+        .mockResolvedValueOnce([[{ cost_price: 1000, product_category: 'OBAT', name: 'Test' }], []]),
+      beginTransaction: jest.fn().mockResolvedValue(undefined),
+      commit: jest.fn().mockResolvedValue(undefined),
+      rollback: jest.fn().mockResolvedValue(undefined),
+      release: jest.fn(),
+    };
+    const pool = { getConnection: jest.fn().mockResolvedValue(connection) };
+    const app = buildApp({ pool });
+
+    const res = await request(app).post('/api/stock-opname').send({
+      items: [{ id: 1, system_stock: 10, actual_stock: 8 }],
+      note: 'test',
+    });
+    expect(res.status).toBe(200);
+  });
+
   test('POST /api/stock-opname error triggers rollback returns 500', async () => {
     const connection = {
       query: jest.fn().mockRejectedValueOnce(new Error('db')),
@@ -346,5 +368,96 @@ describe('products module', () => {
 
     const res = await request(app).post('/api/stock-opname').send({ items: [{ id: 1, system_stock: 10, actual_stock: 8 }] });
     expect(res.status).toBe(500);
+  });
+
+  test('POST /api/products with invalid expired_date returns 201', async () => {
+    const connection = {
+      query: jest.fn().mockResolvedValueOnce([{ insertId: 20 }, []]),
+      release: jest.fn(),
+    };
+    const pool = { getConnection: jest.fn().mockResolvedValue(connection) };
+    const app = buildApp({ pool });
+
+    const res = await request(app).post('/api/products').send({
+      name: 'P', cost_price: 1000, expired_date: 'not-a-date',
+    });
+    expect(res.status).toBe(201);
+  });
+
+  test('PUT /api/products/:id with invalid expired_date returns 200', async () => {
+    const connection = { query: jest.fn().mockResolvedValueOnce([{}, []]), release: jest.fn() };
+    const pool = { getConnection: jest.fn().mockResolvedValue(connection) };
+    const app = buildApp({ pool });
+
+    const res = await request(app).put('/api/products/1').send({
+      name: 'P', cost_price: 1000, expired_date: 'not-a-date',
+    });
+    expect(res.status).toBe(200);
+  });
+
+  test('POST /api/products with needsApproval returns 201', async () => {
+    const connection = {
+      query: jest.fn().mockResolvedValueOnce([{ insertId: 40 }, []]),
+      release: jest.fn(),
+    };
+    const pool = { getConnection: jest.fn().mockResolvedValue(connection) };
+    const app = buildApp({ pool });
+
+    const res = await request(app).post('/api/products').send({
+      name: 'P', cost_price: 1000, needsApproval: true,
+    });
+    expect(res.status).toBe(201);
+  });
+
+  test('POST /api/products with valid expired_date formats date', async () => {
+    const connection = {
+      query: jest.fn().mockResolvedValueOnce([{ insertId: 30 }, []]),
+      release: jest.fn(),
+    };
+    const pool = { getConnection: jest.fn().mockResolvedValue(connection) };
+    const app = buildApp({ pool });
+
+    const res = await request(app).post('/api/products').send({
+      name: 'P', cost_price: 1000, expired_date: '2025-12-31',
+    });
+    expect(res.status).toBe(201);
+  });
+
+  test('PUT /api/products/:id with valid expired_date formats date', async () => {
+    const connection = { query: jest.fn().mockResolvedValueOnce([{}, []]), release: jest.fn() };
+    const pool = { getConnection: jest.fn().mockResolvedValue(connection) };
+    const app = buildApp({ pool });
+
+    const res = await request(app).put('/api/products/1').send({
+      name: 'P', cost_price: 1000, expired_date: '2025-12-31',
+    });
+    expect(res.status).toBe(200);
+  });
+
+  test('POST /api/stock-opname with stock increase triggers positive difference branch', async () => {
+    const connection = {
+      query: jest.fn().mockResolvedValue([{}, []]),
+      beginTransaction: jest.fn().mockResolvedValue(undefined),
+      commit: jest.fn().mockResolvedValue(undefined),
+      rollback: jest.fn().mockResolvedValue(undefined),
+      release: jest.fn(),
+    };
+    const pool = { getConnection: jest.fn().mockResolvedValue(connection) };
+    const app = buildApp({ pool });
+
+    const res = await request(app).post('/api/stock-opname').send({
+      items: [{ id: 1, system_stock: 10, actual_stock: 15 }],
+      note: 'increase',
+    });
+    expect(res.status).toBe(200);
+  });
+
+  test('GET /api/products returns server error on db failure', async () => {
+    const pool = { getConnection: jest.fn().mockRejectedValue(new Error('db')) };
+    const app = buildApp({ pool });
+
+    const res = await request(app).get('/api/products?page=1&limit=10');
+    expect(res.status).toBe(500);
+    expect(res.body.message).toBe('Server error');
   });
 });

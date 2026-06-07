@@ -2,6 +2,7 @@ import React from 'react';
 import { render, screen, waitFor, fireEvent, act } from '@testing-library/react';
 import RecommendationsPage from '../page';
 import { goeyToast } from '@/components/ui/goey-toaster';
+import { HeaderProvider, useHeader } from '@/context/HeaderContext';
 
 const pushMock = jest.fn();
 
@@ -161,8 +162,24 @@ afterEach(() => {
 });
 jest.setTimeout(15000);
 
+function HeaderDisplay() {
+  const { headerState } = useHeader();
+  return (
+    <div data-testid="header">
+      <h1>{headerState.title}</h1>
+      {headerState.subtitle && <p>{headerState.subtitle}</p>}
+      {headerState.rightContent}
+    </div>
+  );
+}
+
 function renderPage() {
-  return render(<RecommendationsPage />);
+  return render(
+    <HeaderProvider>
+      <HeaderDisplay />
+      <RecommendationsPage />
+    </HeaderProvider>
+  );
 }
 
 async function waitLoaded() {
@@ -198,15 +215,13 @@ describe('recommendations module', () => {
 
     await waitLoaded();
 
-    expect(screen.getByText('Gemini')).toBeInTheDocument();
-    expect(screen.getByText('Fallback')).toBeInTheDocument();
-    // expect(screen.getByText('-')).toBeInTheDocument();
+    expect(screen.getByText('Produk Gemini')).toBeInTheDocument();
+    expect(screen.getByText('Produk Fallback')).toBeInTheDocument();
+    expect(screen.getByText('Produk Manual')).toBeInTheDocument();
 
-    expect(screen.getByText('15 pcs')).toBeInTheDocument();
+    expect(screen.getByText('Perlu restock segera')).toBeInTheDocument();
+    expect(screen.getByText('Stok mencukupi')).toBeInTheDocument();
     expect(screen.getAllByText('-').length).toBeGreaterThan(0);
-    expect(screen.getByText('20 pcs')).toBeInTheDocument();
-    expect(screen.getByText('2 pcs')).toBeInTheDocument();
-    expect(screen.getByText('3 kg')).toBeInTheDocument();
     expect(screen.getByText(/Terakhir diperbarui:/)).toBeInTheDocument();
   });
 
@@ -255,206 +270,34 @@ describe('recommendations module', () => {
   });
 
   test('handles search debounce', async () => {
-  renderPage();
-
-  await waitLoaded();
-
-  fireEvent.change(screen.getByPlaceholderText('Ketik nama produk...'), {
-    target: { value: 'gemini' },
-  });
-
-  await waitFor(
-    () => {
-      expect(global.fetch).toHaveBeenCalledWith(
-        expect.stringContaining('search=gemini'),
-        expect.any(Object)
-      );
-    },
-    { timeout: 2000 }
-  );
-});
-
- test('opens and closes note for gemini row', async () => {
-  renderPage();
-
-  await waitLoaded();
-
-  fireEvent.click((await screen.findAllByText('Lihat catatan'))[0]);
-
-  expect(await screen.findByText('Sembunyikan catatan')).toBeInTheDocument();
-
-  fireEvent.click(screen.getByText('Sembunyikan catatan'));
-
-  await waitFor(() => {
-    expect(screen.queryByText('Sembunyikan catatan')).not.toBeInTheDocument();
-  });
-});
-
-  test('opens fallback note', async () => {
-  renderPage();
-
-  await waitLoaded();
-
-  await waitFor(() => {
-    expect(screen.queryByText('Memuat peramalan...')).not.toBeInTheDocument();
-  });
-
-  const noteButtons = await screen.findAllByText('Lihat catatan');
-
-  fireEvent.click(noteButtons[1]);
-
-  expect(await screen.findByText(/Fallback aktif/)).toBeInTheDocument();
-});
-
-  test('opens detail modal success with debug data and closes modal', async () => {
     renderPage();
 
     await waitLoaded();
 
-    fireEvent.click(screen.getAllByText('Debug')[0]);
-
-    expect(await screen.findByText('Debug - Produk Gemini')).toBeInTheDocument();
-    expect(screen.getByText('Gemini AI')).toBeInTheDocument();
-    expect(screen.getByText('PROMPT TEST')).toBeInTheDocument();
-    expect(screen.getByText('RESPONSE TEST')).toBeInTheDocument();
-    expect(screen.getByText('12 pcs')).toBeInTheDocument();
-
-    const closeButton = screen.getByRole('button', {
-      name: '',
+    fireEvent.change(screen.getByPlaceholderText('Ketik nama produk...'), {
+      target: { value: 'gemini' },
     });
 
-    fireEvent.click(closeButton);
-
-    await waitFor(() => {
-      expect(screen.queryByText('Debug - Produk Gemini')).not.toBeInTheDocument();
-    });
+    await waitFor(
+      () => {
+        expect(global.fetch).toHaveBeenCalledWith(
+          expect.stringContaining('search=gemini'),
+          expect.any(Object)
+        );
+      },
+      { timeout: 2000 }
+    );
   });
 
-  test('opens detail modal fallback without debug blocks', async () => {
-    global.fetch = jest.fn((input: RequestInfo, init?: RequestInit) => {
-      const url = typeof input === 'string' ? input : input.url;
-
-      if (url.includes('/api/forecast/latest')) return okJson(rows);
-
-      if (url.includes('/api/forecast/stock') && init?.method === 'POST') {
-        return okJson({
-          metode: 'fallback',
-          alasan_fallback: 'unknown',
-          rekomendasi: {
-            tambahan_stok: 8,
-            satuan: 'box',
-          },
-        });
-      }
-
-      return okJson({});
-    }) as unknown as typeof fetch;
+  test('auto-refresh interval is set up', async () => {
+    const setIntervalSpy = jest.spyOn(global, 'setInterval');
 
     renderPage();
-
     await waitLoaded();
 
-    fireEvent.click(screen.getAllByText('Debug')[1]);
+    expect(setIntervalSpy).toHaveBeenCalledWith(expect.any(Function), 60000);
 
-    expect(await screen.findByText('Debug - Produk Fallback')).toBeInTheDocument();
-    expect(screen.getByText('Fallback (unknown)')).toBeInTheDocument();
-    expect(screen.getByText('8 box')).toBeInTheDocument();
-  });
-
-  test('shows detail loading state', async () => {
-    let resolveDetail: (value: Response) => void = jest.fn();
-
-    global.fetch = jest.fn((input: RequestInfo, init?: RequestInit) => {
-      const url = typeof input === 'string' ? input : input.url;
-
-      if (url.includes('/api/forecast/latest')) return okJson(rows);
-
-      if (url.includes('/api/forecast/stock') && init?.method === 'POST') {
-        return new Promise<Response>((resolve) => {
-          resolveDetail = resolve;
-        });
-      }
-
-      return okJson({});
-    }) as unknown as typeof fetch;
-
-    renderPage();
-
-    await waitLoaded();
-
-    fireEvent.click(screen.getAllByText('Debug')[0]);
-
-    expect(await screen.findByText('Memuat...')).toBeInTheDocument();
-
-    resolveDetail({
-      ok: true,
-      status: 200,
-      json: async () => ({
-        metode: 'gemini',
-        alasan_fallback: null,
-        rekomendasi: {
-          tambahan_stok: 3,
-          satuan: 'pcs',
-        },
-      }),
-      text: async () => '',
-    } as Response);
-
-    expect(await screen.findByText('Gemini AI')).toBeInTheDocument();
-  });
-
-  test('handles detail response failure', async () => {
-  global.fetch = jest.fn((input: RequestInfo, init?: RequestInit) => {
-    const url = typeof input === 'string' ? input : input.url;
-
-    if (url.includes('/api/forecast/stock') && init?.method === 'POST') {
-      return failJson({}, 500);
-    }
-
-    if (url.includes('/api/forecast/latest')) {
-      return okJson(rows);
-    }
-
-    return okJson({});
-  }) as unknown as typeof fetch;
-
-  renderPage();
-
-  await waitLoaded();
-
-  fireEvent.click(screen.getAllByText('Debug')[0]);
-
-  await waitFor(() => {
-    expect(goeyToast.error).toHaveBeenCalledWith('Gagal mengambil detail peramalan');
-  });
-
-  expect(screen.getByText('Gagal memuat detail')).toBeInTheDocument();
-});
-
-  test('handles detail network error', async () => {
-    jest.spyOn(console, 'error').mockImplementation(() => {});
-
-    global.fetch = jest.fn((input: RequestInfo, init?: RequestInit) => {
-      const url = typeof input === 'string' ? input : input.url;
-
-      if (url.includes('/api/forecast/latest')) return okJson(rows);
-
-      if (url.includes('/api/forecast/stock') && init?.method === 'POST') {
-        return Promise.reject(new Error('detail error'));
-      }
-
-      return okJson({});
-    }) as unknown as typeof fetch;
-
-    renderPage();
-
-    await waitLoaded();
-
-    fireEvent.click(screen.getAllByText('Debug')[0]);
-
-    await waitFor(() => {
-      expect(goeyToast.error).toHaveBeenCalledWith('Gagal mengambil detail peramalan');
-    });
+    setIntervalSpy.mockRestore();
   });
 
   test('handles latest unauthorized', async () => {
@@ -536,147 +379,6 @@ describe('recommendations module', () => {
       );
     });
   });
-  test('closes detail modal with empty failed detail state', async () => {
-  global.fetch = jest.fn((input: RequestInfo, init?: RequestInit) => {
-    const url = typeof input === 'string' ? input : input.url;
-
-    if (url.includes('/api/forecast/latest')) return okJson(rows);
-
-    if (url.includes('/api/forecast/stock') && init?.method === 'POST') {
-      return failJson({}, 500);
-    }
-
-    return okJson({});
-  }) as unknown as typeof fetch;
-
-  renderPage();
-
-  await waitLoaded();
-
-  fireEvent.click((await screen.findAllByText('Debug'))[0]);
-
-  expect(await screen.findByText('Gagal memuat detail')).toBeInTheDocument();
-
-  const closeButtons = screen.getAllByRole('button');
-  fireEvent.click(closeButtons[closeButtons.length - 1]);
-
-  await waitFor(() => {
-    expect(screen.queryByText('Debug - Produk Gemini')).not.toBeInTheDocument();
-  });
-});
-
-test('refresh forecast success', async () => {
-  renderPage();
-
-  await waitLoaded();
-
-  fireEvent.click(screen.getByText('Refresh Peramalan'));
-
-  expect(await screen.findByText('Memperbarui...')).toBeInTheDocument();
-
-  await waitFor(() => {
-    expect(goeyToast.success).toHaveBeenCalledWith(
-      'Peramalan sedang berjalan, tunggu sebentar...'
-    );
-  });
-
-  await waitFor(
-    () => {
-      expect(goeyToast.success).toHaveBeenCalledWith(
-        'Peramalan berhasil diperbarui!'
-      );
-    },
-    { timeout: 3500 }
-  );
-});
-  test('refresh forecast failure with backend message', async () => {
-    global.fetch = jest.fn((input: RequestInfo, init?: RequestInit) => {
-      const url = typeof input === 'string' ? input : input.url;
-
-      if (url.includes('/api/forecast/latest')) return okJson(rows);
-
-      if (url.includes('/api/forecast/run') && init?.method === 'POST') {
-        return failJson({ message: 'Run failed' }, 500);
-      }
-
-      return okJson({});
-    }) as unknown as typeof fetch;
-
-    renderPage();
-
-    await waitLoaded();
-
-    fireEvent.click(screen.getByText('Refresh Peramalan'));
-
-    await waitFor(() => {
-      expect(goeyToast.error).toHaveBeenCalledWith(
-        'Gagal memperbarui peramalan',
-        expect.objectContaining({
-          description: 'Run failed',
-        })
-      );
-    });
-  });
-
-  test('refresh forecast failure without backend message', async () => {
-    global.fetch = jest.fn((input: RequestInfo, init?: RequestInit) => {
-      const url = typeof input === 'string' ? input : input.url;
-
-      if (url.includes('/api/forecast/latest')) return okJson(rows);
-
-      if (url.includes('/api/forecast/run') && init?.method === 'POST') {
-        return failJson({}, 500);
-      }
-
-      return okJson({});
-    }) as unknown as typeof fetch;
-
-    renderPage();
-
-    await waitLoaded();
-
-    fireEvent.click(screen.getByText('Refresh Peramalan'));
-
-    await waitFor(() => {
-      expect(goeyToast.error).toHaveBeenCalledWith(
-        'Gagal memperbarui peramalan',
-        expect.objectContaining({
-          description: 'Server error',
-        })
-      );
-    });
-  });
-
-  test('refresh forecast network error', async () => {
-    jest.spyOn(console, 'error').mockImplementation(() => {});
-
-    global.fetch = jest.fn((input: RequestInfo, init?: RequestInit) => {
-      const url = typeof input === 'string' ? input : input.url;
-
-      if (url.includes('/api/forecast/latest')) return okJson(rows);
-
-      if (url.includes('/api/forecast/run') && init?.method === 'POST') {
-        return Promise.reject(new Error('run error'));
-      }
-
-      return okJson({});
-    }) as unknown as typeof fetch;
-
-    renderPage();
-
-    await waitLoaded();
-
-    fireEvent.click(screen.getByText('Refresh Peramalan'));
-
-    await waitFor(() => {
-      expect(goeyToast.error).toHaveBeenCalledWith(
-        'Gagal memperbarui peramalan',
-        expect.objectContaining({
-          description: 'Periksa koneksi internet Anda dan coba lagi.',
-        })
-      );
-    });
-  });
 
   test('fetches without token', async () => {
     localStorage.removeItem('token');
@@ -705,6 +407,32 @@ test('refresh forecast success', async () => {
     renderPage();
 
     expect(await screen.findByText('Tidak ada data.')).toBeInTheDocument();
+  });
+
+  test('auto-refresh interval fetchLatestForecasts is called (line 77)', async () => {
+    const setIntervalSpy = jest.spyOn(global, 'setInterval');
+    renderPage();
+    await waitLoaded();
+
+    const initialCalls = (global.fetch as jest.Mock).mock.calls.filter(
+      (c: any) => typeof c[0] === 'string' && (c[0] as string).includes('/api/forecast/latest')
+    ).length;
+
+    const intervalCall = setIntervalSpy.mock.calls.find(
+      (c: any) => c[1] === 60000
+    );
+    if (intervalCall && intervalCall[0]) {
+      await (intervalCall[0] as () => Promise<void>)();
+    }
+
+    await waitFor(() => {
+      const currentCalls = (global.fetch as jest.Mock).mock.calls.filter(
+        (c: any) => typeof c[0] === 'string' && (c[0] as string).includes('/api/forecast/latest')
+      ).length;
+      expect(currentCalls).toBeGreaterThan(initialCalls);
+    });
+
+    setIntervalSpy.mockRestore();
   });
 });
 

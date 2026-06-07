@@ -2,6 +2,27 @@ import React from 'react';
 import { render, waitFor, fireEvent, screen } from '@testing-library/react';
 import TransactionsPage from '../page';
 import { goeyToast } from '@/components/ui/goey-toaster';
+import { HeaderProvider, useHeader } from '@/context/HeaderContext';
+
+function HeaderDisplay() {
+  const { headerState } = useHeader();
+  return (
+    <div data-testid="header">
+      <h1>{headerState.title}</h1>
+      {headerState.subtitle && <p>{headerState.subtitle}</p>}
+      {headerState.rightContent}
+    </div>
+  );
+}
+
+function renderWithProviders(ui: React.ReactElement) {
+  return render(
+    <HeaderProvider>
+      <HeaderDisplay />
+      {ui}
+    </HeaderProvider>
+  );
+}
 
 const pushMock = jest.fn();
 const mockCheckPermission = jest.fn((action?: string) => true);
@@ -123,7 +144,7 @@ function mockDefaultFetch() {
 }
 
 function renderPage() {
-  return render(<TransactionsPage />);
+  return renderWithProviders(<TransactionsPage />);
 }
 
 async function waitProductsLoaded() {
@@ -686,6 +707,74 @@ describe('transactions module', () => {
     });
   });
 
+  test('handles products response with null data fallback', async () => {
+    global.fetch = jest.fn((input: RequestInfo) => {
+      const url = typeof input === 'string' ? input : input.url;
+
+      if (url.includes('/api/products')) {
+        return okJson({
+          data: null,
+        });
+      }
+
+      if (url.includes('/api/settings')) {
+        return okJson({ ppn_rate: '11', discount_rate: '5' });
+      }
+
+      return okJson({});
+    }) as unknown as typeof fetch;
+
+    renderPage();
+    await waitFor(() => {
+      expect(screen.getByText('Loading products...')).toBeInTheDocument();
+    });
+  });
+
+  test('handles settings fetch failure with non-401 status', async () => {
+    global.fetch = jest.fn((input: RequestInfo) => {
+      const url = typeof input === 'string' ? input : input.url;
+
+      if (url.includes('/api/products')) {
+        return okJson({ data: testProducts });
+      }
+
+      if (url.includes('/api/settings')) {
+        return failJson({}, 500);
+      }
+
+      return okJson({});
+    }) as unknown as typeof fetch;
+
+    renderPage();
+    await waitProductsLoaded();
+
+    addFirstProduct();
+    expect(screen.getByText('Sub total')).toBeInTheDocument();
+  });
+
+  test('renders product with empty unit fallback', async () => {
+    global.fetch = jest.fn((input: RequestInfo) => {
+      const url = typeof input === 'string' ? input : input.url;
+
+      if (url.includes('/api/products')) {
+        return okJson({
+          data: [{ id: 99, name: 'No Unit Product', cost_price: 5000, selling_price: 10000, stock: 5, unit: '', category: 'Test' }],
+          pagination: { total: 1, page: 1, limit: 100, totalPages: 1 },
+        });
+      }
+
+      if (url.includes('/api/settings')) {
+        return okJson({ ppn_rate: '0', discount_rate: '0' });
+      }
+
+      return okJson({});
+    }) as unknown as typeof fetch;
+
+    renderPage();
+    await waitFor(() => expect(screen.getByText('No Unit Product')).toBeInTheDocument());
+    expect(screen.getByText(/tablet/i)).toBeInTheDocument();
+  });
+
   test('uses zero settings fallback when settings values are invalid', async () => {
     global.fetch = jest.fn((input: RequestInfo) => {
       const url = typeof input === 'string' ? input : input.url;
@@ -1135,5 +1224,119 @@ describe('transactions module', () => {
         expect.any(Object)
       );
     });
+  });
+
+  test('shows stock habis when product stock is zero', async () => {
+    global.fetch = jest.fn((input: RequestInfo) => {
+      const url = typeof input === 'string' ? input : input.url;
+
+      if (url.includes('/api/products')) {
+        return okJson({
+          data: [{ ...testProducts[0], stock: 0 }],
+          pagination: { total: 1, page: 1, limit: 100, totalPages: 1 },
+        });
+      }
+
+      if (url.includes('/api/settings')) {
+        return okJson({ ppn_rate: '11', discount_rate: '5' });
+      }
+
+      return okJson({});
+    }) as unknown as typeof fetch;
+
+    renderPage();
+    await waitFor(() => expect(screen.getByText('Test Product 1')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByText('Test Product 1'));
+
+    await waitFor(() => {
+      expect(goeyToast.error).toHaveBeenCalledWith('Stok Habis', expect.any(Object));
+    });
+  });
+
+  test('shows stok tidak cukup when quantity exceeds stock', async () => {
+    global.fetch = jest.fn((input: RequestInfo) => {
+      const url = typeof input === 'string' ? input : input.url;
+
+      if (url.includes('/api/products')) {
+        return okJson({
+          data: [{ ...testProducts[0], stock: 1 }],
+          pagination: { total: 1, page: 1, limit: 100, totalPages: 1 },
+        });
+      }
+
+      if (url.includes('/api/settings')) {
+        return okJson({ ppn_rate: '11', discount_rate: '5' });
+      }
+
+      return okJson({});
+    }) as unknown as typeof fetch;
+
+    renderPage();
+    await waitFor(() => expect(screen.getByText('Test Product 1')).toBeInTheDocument());
+
+    const productCard = screen.getAllByText('Test Product 1')[0];
+    fireEvent.click(productCard);
+    fireEvent.click(productCard);
+
+    await waitFor(() => {
+      expect(goeyToast.error).toHaveBeenCalledWith('Stok Tidak Cukup', expect.any(Object));
+    });
+  });
+
+  test('updateQuantity on one item preserves the other items quantity', async () => {
+    renderPage();
+    await waitProductsLoaded();
+
+    addFirstProduct();
+    addSecondProduct();
+
+    const qty1 = screen.getAllByText('1');
+    expect(qty1.length).toBeGreaterThanOrEqual(2);
+
+    const plusButtons = screen.getAllByTestId('plus-icon');
+    fireEvent.click(plusButtons[plusButtons.length - 1]);
+
+    expect(screen.getByText('2')).toBeInTheDocument();
+    expect(screen.getAllByText('1').length).toBeGreaterThanOrEqual(1);
+  });
+
+  test('print receipt opens print window on cash payment', async () => {
+    const mockDoc = { write: jest.fn(), close: jest.fn() };
+    const mockWin = { document: mockDoc };
+    const openMock = jest.fn().mockReturnValue(mockWin as any);
+    Object.defineProperty(window, 'open', { value: openMock, writable: true });
+
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+
+    global.fetch = jest.fn((input: RequestInfo, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input.url;
+
+      if (url.includes('/api/products')) {
+        return okJson({ data: testProducts });
+      }
+
+      if (url.includes('/api/settings')) {
+        return okJson({ ppn_rate: '11', discount_rate: '5' });
+      }
+
+      if (url.includes('/api/transactions') && init?.method === 'POST') {
+        return okJson({ message: 'Success', id: 123 });
+      }
+
+      return okJson({});
+    }) as unknown as typeof fetch;
+
+    renderPage();
+    await waitProductsLoaded();
+    addFirstProduct();
+
+    fireEvent.click(screen.getByRole('button', { name: /pembayaran/i }));
+
+    await waitFor(() => {
+      expect(openMock).toHaveBeenCalledWith('', '_blank');
+    });
+    expect(mockDoc.write).toHaveBeenCalledWith(expect.stringContaining('APOTEK SUMBER WARAS'));
+    expect(mockDoc.close).toHaveBeenCalled();
   });
 });

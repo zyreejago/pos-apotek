@@ -1,43 +1,477 @@
 # ALUR SISTEM POS APOTEK — DETAIL LENGKAP
+# File ini berisi dokumentasi lengkap arsitektur, database, API, dan alur bisnis
+# sistem POS Apotek "Sales Point". Gunakan file ini sebagai referensi utama
+# untuk memahami seluruh komponen sistem dan interaksinya.
 
 ================================================================================
-                             ARSITEKTUR SISTEM
+                              ARSITEKTUR SISTEM
 ================================================================================
 
-Frontend   : Next.js 14 (App Router) + TypeScript + Tailwind CSS
-Backend    : Express.js 4 (Node.js) + mysql2/promise
-Database   : MySQL 8+
-Auth       : JWT (jsonwebtoken) + bcryptjs, dual-layer (cookie middleware + client)
-Payment    : Midtrans Snap (sandbox)
-Forecast   : Google Gemini API + Holt-Winters + OpenRouter
-File Upload: Multer (memoryStorage → LONGBLOB MySQL)
-Notifikasi : goey-toast
-Icons      : lucide-react
+## Tech Stack
 
-Struktur Provider:
+| Layer      | Teknologi                          | Versi/Keterangan               |
+|------------|------------------------------------|--------------------------------|
+| Frontend   | Next.js (App Router)               | 14.x + TypeScript + Tailwind   |
+| Backend    | Express.js                         | 4.x + mysql2/promise           |
+| Database   | MySQL                              | 8+                             |
+| Auth       | JWT (jsonwebtoken) + bcryptjs      | Dual-layer (cookie + client)   |
+| Payment    | Midtrans Snap                      | Sandbox environment            |
+| Forecast   | Google Gemini API + Holt-Winters   | Fallback jika API gagal        |
+| File Upload| Multer (memoryStorage)             | Disimpan sebagai LONGBLOB      |
+| Notifikasi | goey-toast                         | Custom toast library           |
+| Icons      | lucide-react                       | 0.263+                         |
+| PDF        | jspdf + jspdf-autotable           | Laporan keuangan               |
+
+## Struktur Folder Proyek
+
+```
+sales-point-pos/
+├── src/                                # FRONTEND (Next.js App Router)
+│   ├── app/
+│   │   ├── layout.tsx                  # Root layout + providers
+│   │   ├── page.tsx                    # Halaman default (/)
+│   │   ├── login/                      # Halaman login
+│   │   ├── register/                   # Halaman registrasi
+│   │   ├── forgot-password/            # Lupa password (4 langkah)
+│   │   ├── dashboard/                  # Dashboard utama
+│   │   ├── products/                   # Manajemen produk + faktur/batch
+│   │   ├── transactions/               # POS penjualan
+│   │   ├── suppliers/                  # Manajemen supplier
+│   │   ├── stock-opname/               # Stock opname
+│   │   ├── purchase-history/           # Riwayat pembelian
+│   │   ├── purchase-returns/           # Retur pembelian
+│   │   ├── sale-returns/               # Retur penjualan
+│   │   ├── prescriptions/              # Resep dokter
+│   │   ├── approvals/                  # Approval faktur
+│   │   ├── users/                      # Manajemen pengguna
+│   │   ├── reports/                    # Laporan (financial, balance, dll)
+│   │   ├── recommendations/            # Peramalan stok
+│   │   ├── audit-trails/               # Log aktivitas
+│   │   └── settings/                   # Role & permission, transaction setting
+│   ├── components/                     # Komponen shared
+│   │   ├── Sidebar.tsx                 # Navigasi sidebar
+│   │   ├── Header.tsx                  # Header halaman
+│   │   ├── PageHeader.tsx              # Header dengan breadcrumbs
+│   │   ├── OffCanvas.tsx               # Panel slide-in
+│   │   ├── ConfirmModal.tsx            # Modal konfirmasi
+│   │   ├── AuthProvider.tsx            # Auth context provider
+│   │   └── MainLayout.tsx              # Layout utama dengan sidebar + header
+│   ├── context/                        # React Context
+│   │   ├── AuthContext.tsx             # State autentikasi
+│   │   ├── HeaderContext.tsx           # State header
+│   │   ├── SidebarContext.tsx          # State sidebar (collapsed/expanded)
+│   │   ├── OffCanvasContext.tsx        # State offcanvas
+│   │   └── KeyboardShortcutsContext.tsx# Shortcut keyboard global
+│   └── hooks/                          # Custom hooks
+│       ├── useRequirePermission.ts     # Cek permission module
+│       └── useKeyboardShortcuts.ts     # Hook shortcut
+│
+├── server/                             # BACKEND (Express.js)
+│   ├── index.js                        # Entry point, routes, middleware
+│   ├── config/
+│   │   └── db.js                       # Koneksi MySQL (pool)
+│   ├── middleware/
+│   │   ├── auth.js                     # JWT verification
+│   │   └── upload.js                   # Multer config
+│   ├── routes/
+│   │   ├── auth.js                     # Login, register, profile
+│   │   ├── products.js                 # CRUD produk
+│   │   ├── inventory.js                # Batch, faktur, stock opname
+│   │   ├── transactions.js             # POS penjualan
+│   │   ├── suppliers.js                # CRUD supplier
+│   │   ├── returns.js                  # Retur pembelian & penjualan
+│   │   ├── prescriptions.js            # Resep dokter
+│   │   ├── rbac.js                     # Role & permission
+│   │   ├── reports.js                  # Laporan keuangan
+│   │   ├── accounting.js               # Jurnal akuntansi
+│   │   ├── audit.js                    # Audit trail
+│   │   ├── forecast.js                 # Peramalan stok
+│   │   ├── substitutions.js            # Substitusi obat
+│   │   ├── midtrans.js                 # Midtrans callback
+│   │   ├── settings.js                 # System settings
+│   │   └── forgot-password.js          # Reset password
+│   └── helpers/
+│       ├── auditTrail.js               # Fungsi createAuditTrail()
+│       └── idGenerator.js              # Generate nomor retur (RP-/RJ-)
+│
+├── jest.config.js                       # Konfigurasi Jest
+└── package.json                         # Dependencies frontend
+```
+
+## Struktur Provider (React Context Tree)
+
+```
 <html>
-  <head><Script src="https://app.sandbox.midtrans.com/snap/snap.js" ... /></head>
+  <head>
+    <Script src="https://app.sandbox.midtrans.com/snap/snap.js" ... />
+    <!-- Midtrans Snap JS untuk pembayaran non-tunai -->
+  </head>
   <body>
-    <OffCanvasProvider>
-      <AuthProvider>
-        <HeaderProvider>
-          <SidebarProvider>
-            <KeyboardShortcutsProvider>
-              <MainLayout>
-                {children}  ← halaman yang diakses
+    <OffCanvasProvider>             ← State panel slide-in (open/close, width)
+      <AuthProvider>                ← State login/logout, token, user data
+        <HeaderProvider>            ← State title, subtitle, breadcrumbs
+          <SidebarProvider>         ← State collapsed/expanded
+            <KeyboardShortcutsProvider>  ← Global hotkeys (Ctrl+B, /, 1-8)
+              <MainLayout>          ← Sidebar (kiri) + Header (atas) + content
+                {children}          ← Halaman aktif sesuai route
               </MainLayout>
             </KeyboardShortcutsProvider>
           </SidebarProvider>
         </HeaderProvider>
-        <GoeyToaster />
+        <GoeyToaster />             ← Toast notifications (global, di luar layout)
       </AuthProvider>
     </OffCanvasProvider>
   </body>
 </html>
+```
 
 
 ================================================================================
-                          STRUKTUR DATABASE LENGKAP
+                     API ENDPOINTS REFERENCE (LENGKAP)
+================================================================================
+
+Semua endpoint backend berada di http://localhost:5000/api/
+Kecuali dinyatakan lain, semua endpoint memerlukan header:
+  Authorization: Bearer {token}
+
+Format response sukses:  { data: ..., pagination?: {...} }
+Format response error:   { message: "..." }
+
+## A. AUTH (tidak perlu token)
+------------------------------------------------------------------------
+
+### Login
+  POST /api/auth/login
+  Body: { username: string, password: string }
+  Response 200: { token: string, user: { id, username, role, full_name } }
+  Response 401: { message: "Username atau password salah" }
+
+### Register
+  POST /api/auth/register
+  Body: { username: string, password: string }
+  Validasi: password >= 6 karakter
+  Response 201: { message: string, id: number }
+
+### Forgot Password (Langkah 1)
+  POST /api/forgot-password
+  Body: { email: string }
+  Response 200: { message: string }
+
+### Verify Reset Code (Langkah 2)
+  POST /api/verify-reset-code
+  Body: { email: string, code: string }
+  Response 200: { message: string }
+
+### Reset Password (Langkah 3)
+  POST /api/reset-password
+  Body: { email: string, code: string, new_password: string }
+  Response 200: { message: string }
+
+### Profile
+  GET  /api/profile              → { data: { id, username, full_name, email, phone, role } }
+  PUT  /api/profile              → Body: { full_name?, email?, phone? }
+  POST /api/profile/change-password → Body: { current_password, new_password }
+
+## B. PRODUCTS
+------------------------------------------------------------------------
+
+### List Products
+  GET /api/products?page=&limit=&search=
+  Response: { data: Product[], pagination: { total, page, limit, totalPages } }
+  Fitur: search by name, supplier_name, location_code
+    Stock type ditentukan via prioritas (retur > belum_bayar > dp > konsinyasi > lunas)
+    Teknik: NOT EXISTS + FIELD() — bukan batch terakhir
+
+### Create Product
+  POST /api/products
+  Body (FormData): name, cost_price, selling_price, stock, unit, expired_date,
+                   location_code, supplier_id, stock_type, purchase_date,
+                   invoice_number, dp_amount, due_date, purchase_unit,
+                   unit_multiplier, product_category, image (file), needsApproval
+  Response 201: { id: number, message: string, status?: 'pending' }
+
+### Update Product
+  PUT /api/products/:id
+  Body (JSON): name, cost_price, selling_price, stock, unit, dll
+
+### Delete Product
+  DELETE /api/products/:id
+  Response: { message: string }
+
+## C. INVENTORY / BATCHES (Faktur Pembelian)
+------------------------------------------------------------------------
+
+### List Batches per Product
+  GET /api/inventory/batches/:productId
+  Response: { data: Batch[] } — termasuk dp_payments, qty_returned
+
+### Create Batch
+  POST /api/inventory/batches
+  Body (FormData): product_id, supplier_id, batch_number, stock_type,
+                   purchase_date, initial_quantity, cost_price, expired_date,
+                   dp_amount, due_date, notes, image
+  Jika total > 2jt → status='pending', perlu approval
+
+### Update Batch
+  PUT /api/inventory/batches/:id
+  Sama seperti create. stock_type 'retur' tidak bisa diubah.
+
+### Delete Batch
+  DELETE /api/inventory/batches/:id
+
+### Approve/Reject/Revision Batch
+  PUT /api/inventory/batches/:id/approve
+  PUT /api/inventory/batches/:id/reject
+  PUT /api/inventory/batches/:id/revision
+
+### Expire Batch
+  PUT /api/inventory/batches/:id/expire
+
+### Archive Batch
+  PUT /api/inventory/batches/:id/archive
+  Body: { is_archived: true }
+  Hanya untuk stock_type 'lunas' atau 'retur' (retur harus complete)
+
+### DP Payments
+  POST   /api/inventory/batches/:batchId/dp-payments → Body: { amount, payment_date, payment_method }
+  DELETE /api/inventory/batches/:batchId/dp-payments/:paymentId
+
+### Pending Batches (for Approval page)
+  GET /api/inventory/pending-batches
+  Response: { data: Batch[] } — status IN ('pending','revision','rejected')
+
+## D. TRANSACTIONS (POS)
+------------------------------------------------------------------------
+
+### Create Transaction (Cash)
+  POST /api/transactions
+  Body: { items: [{ product_id, quantity, selling_price }], payment_method: 'cash',
+          amount_tendered, discount, tax_rate }
+  Proses: FEFO (ambil batch expired terdekat duluan) + jurnal otomatis
+  Response: { id, total_amount, change_amount, items_with_batches }
+
+### Create Transaction (Midtrans)
+  POST /api/transactions
+  Body: { items: [...], payment_method: 'midtrans' }
+  Response: { snap_token: string, order_id: string }
+
+### Midtrans Callback
+  POST /api/midtrans/notification
+  Body dari Midtrans: { transaction_status, fraud_status, order_id, transaction_id, ... }
+  Fitur: Idempotency (SELECT ... FOR UPDATE + cek payment_status)
+         FEFO loop + jurnal dalam satu transaksi database
+  Aman dari double callback
+
+### List Transactions
+  GET /api/transactions?page=&limit=&search=
+
+### Void Transaction
+  POST /api/transactions/:id/void
+
+## E. SUPPLIERS
+------------------------------------------------------------------------
+
+  GET    /api/suppliers?page=&limit=&search=  → { data: Supplier[], pagination }
+  POST   /api/suppliers                        → Body: { name, contact_person, phone, address, accepts_return, return_notes }
+  GET    /api/suppliers/:id                    → Detail + batches + products
+  PUT    /api/suppliers/:id                    → Update data
+  DELETE /api/suppliers/:id                    → Soft delete (is_deleted = TRUE)
+
+## F. RETUR PEMBELIAN
+------------------------------------------------------------------------
+
+  GET  /api/returns/purchases?page=&limit=              → Daftar retur
+  GET  /api/returns/purchases/lookup?invoice_no=XXX     → Cari faktur untuk diretur
+       Response: { purchase, supplier, items: [{batch_id, product_name, qty_returnable, ...}] }
+  POST /api/returns/purchases                            → Proses retur
+       Body: { items: [{batch_id, qty_returned, condition}], reason, handling }
+       Efek: UPDATE batch stock_type='retur', kurangi stok, jurnal
+  GET  /api/returns/purchases/:id                        → Detail retur + items
+
+## G. RETUR PENJUALAN
+------------------------------------------------------------------------
+
+  GET  /api/returns/sales?page=&limit=                   → Daftar retur
+  GET  /api/returns/sales/lookup?sale_id=XXX             → Cari transaksi
+  POST /api/returns/sales                                → Proses retur
+       Body: { items: [{sale_item_id, qty_returned}], reason, refund_method }
+       Efek: RESTORE stok batch + jurnal
+  GET  /api/returns/sales/:id                            → Detail
+
+## H. STOCK OPNAME
+------------------------------------------------------------------------
+
+  POST /api/inventory/opname
+  Body: { items: [{ product_id, batch_id, physical_stock }] }
+  Efek: Hitung selisih, update remaining_quantity, jurnal selisih
+
+  GET /api/inventory/opname/history?page=&limit=
+
+## I. LAPORAN KEUANGAN (ACCOUNTING)
+------------------------------------------------------------------------
+
+  GET /api/reports/balance-accounting?month=&year=     → Neraca (asset=liability+equity)
+  GET /api/reports/profit-loss-accounting?month=&year= → Laba/Rugi
+  GET /api/reports/transactions?startDate=&endDate=    → Laporan transaksi
+
+  GET /api/accounting/general-journal?startDate=&endDate=  → Jurnal umum
+  GET /api/accounting/general-ledger?accountId=&startDate=&endDate= → Buku besar
+  POST /api/accounting/journal-entries                      → Transaksi keuangan manual
+       Body: { entry_date, description, items: [{account_id, debit, credit}] }
+
+## J. RBAC (ROLE & PERMISSION)
+------------------------------------------------------------------------
+
+  GET    /api/rbac/permissions?roleId=X&roleName=Y   → Daftar permission
+  PUT    /api/rbac/permissions                        → UPSERT permission
+         Body: { role_id, module, action, allowed }
+  POST   /api/rbac/roles                              → Tambah role
+         Body: { name: string }
+  DELETE /api/rbac/roles/:id                          → Hapus role (tidak bisa superadmin)
+
+## K. SETTINGS
+------------------------------------------------------------------------
+
+  GET /api/settings               → { setting_key, setting_value }
+  PUT /api/settings               → Body: { setting_key, setting_value }
+
+## L. USERS
+------------------------------------------------------------------------
+
+  GET    /api/users               → Daftar user (tanpa password)
+  POST   /api/users               → Tambah user
+  PUT    /api/users/:id           → Edit user
+  PUT    /api/users/:id/toggle-status → Aktif/nonaktifkan
+
+## M. AUDIT TRAIL (READ ONLY)
+------------------------------------------------------------------------
+
+  GET /api/audit-trails?page=&limit=&module=&action=&userId=&startDate=&endDate=
+
+## N. PRESCRIPTIONS (Resep Dokter)
+------------------------------------------------------------------------
+
+  GET    /api/prescriptions
+  POST   /api/prescriptions
+  PUT    /api/prescriptions/:id
+  DELETE /api/prescriptions/:id
+
+## O. STOCK FORECAST (Peramalan)
+------------------------------------------------------------------------
+
+  GET /api/stock-forecast?product_id=&period=30
+  Proses: Ambil riwayat penjualan → Gemini AI → Holt-Winters fallback
+
+## P. SUBSTITUTIONS (Rekomendasi obat alternatif)
+------------------------------------------------------------------------
+
+  POST /api/substitutions
+  Body: { product_name: string }
+  Response: { data: Substitution[], source: 'cache' | 'openrouter' }
+
+
+================================================================================
+                     STATE MANAGEMENT (FRONTEND)
+================================================================================
+
+Setiap halaman menggunakan React state lokal (useState/useCallback).
+Tidak ada global state selain Context providers di atas.
+
+## Pola Umum Setiap Halaman:
+
+  const [loading, setLoading] = useState(true);
+  const [data, setData] = useState<DataType[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [pagination, setPagination] = useState<Pagination>({...});
+
+  // Fetch data
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/...?page=${currentPage}&limit=${itemsPerPage}&search=${search}`);
+      const json = await res.json();
+      setData(json.data || []);
+      setPagination(json.pagination || { total: 0, page: 1, limit: 10, totalPages: 1 });
+    } catch (error) {
+      console.error('Error:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [currentPage, itemsPerPage, search]);
+
+  // Debounce search (500ms)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+      setCurrentPage(1);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  // Initial fetch
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+## State Khusus Per Modul:
+
+| Modul                | State Tambahan                                           |
+|----------------------|----------------------------------------------------------|
+| Login                | username, password, showPassword, loading                |
+| Dashboard            | stats, recentTransactions, chartData                     |
+| Products             | formData, selectedProduct, isProductOffCanvasOpen,       |
+|                      | isMultipleProducts, multipleProducts[], faktur list,     |
+|                      | isFakturOffCanvasOpen, confirmModal, approvalModal       |
+| Transactions         | cart[], paymentMethod, amountTendered, discount, ppnRate |
+| Suppliers            | selectedSupplier, supplierOffCanvas                      |
+| Purchase Returns     | lookupResult, returnItems[], formData                    |
+| Sale Returns         | lookupResult, returnItems[], formData                    |
+| Stock Opname         | opnameItems[], history                                   |
+| Approvals            | pendingFakturs[], isFetchingPending                      |
+| Reports              | month, year, reportData                                  |
+| Settings             | roles, permissions, settings                             |
+| Audit Trail          | filters (module, action, userId, dateRange)              |
+
+
+================================================================================
+                     ERROR HANDLING PATTERN
+================================================================================
+
+## Frontend (Global)
+
+Setiap fetch di-catch dengan pattern:
+  1. Cek res.ok
+  2. Jika tidak ok → parse json error → goeyToast.error(message)
+  3. Jika fetch throw (network error) → goeyToast.error('Gagal terhubung ke server')
+
+## Backend (Global)
+
+  app.use((err, req, res, next) => {
+    console.error(err.stack);
+    res.status(err.status || 500).json({ message: err.message || 'Internal Server Error' });
+  });
+
+## Pattern Khusus:
+
+### Auto-logout (401 dari API)
+  API return 401 → frontend: localStorage.clear() + cookie dihapus + redirect /login
+  Implementasi: Middleware Next.js cek cookie 'token', AuthProvider cek localStorage
+
+### Idempotency Pattern (Midtrans)
+  - SELECT ... FOR UPDATE sebelum proses
+  - Cek payment_status === 'completed' → skip
+  - UNIQUE KEY midtrans_transaction_id
+  - Update status duluan, baru FEFO + jurnal
+
+### Permission Check
+  Frontend: useRequirePermission(module) → cek 'show'
+  Backend:  checkPermission(module, action) → cek role_permissions
+  Superadmin bypass: hanya jika record permission TIDAK ADA (bukan allowed=0)
+
+
+================================================================================
+                           STRUKTUR DATABASE LENGKAP
 ================================================================================
 
 1. users
@@ -75,12 +509,13 @@ Struktur Provider:
 8. transactions
    - id, user_id, total_amount, tax_amount, discount_amount, subtotal,
      payment_method (cash/midtrans), payment_status (pending/completed/
-     cancelled/settlement), midtrans_order_id, midtrans_transaction_id,
+     cancelled/settlement), midtrans_order_id,
+     midtrans_transaction_id (VARCHAR 255, UNIQUE KEY — idempotency),
      is_fully_returned (BOOLEAN), created_at
 
 9. transaction_items
-   - id, transaction_id, product_id, batch_id, quantity, cost_price,
-     selling_price, subtotal, created_at
+   - id, transaction_id, product_id, batch_id (nullable), quantity,
+     cost_price, selling_price, subtotal, created_at
 
 10. purchases (legacy — diclaim ulang saat retur)
     - id, invoice_no, supplier_id, user_id, total_amount, payment_status,
@@ -107,11 +542,17 @@ Struktur Provider:
     - id, journal_entry_id, account_id, debit (DECIMAL 15,2),
       credit (DECIMAL 15,2)
 
-17. audit_trails
-    - id, user_id, username, role, module, action, description, created_at
+17. audit_trails (IMMUTABLE — append-only event log)
+    - id, user_id, username, role, module, action, description,
+      ip_address (VARCHAR 50), user_agent (TEXT), created_at
+    - INDEX: idx_audit_user (user_id), idx_audit_created_at (created_at),
+      idx_audit_module (module)
+    - TRIGGER: BEFORE UPDATE → SIGNAL SQLSTATE '45000'
+    - TRIGGER: BEFORE DELETE → SIGNAL SQLSTATE '45000'
+    - Tidak bisa diupdate/dihapus, baik dari aplikasi maupun direct SQL
 
 18. system_settings
-    - id, setting_key, setting_value
+    - id, setting_key (VARCHAR 50 PRIMARY KEY), setting_value (VARCHAR 255)
 
 19. substitutions_cache
     - id, product_name, result (JSON), created_at
@@ -131,7 +572,7 @@ Struktur Provider:
 
 24. purchase_return_items
     - id, return_id, purchase_item_id (nullable), batch_id, product_id,
-      qty_returned, buy_price, `condition` (damaged/expired/wrong_item),
+      qty_returned, buy_price, condition (damaged/expired/wrong_item),
       created_at
 
 25. supplier_credits
@@ -161,7 +602,8 @@ Peramalan Stok      | show
 Substitutions       | show (frontend only)
 Suppliers           | create, edit, delete, show
 Stock Opname        | create
-System Settings     | (tidak ada checkPermission backend — superadmin only)
+Role & Permission   | show, create, edit, delete (superadmin bypass)
+Transaction Setting | show, edit (superadmin bypass)
 Audit Trail         | show
 Approval Faktur     | show, edit
 Riwayat Pembelian   | show
@@ -175,6 +617,8 @@ Catatan:
   allowed = 0, superadmin pun akan ditolak.
 - `useRequirePermission(module)` di frontend: cek 'show'. Jika tidak punya,
   redirect ke /dashboard.
+- `Role & Permission` dan `Transaction Setting` adalah pengganti dari
+  modul `System Settings` lama (dipecah jadi 2).
 
 
 ================================================================================
@@ -281,7 +725,10 @@ Langkah 3: Reset Password
       - Reports → sama (cek Sales Report)
       - Retur → dropdown dengan sub-menu Retur Pembelian + Retur Penjualan
         (icon RotateCcw, collapsible, cek permission per sub-menu)
-      - System Settings → superadmin bypass
+      - System Settings → dropdown dengan sub-menu:
+        * Role & Permission (cek Role & Permission)
+        * Transaction Setting (cek Transaction Setting)
+        Parent dropdown visible jika user punya akses ke SALAH SATU module
    c. Jika loading → sembunyikan semua menu
 
 2. Collapse/Expand:
@@ -360,6 +807,12 @@ Implementasi SQL (server/routes/products.js):
     )
   GROUP BY b1.product_id
 
+--- 3g. Qty Terjual (Sold) ---
+Qty Terjual dihitung sebagai NET sold (bukan gross):
+  sold = initial_quantity - remaining_quantity
+Ini adalah jumlah yang benar-benar sudah pergi dari stok batch saat ini.
+Tidak termasuk qty yang diretur penjualan (karena stok sudah dikembalikan ke batch).
+
 
 ================================================================================
               ALUR 4: MANAJEMEN FAKTUR / BATCH (DALAM PRODUCTS)
@@ -368,8 +821,9 @@ Implementasi SQL (server/routes/products.js):
 --- 4a. Melihat Faktur Suatu Produk ---
 1. Klik baris produk → buka Faktur OffCanvas (lebar 800px)
 2. Fetch GET /api/inventory/batches/:productId
-3. Backend: SELECT batches + supplier_name + dp_payments + qty_returned
-   (SUM dari purchase_return_items per batch)
+3. Backend: SELECT batches + supplier_name + dp_payments +
+   qty_returned (SUM dari purchase_return_items per batch) +
+   qty_restored (SUM dari sale_return_items per batch — untuk info)
 4. Tabel: No.Faktur, Supplier, Tipe Stok, Tgl Pembelian, Status, Qty Awal,
    Qty Tersisa, Qty Terjual, **Qty Retur** (merah jika ada), Expired Date,
    Harga Beli, Total, Aksi
@@ -500,19 +954,26 @@ POST /api/transactions dengan payment_method='cash' → langsung complete + jurn
 2. Panggil Midtrans Snap API → return snap_token
 3. Frontend: snap.pay(snap_token, ...)
 4. Midtrans callback → **POST /api/midtrans/notification**
-5. **Callback Midtrans — FEFO + Jurnal:**
-   a. Cari transaksi by order_id
-   b. Update payment_status = 'settlement'
-   c. **FEFO loop: kurangi stok batch (bukan langsung products.stock)**
+5. **Callback Midtrans — IDEMPOTENCY + FEFO + Jurnal:**
+   a. beginTransaction() langsung (SEBELUM query apapun)
+   b. SELECT ... FROM transactions WHERE midtrans_order_id = ? FOR UPDATE
+      → LOCK baris, cegah race condition
+   c. **Idempotency guard:** jika payment_status sudah 'completed' →
+      COMMIT + return (skip, tidak proses ulang)
+   d. Tentukan paymentStatus dari transaction_status & fraud_status
+   e. UPDATE transactions SET payment_status = ?, midtrans_transaction_id = ?
+      → Simpan transaction_id dari Midtrans (UNIQUE KEY mencegah duplikat)
+   f. **FEFO loop: kurangi stok batch (bukan langsung products.stock)**
       - Query batch FEFO untuk tiap produk
       - Loop batch, kurangi remaining_quantity
       - Baru update products.stock total dari semua batch
-   d. **Buat jurnal:**
+   g. **Buat jurnal:**
       - Dr. Bank (102) = total_amount
       - Cr. Penjualan OBAT (401) / NON_OBAT (402)
       - Cr. PPN Keluaran (202)
       - Dr. HPP OBAT (501) / NON_OBAT (502)
       - Cr. Persediaan OBAT (103) / NON_OBAT (104)
+   h. COMMIT
 
 --- 7f. Cetak Struk ---
 Modal receipt → window.print()
@@ -655,6 +1116,7 @@ Akun-akun khusus:
 ================================================================================
 
 --- 16a. Role & Permissions ---
+Module RBAC: Role & Permission
 Dua panel: daftar role (kiri) + permission toggles (kanan)
 Pilih role → GET /api/rbac/permissions?roleId=X
 Toggle → PUT /api/rbac/permissions (UPSERT)
@@ -666,15 +1128,46 @@ POST /api/rbac/roles
 DELETE /api/rbac/roles/:id (tidak bisa hapus superadmin)
 
 --- 16d. Transaction Settings ---
-PPN Rate, Diskon Default → GET/PUT /api/settings
+Module RBAC: Transaction Setting
+PPN Rate + Diskon Default → GET/PUT /api/settings
+Hanya edit (show + edit), tidak ada create/delete
 
 
 ================================================================================
-            ALUR 17: AUDIT TRAIL
+            ALUR 17: AUDIT TRAIL (IMMUTABLE EVENT LOG)
 ================================================================================
 
+--- 17a. Arsitektur ---
+Audit trail adalah append-only event log:
+- INSERT-only: tidak ada UPDATE/DELETE endpoint di aplikasi
+- Database trigger: BEFORE UPDATE dan BEFORE DELETE pada audit_trails
+  mengeluarkan SIGNAL SQLSTATE '45000' — mencegah modifikasi dari SQL langsung
+- Semua audit trail dibuat secara EVENT-DRIVEN oleh fungsi createAuditTrail()
+  yang dipanggil otomatis di setiap operasi (tidak ada form manual)
+
+--- 17b. Data yang Dicatat ---
+Setiap event mencatat:
+- user_id, username, role — siapa yang melakukan
+- module — modul mana (Management Product, Transactions, dll)
+- action — aksi (create, edit, delete, login, register, dll)
+- description — deskripsi detail
+- ip_address, user_agent — dari request header (jika tersedia)
+- created_at — timestamp otomatis
+
+--- 17c. API ---
 GET /api/audit-trails?page=&limit=&module=&action=&userId=&startDate=&endDate=
 Filter + pagination, ORDER BY created_at DESC
+Hanya read-only, tidak ada POST/PUT/DELETE
+
+--- 17d. Event-Driven — Semua Modul ---
+createAuditTrail() di-inject ke setiap route handler sebagai callback:
+  registerUserRoutes, registerProductRoutes, registerTransactionRoutes,
+  registerSupplierRoutes, registerInventoryRoutes, registerReturnRoutes,
+  registerProfileRoutes, registerSettingsRoutes
+Ditambah inline di index.js untuk register + login
+
+Tidak ada cara untuk membuat audit trail secara manual — hanya terjadi
+saat aksi nyata di sistem.
 
 
 ================================================================================
@@ -769,6 +1262,8 @@ Setelah retur pembelian sukses:
 - stock_type 'retur' TIDAK BISA diubah manual
 - Arsip hanya bisa jika qty_returned >= initial_quantity
 - Qty retur tampil MERAH di tabel detail faktur (/products)
+- Batch endpoint juga mengembalikan qty_restored (dari sale_return_items)
+  untuk informasi, tidak dipakai dalam perhitungan sold
 
 
 ================================================================================
@@ -867,3 +1362,38 @@ GET /api/returns/sales → list + detail per item
     transaction_items tidak menyimpan batch_id.
     Batch ditemukan via product_id, termasuk batch dengan remaining_quantity = 0.
     Jika tidak ada batch sama sekali → error.
+
+12. **Midtrans Callback — Idempotency (cegah FEFO double)**:
+    Dua layer pengaman:
+    a. Database UNIQUE KEY pada midtrans_transaction_id → mencegah duplikat
+       secara skema walau order_id berbeda
+    b. SELECT ... FOR UPDATE + state lock pattern:
+       - beginTransaction() sebelum SELECT
+       - FOR UPDATE lock baris transaksi
+       - Cek payment_status === 'completed' → jika sudah, skip
+       - Update payment_status duluan SEBELUM FEFO/jurnal
+       - Callback kedua akan lihat status 'completed' dan berhenti
+    Ini mencegah skenario: callback masuk 2x → FEFO jalan 2x → stok dobel minus
+
+13. **Audit Trail — Immutable (append-only)**:
+    a. Aplikasi: tidak ada endpoint PUT/DELETE untuk audit_trails
+    b. Database: trigger BEFORE UPDATE dan BEFORE DELETE pada tabel
+       audit_trails → SIGNAL SQLSTATE '45000' (error)
+    c. Semua audit trail dibuat event-driven oleh createAuditTrail()
+       callback — tidak ada form manual
+    d. Setiap event mencatat: user_id, username, role, module, action,
+       description, ip_address, user_agent
+
+14. **Sold Quantity — Net Calculation**:
+    Qty Terjual = initial_quantity - remaining_quantity (NET sold)
+    Tidak termasuk qty yang dikembalikan via sale return (karena stok
+    sudah direstore ke batch). Ini berbeda dari gross sold yang
+    menghitung total penjualan kotor.
+
+15. **RBAC Modules — System Settings dipecah**:
+    Module `System Settings` (lama) dipecah menjadi 2 module terpisah:
+    - `Role & Permission`: manage role + permission toggles (create/edit/delete/show)
+    - `Transaction Setting`: manage PPN rate & diskon (show/edit)
+    Masing-masing memiliki permission sendiri dan superadmin bypass.
+    Sidebar: System Settings sebagai parent dropdown, visibility
+    menggunakan OR dari kedua module.

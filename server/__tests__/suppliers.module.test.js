@@ -12,7 +12,7 @@ async function loadApp() {
   };
 
   const mockPool = {
-    query: jest.fn(),
+    query: jest.fn().mockResolvedValue([[]]),
     getConnection: jest.fn().mockResolvedValue(mockConnection),
   };
 
@@ -85,7 +85,9 @@ describe('suppliers module', () => {
 
   test('POST /api/suppliers success returns 201', async () => {
     const { app, token, mockPool } = await loadApp();
-    mockPool.query.mockResolvedValueOnce([{ insertId: 10 }, []]);
+    mockPool.query
+      .mockResolvedValueOnce([[]])
+      .mockResolvedValueOnce([{ insertId: 10 }, []]);
 
     const res = await request(app)
       .post('/api/suppliers')
@@ -98,7 +100,9 @@ describe('suppliers module', () => {
 
   test('POST /api/suppliers error returns 500', async () => {
     const { app, token, mockPool } = await loadApp();
-    mockPool.query.mockRejectedValueOnce(new Error('insert fail'));
+    mockPool.query
+      .mockResolvedValueOnce([[]])
+      .mockRejectedValueOnce(new Error('insert fail'));
 
     const res = await request(app)
       .post('/api/suppliers')
@@ -110,7 +114,10 @@ describe('suppliers module', () => {
 
   test('PUT /api/suppliers/:id success returns 200', async () => {
     const { app, token, mockPool } = await loadApp();
-    mockPool.query.mockResolvedValueOnce([{}, []]);
+    mockPool.query
+      .mockResolvedValueOnce([[]])
+      .mockResolvedValueOnce([{ id: 1, name: 'PT A' }])
+      .mockResolvedValueOnce([{}]);
 
     const res = await request(app)
       .put('/api/suppliers/1')
@@ -122,7 +129,9 @@ describe('suppliers module', () => {
 
   test('PUT /api/suppliers/:id error returns 500', async () => {
     const { app, token, mockPool } = await loadApp();
-    mockPool.query.mockRejectedValueOnce(new Error('update fail'));
+    mockPool.query
+      .mockResolvedValueOnce([[]])
+      .mockRejectedValueOnce(new Error('update fail'));
 
     const res = await request(app)
       .put('/api/suppliers/1')
@@ -134,7 +143,10 @@ describe('suppliers module', () => {
 
   test('DELETE /api/suppliers/:id success returns 200', async () => {
     const { app, token, mockPool } = await loadApp();
-    mockPool.query.mockResolvedValueOnce([{}, []]);
+    mockPool.query
+      .mockResolvedValueOnce([[]])
+      .mockResolvedValueOnce([{ id: 1, name: 'PT A' }])
+      .mockResolvedValueOnce([{}]);
 
     const res = await request(app)
       .delete('/api/suppliers/1')
@@ -145,13 +157,101 @@ describe('suppliers module', () => {
 
   test('DELETE /api/suppliers/:id error returns 500', async () => {
     const { app, token, mockPool } = await loadApp();
-    mockPool.query.mockRejectedValueOnce(new Error('delete fail'));
+    mockPool.query
+      .mockResolvedValueOnce([[]])
+      .mockRejectedValueOnce(new Error('delete fail'));
 
     const res = await request(app)
       .delete('/api/suppliers/1')
       .set('Authorization', `Bearer ${token}`);
 
     expect(res.status).toBe(500);
+  });
+
+  test('GET /api/suppliers/:id success returns supplier details', async () => {
+    const { app, token, mockConnection } = await loadApp();
+
+    mockConnection.query
+      .mockResolvedValueOnce([[{ id: 1, name: 'PT A' }], []])
+      .mockResolvedValueOnce([[], []])
+      .mockResolvedValueOnce([[], []])
+      .mockResolvedValueOnce([[], []]);
+
+    const res = await request(app)
+      .get('/api/suppliers/1')
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.supplier.name).toBe('PT A');
+    expect(res.body.purchases).toEqual([]);
+    expect(res.body.batches).toEqual([]);
+    expect(res.body.products).toEqual([]);
+  });
+
+  test('GET /api/suppliers/:id returns 404 when supplier not found', async () => {
+    const { app, token, mockConnection } = await loadApp();
+
+    mockConnection.query.mockResolvedValueOnce([[], []]);
+
+    const res = await request(app)
+      .get('/api/suppliers/999')
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(res.status).toBe(404);
+    expect(res.body.message).toBe('Supplier not found');
+  });
+
+  test('GET /api/suppliers/:id error returns 500', async () => {
+    const { app, token, mockPool } = await loadApp();
+    mockPool.getConnection.mockRejectedValueOnce(new Error('connection fail'));
+
+    const res = await request(app)
+      .get('/api/suppliers/1')
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(res.status).toBe(500);
+    expect(res.body.message).toBe('Server error');
+  });
+
+  test('GET /api/suppliers/:id with batches and purchase details', async () => {
+    const { app, token, mockConnection } = await loadApp();
+
+    mockConnection.query
+      .mockResolvedValueOnce([[{ id: 1, name: 'PT A' }], []])
+      .mockResolvedValueOnce([[{ id: 10, invoice_no: 'INV-001' }], []])
+      .mockResolvedValueOnce([[{ id: 99, batch_no: 'B001' }], []])
+      .mockResolvedValueOnce([[{ id: 1, amount: 1000 }], []])
+      .mockResolvedValueOnce([[], []])
+      .mockResolvedValueOnce([[{ id: 1, product_name: 'P1' }], []])
+      .mockResolvedValueOnce([[{ id: 1, amount: 5000 }], []]);
+
+    const res = await request(app)
+      .get('/api/suppliers/1')
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.batches[0].dp_payments).toEqual([{ id: 1, amount: 1000 }]);
+    expect(res.body.purchases).toHaveLength(1);
+    expect(res.body.purchases[0].items).toHaveLength(1);
+    expect(res.body.purchases[0].payments).toHaveLength(1);
+  });
+
+  test('GET /api/suppliers/:id handles dp_payments query error gracefully', async () => {
+    const { app, token, mockConnection } = await loadApp();
+
+    mockConnection.query
+      .mockResolvedValueOnce([[{ id: 1, name: 'PT A' }], []])
+      .mockResolvedValueOnce([[], []])
+      .mockResolvedValueOnce([[{ id: 99, batch_no: 'B001' }], []])
+      .mockRejectedValueOnce(new Error('dp table missing'))
+      .mockResolvedValueOnce([[], []]);
+
+    const res = await request(app)
+      .get('/api/suppliers/1')
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.batches[0].dp_payments).toEqual([]);
   });
 });
 

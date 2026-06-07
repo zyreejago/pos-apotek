@@ -1,5 +1,20 @@
 import React from 'react';
 import { render, fireEvent } from '@testing-library/react';
+import { OffCanvasProvider } from '@/context/OffCanvasContext';
+import { SidebarProvider } from '@/context/SidebarContext';
+import { HeaderProvider } from '@/context/HeaderContext';
+
+function renderWithProviders(ui: React.ReactElement) {
+  return render(
+    <OffCanvasProvider>
+      <SidebarProvider>
+        <HeaderProvider>
+          {ui}
+        </HeaderProvider>
+      </SidebarProvider>
+    </OffCanvasProvider>
+  );
+}
 
 import Header from '@/components/Header';
 import Sidebar from '@/components/Sidebar';
@@ -75,23 +90,23 @@ beforeEach(() => {
 
 describe('components module', () => {
   test('renders Header', () => {
-    expect(() => render(<Header />)).not.toThrow();
+    expect(() => renderWithProviders(<Header />)).not.toThrow();
   });
 
   test('renders Sidebar', () => {
-    expect(() => render(<Sidebar />)).not.toThrow();
+    expect(() => renderWithProviders(<Sidebar />)).not.toThrow();
   });
 
   test('renders GoeyToaster', () => {
-    expect(() => render(<GoeyToaster />)).not.toThrow();
+    expect(() => renderWithProviders(<GoeyToaster />)).not.toThrow();
   });
 
   test('renders AuthProvider', () => {
-    expect(() => render(<AuthProvider><div /></AuthProvider>)).not.toThrow();
+    expect(() => renderWithProviders(<AuthProvider><div /></AuthProvider>)).not.toThrow();
   });
 
   test('ProfileDropdown toggles open/close', () => {
-    const { getByText, queryByText } = render(<ProfileDropdown />);
+    const { getByText, queryByText } = renderWithProviders(<ProfileDropdown />);
     expect(queryByText("My Account")).not.toBeInTheDocument();
     
     const btn = document.querySelector('button[class*="w-10 h-10"]');
@@ -104,7 +119,7 @@ describe('components module', () => {
   });
 
   test('ProfileDropdown closes when clicking outside', () => {
-    const { getByText } = render(<ProfileDropdown />);
+    const { getByText } = renderWithProviders(<ProfileDropdown />);
     const btn = document.querySelector('button[class*="w-10 h-10"]');
     if (btn) fireEvent.click(btn);
     
@@ -115,7 +130,7 @@ describe('components module', () => {
   });
 
   test('ProfileDropdown handles logout', () => {
-    const { getByText } = render(<ProfileDropdown />);
+    const { getByText } = renderWithProviders(<ProfileDropdown />);
     const btn = document.querySelector('button[class*="w-10 h-10"]');
     if (btn) fireEvent.click(btn);
     
@@ -129,7 +144,7 @@ describe('components module', () => {
   });
 
   test('ProfileDropdown Profile link closes dropdown', () => {
-    const { getByText, container } = render(<ProfileDropdown />);
+    const { getByText, container } = renderWithProviders(<ProfileDropdown />);
     const btn = document.querySelector('button[class*="w-10 h-10"]');
     if (btn) fireEvent.click(btn);
     
@@ -150,7 +165,7 @@ describe('components module', () => {
 
 
   test('ConfirmModal is null when isOpen is false', () => {
-    const { container } = render(
+    const { container } = renderWithProviders(
       <ConfirmModal 
         isOpen={false} 
         onConfirm={jest.fn()} 
@@ -165,7 +180,7 @@ describe('components module', () => {
   test('ConfirmModal renders danger variant', () => {
     const onConfirm = jest.fn();
     const onClose = jest.fn();
-    const { getByText } = render(
+    const { getByText } = renderWithProviders(
       <ConfirmModal 
         isOpen={true} 
         variant="danger"
@@ -190,7 +205,7 @@ describe('components module', () => {
   });
 
   test('ConfirmModal renders warning variant', () => {
-    const { getByText } = render(
+    const { getByText } = renderWithProviders(
       <ConfirmModal 
         isOpen={true} 
         variant="warning"
@@ -204,7 +219,7 @@ describe('components module', () => {
   });
 
   test('ConfirmModal renders info variant', () => {
-    const { getByText } = render(
+    const { getByText } = renderWithProviders(
       <ConfirmModal 
         isOpen={true} 
         variant="info"
@@ -218,7 +233,7 @@ describe('components module', () => {
   });
 
   test('ConfirmModal shows loading state', () => {
-    const { getByRole } = render(
+    const { getByRole } = renderWithProviders(
       <ConfirmModal 
         isOpen={true} 
         isLoading={true}
@@ -234,7 +249,7 @@ describe('components module', () => {
 
   test('ConfirmModal close via X button', () => {
     const onClose = jest.fn();
-    const { container } = render(
+    const { container } = renderWithProviders(
       <ConfirmModal 
         isOpen={true} 
         onConfirm={jest.fn()} 

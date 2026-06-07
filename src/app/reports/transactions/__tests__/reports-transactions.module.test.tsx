@@ -2,6 +2,27 @@ import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import ReportstransactionsPage from '../page';
 import { goeyToast } from '@/components/ui/goey-toaster';
+import { HeaderProvider, useHeader } from '@/context/HeaderContext';
+
+function HeaderDisplay() {
+  const { headerState } = useHeader();
+  return (
+    <div data-testid="header">
+      <h1>{headerState.title}</h1>
+      {headerState.subtitle && <p>{headerState.subtitle}</p>}
+      {headerState.rightContent}
+    </div>
+  );
+}
+
+function renderWithProviders(ui: React.ReactElement) {
+  return render(
+    <HeaderProvider>
+      <HeaderDisplay />
+      {ui}
+    </HeaderProvider>
+  );
+}
 
 const mockSave = jest.fn();
 const mockAddPage = jest.fn();
@@ -135,7 +156,7 @@ beforeEach(() => {
 
 describe('reports-transactions module', () => {
   test('renders page and loads transaction data', async () => {
-    render(<ReportstransactionsPage />);
+    renderWithProviders(<ReportstransactionsPage />);
 
     expect(screen.getByText('Laporan Transaksi')).toBeInTheDocument();
     expect(screen.getByText('Sales Report')).toBeInTheDocument();
@@ -170,7 +191,7 @@ describe('reports-transactions module', () => {
       okJson({ transactions: [], chartData: [] })
     ) as unknown as typeof fetch;
 
-    render(<ReportstransactionsPage />);
+    renderWithProviders(<ReportstransactionsPage />);
 
     await waitFor(() => {
       expect(screen.getByText('Tidak ada transaksi pada periode ini')).toBeInTheDocument();
@@ -187,7 +208,7 @@ describe('reports-transactions module', () => {
       okJson({ transactions: [], chartData: [] })
     ) as unknown as typeof fetch;
 
-    render(<ReportstransactionsPage />);
+    renderWithProviders(<ReportstransactionsPage />);
 
     await waitFor(() => {
       expect(global.fetch).toHaveBeenCalledTimes(1);
@@ -211,7 +232,7 @@ describe('reports-transactions module', () => {
       okJson({ transactions: [], chartData: [] })
     ) as unknown as typeof fetch;
 
-    render(<ReportstransactionsPage />);
+    renderWithProviders(<ReportstransactionsPage />);
 
     await waitFor(() => {
       expect(global.fetch).toHaveBeenCalledTimes(1);
@@ -240,7 +261,7 @@ describe('reports-transactions module', () => {
         })
     ) as unknown as typeof fetch;
 
-    render(<ReportstransactionsPage />);
+    renderWithProviders(<ReportstransactionsPage />);
 
     expect(screen.getByText('Loading data...')).toBeInTheDocument();
 
@@ -257,7 +278,7 @@ describe('reports-transactions module', () => {
   });
 
   test('calls fetch again when filter button is clicked', async () => {
-    render(<ReportstransactionsPage />);
+    renderWithProviders(<ReportstransactionsPage />);
 
     await waitFor(() => {
       expect(global.fetch).toHaveBeenCalledTimes(1);
@@ -271,7 +292,7 @@ describe('reports-transactions module', () => {
   });
 
   test('changes date inputs and filters data', async () => {
-    render(<ReportstransactionsPage />);
+    renderWithProviders(<ReportstransactionsPage />);
 
     await waitFor(() => {
       expect(screen.getByText('Paracetamol')).toBeInTheDocument();
@@ -300,7 +321,7 @@ describe('reports-transactions module', () => {
   test('fetches without authorization header when token is missing', async () => {
     localStorage.removeItem('token');
 
-    render(<ReportstransactionsPage />);
+    renderWithProviders(<ReportstransactionsPage />);
 
     await waitFor(() => {
       expect(global.fetch).toHaveBeenCalledWith(
@@ -313,7 +334,7 @@ describe('reports-transactions module', () => {
   });
 
   test('uses username when downloading PDF', async () => {
-    render(<ReportstransactionsPage />);
+    renderWithProviders(<ReportstransactionsPage />);
 
     await waitFor(() => {
       expect(screen.getByText('Paracetamol')).toBeInTheDocument();
@@ -337,7 +358,7 @@ describe('reports-transactions module', () => {
       })
     );
 
-    render(<ReportstransactionsPage />);
+    renderWithProviders(<ReportstransactionsPage />);
 
     await waitFor(() => {
       expect(screen.getByText('Paracetamol')).toBeInTheDocument();
@@ -360,7 +381,7 @@ describe('reports-transactions module', () => {
       })
     );
 
-    render(<ReportstransactionsPage />);
+    renderWithProviders(<ReportstransactionsPage />);
 
     await waitFor(() => {
       expect(screen.getByText('Paracetamol')).toBeInTheDocument();
@@ -377,7 +398,7 @@ describe('reports-transactions module', () => {
   test('uses Admin fallback when user localStorage is missing', async () => {
     localStorage.removeItem('user');
 
-    render(<ReportstransactionsPage />);
+    renderWithProviders(<ReportstransactionsPage />);
 
     await waitFor(() => {
       expect(screen.getByText('Paracetamol')).toBeInTheDocument();
@@ -392,7 +413,7 @@ describe('reports-transactions module', () => {
   });
 
   test('downloads PDF and writes table rows from transaction items', async () => {
-    render(<ReportstransactionsPage />);
+    renderWithProviders(<ReportstransactionsPage />);
 
     await waitFor(() => {
       expect(screen.getByText('Paracetamol')).toBeInTheDocument();
@@ -418,7 +439,7 @@ describe('reports-transactions module', () => {
   test('adds new page when PDF table is too long', async () => {
     mockAutoTableFinalY.mockReturnValueOnce(260);
 
-    render(<ReportstransactionsPage />);
+    renderWithProviders(<ReportstransactionsPage />);
 
     await waitFor(() => {
       expect(screen.getByText('Paracetamol')).toBeInTheDocument();
@@ -435,7 +456,7 @@ describe('reports-transactions module', () => {
   test('does not add new page when PDF table is short', async () => {
     mockAutoTableFinalY.mockReturnValueOnce(120);
 
-    render(<ReportstransactionsPage />);
+    renderWithProviders(<ReportstransactionsPage />);
 
     await waitFor(() => {
       expect(screen.getByText('Paracetamol')).toBeInTheDocument();
@@ -455,7 +476,7 @@ describe('reports-transactions module', () => {
       throw new Error('PDF error');
     });
 
-    render(<ReportstransactionsPage />);
+    renderWithProviders(<ReportstransactionsPage />);
 
     await waitFor(() => {
       expect(screen.getByText('Paracetamol')).toBeInTheDocument();
@@ -476,7 +497,7 @@ describe('reports-transactions module', () => {
       failJson({ message: 'Server error' })
     ) as unknown as typeof fetch;
 
-    render(<ReportstransactionsPage />);
+    renderWithProviders(<ReportstransactionsPage />);
 
     await waitFor(() => {
       expect(goeyToast.error).toHaveBeenCalledWith(
@@ -489,7 +510,7 @@ describe('reports-transactions module', () => {
   test('shows fallback toast error when fetch response has no message', async () => {
     global.fetch = jest.fn(() => failJson({})) as unknown as typeof fetch;
 
-    render(<ReportstransactionsPage />);
+    renderWithProviders(<ReportstransactionsPage />);
 
     await waitFor(() => {
       expect(goeyToast.error).toHaveBeenCalledWith(
@@ -506,12 +527,119 @@ describe('reports-transactions module', () => {
       Promise.reject(new Error('Network error'))
     ) as unknown as typeof fetch;
 
-    render(<ReportstransactionsPage />);
+    renderWithProviders(<ReportstransactionsPage />);
 
     await waitFor(() => {
       expect(goeyToast.error).toHaveBeenCalledWith(
         'Gagal terhubung ke server',
         expect.any(Object)
+      );
+    });
+  });
+
+  test('covers PDF forEach body lines 157-166 with cashier_name and product_unit', async () => {
+    const pdfPayload = {
+      transactions: [
+        {
+          id: 1,
+          transaction_date: '2026-05-23T10:00:00.000Z',
+          total_amount: 50000,
+          cashier_name: 'Test Cashier',
+          items: [
+            { product_name: 'Paracetamol', quantity: 2, price: 25000, product_unit: 'tablet' },
+            { product_name: 'Vitamin C', quantity: 1, price: 15000, product_unit: 'kapsul' },
+          ],
+        },
+      ],
+      chartData: [],
+    };
+
+    global.fetch = jest.fn(() => okJson(pdfPayload)) as unknown as typeof fetch;
+
+    renderWithProviders(<ReportstransactionsPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Test Cashier')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('Download PDF'));
+
+    await waitFor(() => {
+      expect(mockSave).toHaveBeenCalledWith(
+        expect.stringContaining('Laporan_Transaksi_')
+      );
+    });
+  });
+
+  test('covers PDF forEach with multiple transactions (lines 157-166)', async () => {
+    const multiPayload = {
+      transactions: [
+        {
+          id: 1,
+          transaction_date: '2026-05-23T10:00:00.000Z',
+          total_amount: 50000,
+          cashier_name: 'Cashier A',
+          items: [
+            { product_name: 'Obat A', quantity: 2, price: 25000, product_unit: 'tablet' },
+          ],
+        },
+        {
+          id: 2,
+          transaction_date: '2026-05-24T11:00:00.000Z',
+          total_amount: 75000,
+          items: [
+            { product_name: 'Obat B', quantity: 1, price: 75000 },
+          ],
+        },
+      ],
+      chartData: [],
+    };
+
+    global.fetch = jest.fn(() => okJson(multiPayload)) as unknown as typeof fetch;
+
+    renderWithProviders(<ReportstransactionsPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Cashier A')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('Download PDF'));
+
+    await waitFor(() => {
+      expect(mockSave).toHaveBeenCalledWith(
+        expect.stringContaining('Laporan_Transaksi_')
+      );
+    });
+  });
+
+  test('covers PDF with cashier_name undefined and no product_unit (lines 161,163 branches)', async () => {
+    const nullPayload = {
+      transactions: [
+        {
+          id: 1,
+          transaction_date: '2026-05-23T10:00:00.000Z',
+          total_amount: 50000,
+          items: [
+            { product_name: 'Obat C', quantity: 3, price: 10000 },
+          ],
+        },
+      ],
+      chartData: [],
+    };
+
+    global.fetch = jest.fn(() => okJson(nullPayload)) as unknown as typeof fetch;
+
+    renderWithProviders(<ReportstransactionsPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Obat C')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('Download PDF'));
+
+    await waitFor(() => {
+      expect(mockSave).toHaveBeenCalledWith(
+        expect.stringContaining('Laporan_Transaksi_')
       );
     });
   });

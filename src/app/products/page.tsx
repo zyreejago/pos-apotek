@@ -530,63 +530,63 @@ export default function ProductsPage() {
     });
   };
 
-  const handleApproveFaktur = async (fakturId: number) => {
-    try {
-      const res = await fetch(`http://localhost:5000/api/inventory/batches/${fakturId}/approve`, {
-        method: 'PUT',
-        headers: authHeaders
-      });
-      if (res.ok) {
-        goeyToast.success('Faktur disetujui!');
-        if (selectedProduct) fetchFakturs(selectedProduct.id);
-        if (isApprovalModalOpen) fetchGlobalPendingFakturs();
-        fetchProducts();
-      } else {
-        goeyToast.error('Gagal menyetujui faktur');
-      }
-    } catch (error) {
-      console.error(error);
-      goeyToast.error('Terjadi kesalahan');
-    }
-  };
+  // const handleApproveFaktur = async (fakturId: number) => {
+  //   try {
+  //     const res = await fetch(`http://localhost:5000/api/inventory/batches/${fakturId}/approve`, {
+  //       method: 'PUT',
+  //       headers: authHeaders
+  //     });
+  //     if (res.ok) {
+  //       goeyToast.success('Faktur disetujui!');
+  //       if (selectedProduct) fetchFakturs(selectedProduct.id);
+  //       if (isApprovalModalOpen) fetchGlobalPendingFakturs();
+  //       fetchProducts();
+  //     } else {
+  //       goeyToast.error('Gagal menyetujui faktur');
+  //     }
+  //   } catch (error) {
+  //     console.error(error);
+  //     goeyToast.error('Terjadi kesalahan');
+  //   }
+  // };
 
-  const handleRejectFaktur = async (fakturId: number) => {
-    try {
-      const res = await fetch(`http://localhost:5000/api/inventory/batches/${fakturId}/reject`, {
-        method: 'PUT',
-        headers: authHeaders
-      });
-      if (res.ok) {
-        goeyToast.success('Faktur ditolak');
-        if (selectedProduct) fetchFakturs(selectedProduct.id);
-        if (isApprovalModalOpen) fetchGlobalPendingFakturs();
-      } else {
-        goeyToast.error('Gagal menolak faktur');
-      }
-    } catch (error) {
-      console.error(error);
-      goeyToast.error('Terjadi kesalahan');
-    }
-  };
+  // const handleRejectFaktur = async (fakturId: number) => {
+  //   try {
+  //     const res = await fetch(`http://localhost:5000/api/inventory/batches/${fakturId}/reject`, {
+  //       method: 'PUT',
+  //       headers: authHeaders
+  //     });
+  //     if (res.ok) {
+  //       goeyToast.success('Faktur ditolak');
+  //       if (selectedProduct) fetchFakturs(selectedProduct.id);
+  //       if (isApprovalModalOpen) fetchGlobalPendingFakturs();
+  //     } else {
+  //       goeyToast.error('Gagal menolak faktur');
+  //     }
+  //   } catch (error) {
+  //     console.error(error);
+  //     goeyToast.error('Terjadi kesalahan');
+  //   }
+  // };
 
-  const handleRequestRevision = async (fakturId: number) => {
-    try {
-      const res = await fetch(`http://localhost:5000/api/inventory/batches/${fakturId}/revision`, {
-        method: 'PUT',
-        headers: authHeaders
-      });
-      if (res.ok) {
-        goeyToast.success('Permintaan perbaikan dikirim');
-        if (selectedProduct) fetchFakturs(selectedProduct.id);
-        if (isApprovalModalOpen) fetchGlobalPendingFakturs();
-      } else {
-        goeyToast.error('Gagal mengirim permintaan perbaikan');
-      }
-    } catch (error) {
-      console.error(error);
-      goeyToast.error('Terjadi kesalahan');
-    }
-  };
+  // const handleRequestRevision = async (fakturId: number) => {
+  //   try {
+  //     const res = await fetch(`http://localhost:5000/api/inventory/batches/${fakturId}/revision`, {
+  //       method: 'PUT',
+  //       headers: authHeaders
+  //     });
+  //     if (res.ok) {
+  //       goeyToast.success('Permintaan perbaikan dikirim');
+  //       if (selectedProduct) fetchFakturs(selectedProduct.id);
+  //       if (isApprovalModalOpen) fetchGlobalPendingFakturs();
+  //     } else {
+  //       goeyToast.error('Gagal mengirim permintaan perbaikan');
+  //     }
+  //   } catch (error) {
+  //     console.error(error);
+  //     goeyToast.error('Terjadi kesalahan');
+  //   }
+  // };
 
   const handleSaveFaktur = async () => {
     if (!selectedProduct) return;

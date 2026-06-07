@@ -578,4 +578,154 @@ test('enable reset button when passwords match', async () => {
       expect(goeyToast.error).toHaveBeenCalled();
     });
   });
+
+  test('requestCode with invalid email shows toast', async () => {
+    renderPage();
+    fireEvent.change(screen.getByPlaceholderText('email@email.com'), {
+      target: { value: 'invalid-email' },
+    });
+    const btn = screen.getByText('Kirim Kode') as HTMLButtonElement;
+    const fiberKey = Object.keys(btn).find(k => k.startsWith('__reactFiber'));
+    if (fiberKey) {
+      const fiber = (btn as any)[fiberKey];
+      const props = fiber.memoizedProps || fiber.pendingProps || {};
+      if (props.onClick) await props.onClick();
+    }
+    await waitFor(() => {
+      expect(goeyToast.error).toHaveBeenCalledWith('Email tidak valid', expect.any(Object));
+    });
+  });
+
+  test('verifyCode with short code shows invalid data toast', async () => {
+    await goToVerifyStep();
+    fireEvent.change(screen.getByPlaceholderText('______'), {
+      target: { value: '12' },
+    });
+    const btn = screen.getByText('Verifikasi Kode') as HTMLButtonElement;
+    const fiberKey = Object.keys(btn).find(k => k.startsWith('__reactFiber'));
+    if (fiberKey) {
+      const fiber = (btn as any)[fiberKey];
+      const props = fiber.memoizedProps || fiber.pendingProps || {};
+      if (props.onClick) await props.onClick();
+    }
+    await waitFor(() => {
+      expect(goeyToast.error).toHaveBeenCalledWith('Data tidak valid', expect.any(Object));
+    });
+  });
+
+  test('verifyCode with no resetToken in response shows toast', async () => {
+    global.fetch = jest.fn((input: RequestInfo) => {
+      const url = typeof input === 'string' ? input : input.url;
+      if (url.includes('/api/auth/forgot-password')) return okJson({ success: true });
+      if (url.includes('/api/auth/verify-reset-code')) return okJson({});
+      return okJson({});
+    }) as unknown as typeof fetch;
+
+    await goToVerifyStep();
+    fireEvent.change(screen.getByPlaceholderText('______'), {
+      target: { value: '123456' },
+    });
+    fireEvent.click(screen.getByText('Verifikasi Kode'));
+    await waitFor(() => {
+      expect(goeyToast.error).toHaveBeenCalledWith('Gagal verifikasi', expect.any(Object));
+    });
+  });
+
+  test('resetPassword shows password mismatch toast when passwords dont match', async () => {
+    await goToResetStep();
+    fireEvent.change(screen.getByPlaceholderText('Minimal 6 karakter'), {
+      target: { value: 'password123' },
+    });
+    fireEvent.change(screen.getByPlaceholderText('Ulangi password baru'), {
+      target: { value: 'different456' },
+    });
+    const btn = screen.getByText('Simpan Password Baru') as HTMLButtonElement;
+    const fiberKey = Object.keys(btn).find(k => k.startsWith('__reactFiber'));
+    if (fiberKey) {
+      const fiber = (btn as any)[fiberKey];
+      const props = fiber.memoizedProps || fiber.pendingProps || {};
+      if (props.onClick) await props.onClick();
+    }
+    await waitFor(() => {
+      expect(goeyToast.error).toHaveBeenCalledWith('Password tidak sama', expect.any(Object));
+    });
+  });
+
+  test('resetPassword shows data incomplete toast when passwords too short', async () => {
+    await goToResetStep();
+    fireEvent.change(screen.getByPlaceholderText('Minimal 6 karakter'), {
+      target: { value: 'abc' },
+    });
+    fireEvent.change(screen.getByPlaceholderText('Ulangi password baru'), {
+      target: { value: 'abc' },
+    });
+    const btn = screen.getByText('Simpan Password Baru') as HTMLButtonElement;
+    const fiberKey = Object.keys(btn).find(k => k.startsWith('__reactFiber'));
+    if (fiberKey) {
+      const fiber = (btn as any)[fiberKey];
+      const props = fiber.memoizedProps || fiber.pendingProps || {};
+      if (props.onClick) await props.onClick();
+    }
+    await waitFor(() => {
+      expect(goeyToast.error).toHaveBeenCalledWith('Data belum lengkap', expect.any(Object));
+    });
+  });
+
+  test('ganti email button resets step to request', async () => {
+    await goToVerifyStep();
+    fireEvent.click(screen.getByText('Ganti email'));
+    expect(await screen.findByText('Kirim Kode')).toBeInTheDocument();
+  });
+
+  test('covers done step button onClick handler line 296', async () => {
+    global.fetch = jest.fn((input: RequestInfo) => {
+      const url = typeof input === 'string' ? input : input.url;
+      if (url.includes('/api/auth/forgot-password')) return okJson({ success: true });
+      if (url.includes('/api/auth/verify-reset-code')) return okJson({ resetToken: 'test-reset-token' });
+      if (url.includes('/api/auth/reset-password')) return okJson({ success: true });
+      return okJson({});
+    }) as unknown as typeof fetch;
+
+    renderPage();
+
+    fireEvent.change(screen.getByPlaceholderText('email@email.com'), { target: { value: 'test@test.com' } });
+    fireEvent.click(screen.getByText('Kirim Kode'));
+    await screen.findByText('Kode Verifikasi');
+
+    fireEvent.change(screen.getByPlaceholderText('______'), { target: { value: '123456' } });
+    fireEvent.click(screen.getByText('Verifikasi Kode'));
+    await screen.findByText('Password Baru');
+
+    fireEvent.change(screen.getByPlaceholderText('Minimal 6 karakter'), { target: { value: 'newpass123' } });
+    fireEvent.change(screen.getByPlaceholderText('Ulangi password baru'), { target: { value: 'newpass123' } });
+    fireEvent.click(screen.getByText('Simpan Password Baru'));
+
+    const kembaliBtns = await screen.findAllByText('Kembali ke Login');
+    fireEvent.click(kembaliBtns[kembaliBtns.length - 1]);
+    expect(pushMock).toHaveBeenCalledWith('/login');
+  });
+
+  test('done step kembali ke login button navigates to /login', async () => {
+    global.fetch = jest.fn((input: RequestInfo) => {
+      const url = typeof input === 'string' ? input : input.url;
+      if (url.includes('/api/auth/forgot-password')) return okJson({ success: true });
+      if (url.includes('/api/auth/verify-reset-code')) return okJson({ resetToken: 'test-reset-token' });
+      if (url.includes('/api/auth/reset-password')) return okJson({ success: true });
+      return okJson({});
+    }) as unknown as typeof fetch;
+
+    await goToResetStep();
+    fireEvent.change(screen.getByPlaceholderText('Minimal 6 karakter'), {
+      target: { value: 'newpass123' },
+    });
+    fireEvent.change(screen.getByPlaceholderText('Ulangi password baru'), {
+      target: { value: 'newpass123' },
+    });
+    fireEvent.click(screen.getByText('Simpan Password Baru'));
+
+    const kembaliBtns = await screen.findAllByText('Kembali ke Login');
+    const doneBtn = kembaliBtns[kembaliBtns.length - 1];
+    fireEvent.click(doneBtn);
+    expect(pushMock).toHaveBeenCalledWith('/login');
+  });
 });

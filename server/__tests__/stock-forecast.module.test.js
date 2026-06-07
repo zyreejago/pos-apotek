@@ -175,6 +175,22 @@ describe('stock-forecast module', () => {
     expect(dm.get('2025-02-01')).toBe(3);
   });
 
+  test('loadMonthlySalesFromXlsx normalizes M/D/YY date format', () => {
+    fs.existsSync.mockReturnValue(true);
+    XLSX.readFile.mockReturnValue({
+      SheetNames: ['Sheet1'],
+      Sheets: { Sheet1: {} },
+    });
+    XLSX.utils.sheet_to_json.mockReturnValueOnce([
+      [],
+      [],
+      ['x', 'y', '1/5/25'],
+      ['a', 'Paracetamol', 5],
+    ]);
+    const res = stockForecastRoutes._test.loadMonthlySalesFromXlsx('/ok.xlsx');
+    expect(res.salesByName.get('paracetamol').get('2025-01-05')).toBe(5);
+  });
+
   test('extractJson parses from code fences and aliases', () => {
     const obj = stockForecastRoutes.extractJson('```json\\n{ \"kebutuhan_7_hari\": \"7\", \"stok\": \"5\" }\\n```');
     expect(obj).toEqual({ kebutuhan_7_hari: 7, tambahan_stok: 5 });

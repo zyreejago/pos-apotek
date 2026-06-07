@@ -2,6 +2,33 @@ import React from 'react';
 import { render, waitFor, fireEvent, screen } from '@testing-library/react';
 import SuppliersPage from '../page';
 import { goeyToast } from '@/components/ui/goey-toaster';
+import { OffCanvasProvider } from '@/context/OffCanvasContext';
+import { SidebarProvider } from '@/context/SidebarContext';
+import { HeaderProvider, useHeader } from '@/context/HeaderContext';
+
+function HeaderDisplay() {
+  const { headerState } = useHeader();
+  return (
+    <div data-testid="header">
+      <h1>{headerState.title}</h1>
+      {headerState.subtitle && <p>{headerState.subtitle}</p>}
+      {headerState.rightContent}
+    </div>
+  );
+}
+
+function renderWithProviders(ui: React.ReactElement) {
+  return render(
+    <OffCanvasProvider>
+      <SidebarProvider>
+        <HeaderProvider>
+          <HeaderDisplay />
+          {ui}
+        </HeaderProvider>
+      </SidebarProvider>
+    </OffCanvasProvider>
+  );
+}
 
 const pushMock = jest.fn();
 const mockCheckPermission = jest.fn((action?: string) => true);
@@ -64,12 +91,29 @@ jest.mock('@/components/ConfirmModal', () => ({
     ) : null,
 }));
 
+jest.mock('@/components/OffCanvas', () => ({
+  __esModule: true,
+  default: ({ isOpen, onClose, title, children }: any) =>
+    isOpen ? (
+      <div data-testid="offcanvas">
+        <h2>{title}</h2>
+        <button type="button" onClick={onClose}>
+          <span data-testid="x-icon" />
+        </button>
+        {children}
+      </div>
+    ) : null,
+}));
+
 jest.mock('lucide-react', () => ({
   Search: () => <span data-testid="search-icon" />,
   Filter: () => <span data-testid="filter-icon" />,
   Edit: () => <span data-testid="edit-icon" />,
   Trash2: () => <span data-testid="trash-icon" />,
   X: () => <span data-testid="x-icon" />,
+  Eye: () => <span data-testid="eye-icon" />,
+  FileText: () => <span data-testid="filetext-icon" />,
+  ShoppingBag: () => <span data-testid="shoppingbag-icon" />,
 }));
 
 function okJson(data: unknown) {
@@ -115,6 +159,48 @@ const suppliersPayload = {
   },
 };
 
+const supplierDetailsPayload = {
+  supplier: {
+    id: 1,
+    name: 'PT Sumber Makmur',
+    contact_person: 'John Doe',
+    phone: '08123456789',
+    address: 'Jl. Sudirman No. 1',
+  },
+  batches: [
+    {
+      id: 1,
+      product_name: 'Paracetamol 500mg',
+      status: 'approved',
+      purchase_date: '2024-01-01',
+      expired_date: '2025-01-01',
+      due_date: '2024-02-01',
+      initial_quantity: 100,
+      remaining_quantity: 50,
+      cost_price: 10000,
+      stock_type: 'dp',
+      dp_payments: [
+        { id: 1, amount: 500000, payment_date: '2024-01-01', payment_method: 'cash' },
+        { id: 2, amount: 300000, payment_date: '2024-01-15', payment_method: 'transfer' }
+      ],
+      notes: 'Order pertama',
+      image_url: '/uploads/bukti1.jpg'
+    },
+    {
+      id: 2,
+      product_name: 'Amoxicillin 250mg',
+      status: 'pending',
+      purchase_date: '2024-01-10',
+      initial_quantity: 50,
+      remaining_quantity: 50,
+      cost_price: 15000,
+      stock_type: 'lunas',
+      dp_amount: 750000,
+      notes: ''
+    }
+  ]
+};
+
 function mockDefaultFetch() {
   global.fetch = jest.fn((input: RequestInfo, init?: RequestInit) => {
     const url = typeof input === 'string' ? input : input.url;
@@ -131,6 +217,10 @@ function mockDefaultFetch() {
       return okJson({ message: 'deleted' });
     }
 
+    if (url.includes('/api/suppliers/1')) {
+      return okJson(supplierDetailsPayload);
+    }
+
     if (url.includes('/api/suppliers')) {
       return okJson(suppliersPayload);
     }
@@ -140,7 +230,7 @@ function mockDefaultFetch() {
 }
 
 function renderPage() {
-  return render(<SuppliersPage />);
+  return renderWithProviders(<SuppliersPage />);
 }
 
 async function waitSuppliersLoaded() {
@@ -873,5 +963,222 @@ describe('suppliers module', () => {
     await waitSuppliersLoaded();
 
     expect(screen.queryByTitle('Delete')).not.toBeInTheDocument();
+  });
+
+  test('opens view supplier offcanvas and displays supplier details', async () => {
+    renderPage();
+
+    await waitSuppliersLoaded();
+
+    const viewButtons = await screen.findAllByTitle('View Details');
+    fireEvent.click(viewButtons[0]);
+
+    expect(await screen.findByText('Supplier Details')).toBeInTheDocument();
+    // PT Sumber Makmur appears in both table and offcanvas
+    const supplierNameElements = screen.getAllByText('PT Sumber Makmur');
+    expect(supplierNameElements.length).toBeGreaterThanOrEqual(2);
+    // Verify offcanvas rendered with children
+    expect(await screen.findByTestId('offcanvas')).toBeInTheDocument();
+    expect(screen.getByText('Supplier Details')).toBeInTheDocument();
+    // Check that supplier details loaded inside offcanvas
+    expect(await screen.findByText(/John Doe/)).toBeInTheDocument();
+    expect(await screen.findByText(/Jl. Sudirman/)).toBeInTheDocument();
+  });
+
+  test('displays batches (Bukti Faktur Pembelian) with DP, quantities, status, etc.', async () => {
+    renderPage();
+
+    await waitSuppliersLoaded();
+
+    const viewButtons = await screen.findAllByTitle('View Details');
+    fireEvent.click(viewButtons[0]);
+
+    // Check first batch
+    expect(await screen.findByText('Paracetamol 500mg')).toBeInTheDocument();
+    expect(screen.getByText('Disetujui')).toBeInTheDocument();
+    const stokMasukLabels = screen.getAllByText('Jumlah Stok Masuk:');
+    expect(stokMasukLabels.length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText('100')).toBeInTheDocument();
+    const sisaStokLabels = screen.getAllByText('Sisa Stok:');
+    expect(sisaStokLabels.length).toBeGreaterThanOrEqual(1);
+    const sisaStokValues = screen.getAllByText('50');
+    expect(sisaStokValues.length).toBeGreaterThanOrEqual(1);
+    const dp1Elements = screen.getAllByText('DP 1:');
+    expect(dp1Elements.length).toBeGreaterThanOrEqual(1);
+    const cashElements = screen.getAllByText('Cash');
+    expect(cashElements.length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText(/Rp\s*500\.000/)).toBeInTheDocument();
+    expect(screen.getByText('DP 2:')).toBeInTheDocument();
+    expect(screen.getByText('TF')).toBeInTheDocument();
+    expect(screen.getByText(/Rp\s*300\.000/)).toBeInTheDocument();
+    expect(screen.getByText(/Sisa hutang/)).toBeInTheDocument();
+    expect(screen.getByText(/Rp\s*200\.000/)).toBeInTheDocument();
+    expect(screen.getByText('Catatan: Order pertama')).toBeInTheDocument();
+
+    // Check second batch
+    expect(screen.getByText('Amoxicillin 250mg')).toBeInTheDocument();
+    expect(screen.getByText('Menunggu')).toBeInTheDocument();
+    const lunasElements = screen.getAllByText('Lunas');
+    expect(lunasElements.length).toBeGreaterThanOrEqual(1);
+  });
+
+  test('displays no batches message when no batches exist', async () => {
+    global.fetch = jest.fn((input: RequestInfo, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input.url;
+      if (url.includes('/api/suppliers/1')) {
+        return okJson({ ...supplierDetailsPayload, batches: [] });
+      }
+      if (url.includes('/api/suppliers')) return okJson(suppliersPayload);
+      return okJson({});
+    }) as unknown as typeof fetch;
+
+    renderPage();
+
+    await waitSuppliersLoaded();
+
+    const viewButtons = await screen.findAllByTitle('View Details');
+    fireEvent.click(viewButtons[0]);
+
+    expect(await screen.findByText('Belum ada bukti faktur pembelian dari supplier ini.')).toBeInTheDocument();
+  });
+
+  test('handles error fetching supplier details', async () => {
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+    global.fetch = jest.fn((input: RequestInfo, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input.url;
+      if (url.includes('/api/suppliers/1')) {
+        return Promise.reject(new Error('detail error'));
+      }
+      if (url.includes('/api/suppliers')) return okJson(suppliersPayload);
+      return okJson({});
+    }) as unknown as typeof fetch;
+
+    renderPage();
+
+    await waitSuppliersLoaded();
+
+    const viewButtons = await screen.findAllByTitle('View Details');
+    fireEvent.click(viewButtons[0]);
+
+    await waitFor(() => {
+      expect(console.error).toHaveBeenCalledWith('Error fetching supplier details:', expect.any(Error));
+    });
+  });
+
+  test('search resets to page 1 when not on first page', async () => {
+    renderPage();
+
+    await waitSuppliersLoaded();
+
+    fireEvent.click(screen.getByText('2'));
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining('page=2'),
+        expect.any(Object)
+      );
+    });
+
+    const searchInput = screen.getByPlaceholderText('Search Supplier');
+    fireEvent.change(searchInput, {
+      target: { value: 'test' },
+    });
+
+    await waitFor(
+      () => {
+        expect(global.fetch).toHaveBeenLastCalledWith(
+          expect.stringContaining('page=1'),
+          expect.any(Object)
+        );
+      },
+      { timeout: 1500 }
+    );
+  });
+
+  test('displays batch without dp_payments or dp_amount', async () => {
+    const batchNoDp = {
+      id: 3,
+      product_name: 'Vitamin C',
+      status: 'rejected',
+      purchase_date: '2024-03-01',
+      initial_quantity: 30,
+      remaining_quantity: 30,
+      cost_price: 5000,
+      stock_type: 'retur',
+      notes: '',
+    };
+
+    const payload = {
+      supplier: {
+        id: 1,
+        name: 'PT Sumber Makmur',
+        contact_person: 'John Doe',
+        phone: '08123456789',
+        address: 'Jl. Sudirman No. 1',
+      },
+      batches: [batchNoDp],
+    };
+
+    global.fetch = jest.fn((input: RequestInfo, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input.url;
+      if (url.includes('/api/suppliers/1')) return okJson(payload);
+      if (url.includes('/api/suppliers')) return okJson(suppliersPayload);
+      return okJson({});
+    }) as unknown as typeof fetch;
+
+    renderPage();
+
+    await waitSuppliersLoaded();
+
+    const viewButtons = await screen.findAllByTitle('View Details');
+    fireEvent.click(viewButtons[0]);
+
+    expect(await screen.findByText('Vitamin C')).toBeInTheDocument();
+    expect(screen.getByText('Ditolak')).toBeInTheDocument();
+  });
+
+  test('covers search debounce fetchSuppliers else branch (line 115)', async () => {
+    renderPage();
+
+    await waitSuppliersLoaded();
+
+    const initialSupplierCalls = (global.fetch as jest.Mock).mock.calls.filter(
+      c => typeof c[0] === 'string' && (c[0] as string).includes('/api/suppliers?')
+    ).length;
+
+    const searchInput = screen.getByPlaceholderText('Search Supplier');
+    fireEvent.change(searchInput, { target: { value: 'testquery' } });
+
+    await waitFor(() => {
+      const currentCalls = (global.fetch as jest.Mock).mock.calls.filter(
+        c => typeof c[0] === 'string' && (c[0] as string).includes('/api/suppliers?')
+      ).length;
+      expect(currentCalls).toBe(initialSupplierCalls + 2);
+    }, { timeout: 2000 });
+  });
+
+  test('covers search debounce currentPage !== 1 branch (line 113)', async () => {
+    renderPage();
+
+    await waitSuppliersLoaded();
+
+    fireEvent.click(screen.getByText('2'));
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining('page=2'),
+        expect.any(Object)
+      );
+    });
+
+    const searchInput = screen.getByPlaceholderText('Search Supplier');
+    fireEvent.change(searchInput, { target: { value: 'pagetest' } });
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenLastCalledWith(
+        expect.stringContaining('page=1'),
+        expect.any(Object)
+      );
+    }, { timeout: 2000 });
   });
 });

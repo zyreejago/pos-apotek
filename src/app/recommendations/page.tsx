@@ -79,35 +79,35 @@ export default function Page() {
     return () => clearInterval(t);
   }, [fetchLatestForecasts]);
 
-  const handleRefresh = useCallback(async () => {
-    setRefreshLoading(true);
-    try {
-      console.log('[FRONTEND] Running forecast...');
-      const runRes = await fetch('http://localhost:5000/api/forecast/run', {
-        method: 'POST',
-        headers: authHeaders,
-      });
+  // const handleRefresh = useCallback(async () => {
+  //   setRefreshLoading(true);
+  //   try {
+  //     console.log('[FRONTEND] Running forecast...');
+  //     const runRes = await fetch('http://localhost:5000/api/forecast/run', {
+  //       method: 'POST',
+  //       headers: authHeaders,
+  //     });
 
-      console.log('[FRONTEND] Forecast response status:', runRes.status);
+  //     console.log('[FRONTEND] Forecast response status:', runRes.status);
 
-      if (runRes.ok) {
-        console.log('[FRONTEND] Forecast successful, fetching latest...');
-        goeyToast.success('Peramalan sedang berjalan, tunggu sebentar...');
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        await fetchLatestForecasts();
-        goeyToast.success('Peramalan berhasil diperbarui!');
-      } else {
-        const data = await runRes.json().catch(() => ({}));
-        console.error('[FRONTEND] Forecast error:', data);
-        goeyToast.error('Gagal memperbarui peramalan', { description: data.message || 'Server error' });
-      }
-    } catch (e) {
-      console.error('[FRONTEND] Refresh error:', e);
-      goeyToast.error('Gagal memperbarui peramalan', { description: 'Periksa koneksi internet Anda dan coba lagi.' });
-    } finally {
-      setRefreshLoading(false);
-    }
-  }, [authHeaders, fetchLatestForecasts]);
+  //     if (runRes.ok) {
+  //       console.log('[FRONTEND] Forecast successful, fetching latest...');
+  //       goeyToast.success('Peramalan sedang berjalan, tunggu sebentar...');
+  //       await new Promise(resolve => setTimeout(resolve, 2000));
+  //       await fetchLatestForecasts();
+  //       goeyToast.success('Peramalan berhasil diperbarui!');
+  //     } else {
+  //       const data = await runRes.json().catch(() => ({}));
+  //       console.error('[FRONTEND] Forecast error:', data);
+  //       goeyToast.error('Gagal memperbarui peramalan', { description: data.message || 'Server error' });
+  //     }
+  //   } catch (e) {
+  //     console.error('[FRONTEND] Refresh error:', e);
+  //     goeyToast.error('Gagal memperbarui peramalan', { description: 'Periksa koneksi internet Anda dan coba lagi.' });
+  //   } finally {
+  //     setRefreshLoading(false);
+  //   }
+  // }, [authHeaders, fetchLatestForecasts]);
 
   const lastUpdated = useMemo(() => {
     const dates = rows

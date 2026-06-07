@@ -1,5 +1,23 @@
 import React from 'react';
 import { render, waitFor } from '@testing-library/react';
+import { OffCanvasProvider } from '@/context/OffCanvasContext';
+import { SidebarProvider } from '@/context/SidebarContext';
+import { HeaderProvider } from '@/context/HeaderContext';
+import { KeyboardShortcutsProvider } from '@/context/KeyboardShortcutsContext';
+
+function renderWithProviders(ui: React.ReactElement) {
+  return render(
+    <OffCanvasProvider>
+      <SidebarProvider>
+        <HeaderProvider>
+          <KeyboardShortcutsProvider>
+            {ui}
+          </KeyboardShortcutsProvider>
+        </HeaderProvider>
+      </SidebarProvider>
+    </OffCanvasProvider>
+  );
+}
 
 import DashboardPage from '../dashboard/page';
 import ForgotPasswordPage from '../forgot-password/page';
@@ -127,11 +145,11 @@ describe('pages smoke', () => {
   ];
 
   test.each(pages)('renders %s', async (_route, Page) => {
-    expect(() => render(<Page />)).not.toThrow();
+    expect(() => renderWithProviders(<Page />)).not.toThrow();
   });
 
   test('HomePage redirects to dashboard', async () => {
-    render(<HomePage />);
+    renderWithProviders(<HomePage />);
     await waitFor(() => {
       expect(mockReplace).toHaveBeenCalledWith('/dashboard');
     });

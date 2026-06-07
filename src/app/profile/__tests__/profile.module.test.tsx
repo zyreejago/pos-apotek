@@ -1,6 +1,15 @@
 import React from 'react';
 import { render, waitFor, fireEvent } from '@testing-library/react';
 import ProfilePage from '../page';
+import { HeaderProvider } from '@/context/HeaderContext';
+
+function renderWithProviders(ui: React.ReactElement) {
+  return render(
+    <HeaderProvider>
+      {ui}
+    </HeaderProvider>
+  );
+}
 
 jest.mock('next/navigation', () => ({
   useRouter: () => ({
@@ -110,7 +119,7 @@ afterEach(() => {
 
 describe('profile module', () => {
   test('renders Profile page', async () => {
-    const { getByText } = render(<ProfilePage />);
+    const { getByText } = renderWithProviders(<ProfilePage />);
     await waitFor(() => {
       expect(getByText('Personal Information')).toBeInTheDocument();
     });
@@ -118,14 +127,14 @@ describe('profile module', () => {
 
   test('handles fetchProfile error (non-Error)', async () => {
     global.fetch = jest.fn().mockRejectedValue('String error');
-    const { getByText } = render(<ProfilePage />);
+    const { getByText } = renderWithProviders(<ProfilePage />);
     await waitFor(() => {
       expect(getByText('Personal Information')).toBeInTheDocument();
     });
   });
 
   test('updates profile successfully', async () => {
-    const { getByText, getByRole, container } = render(<ProfilePage />);
+    const { getByText, getByRole, container } = renderWithProviders(<ProfilePage />);
     await waitFor(() => expect(getByText('Personal Information')).toBeInTheDocument());
     
     const inputs = container.querySelectorAll('input[type="text"], input[type="email"]');
@@ -144,9 +153,16 @@ describe('profile module', () => {
   });
 
   test('handles profile update error', async () => {
-    global.fetch = jest.fn().mockResolvedValue(errorJson({ message: 'Test error' }));
+    const { goeyToast } = require('@/components/ui/goey-toaster');
+    let callCount = 0;
+    global.fetch = jest.fn((input: RequestInfo) => {
+      callCount++;
+      const url = typeof input === 'string' ? input : input.url;
+      if (url.includes('/api/profile') && callCount >= 2) return errorJson({ message: 'Test error' });
+      return okJson({ id: 1, username: 'test', role: 'superadmin', email: 'test@test.com' });
+    }) as unknown as typeof fetch;
     
-    const { getByText, getByRole, container } = render(<ProfilePage />);
+    const { getByText, getByRole, container } = renderWithProviders(<ProfilePage />);
     await waitFor(() => expect(getByText('Personal Information')).toBeInTheDocument());
     
     const inputs = container.querySelectorAll('input[type="text"], input[type="email"]');
@@ -156,14 +172,14 @@ describe('profile module', () => {
     fireEvent.click(saveBtn);
     
     await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalled();
+      expect(goeyToast.error).toHaveBeenCalledWith('Error', { description: 'Test error' });
     });
   });
 
   test('handles profile update with no user in localStorage', async () => {
     localStorage.removeItem('user');
     
-    const { getByText, getByRole, container } = render(<ProfilePage />);
+    const { getByText, getByRole, container } = renderWithProviders(<ProfilePage />);
     await waitFor(() => expect(getByText('Personal Information')).toBeInTheDocument());
     
     const inputs = container.querySelectorAll('input[type="text"], input[type="email"]');
@@ -180,7 +196,7 @@ describe('profile module', () => {
   test('handles profile update with non-Error object', async () => {
     global.fetch = jest.fn().mockRejectedValue('This is a string error');
     
-    const { getByText, getByRole, container } = render(<ProfilePage />);
+    const { getByText, getByRole, container } = renderWithProviders(<ProfilePage />);
     await waitFor(() => expect(getByText('Personal Information')).toBeInTheDocument());
     
     const inputs = container.querySelectorAll('input[type="text"], input[type="email"]');
@@ -194,8 +210,41 @@ describe('profile module', () => {
     });
   });
 
+  test('handles profile update rejection as non-Error via fetch mock', async () => {
+    const { goeyToast } = require('@/components/ui/goey-toaster');
+    let callCount = 0;
+    const realFetch = jest.fn((input: string | RequestInfo | URL) => {
+      callCount++;
+      const url = typeof input === 'string' ? input : (input as Request).url;
+      if (url.includes('/api/profile/password')) {
+        return okJson({ success: true });
+      }
+      if (url.includes('/api/profile')) {
+        if (callCount === 2) {
+          return Promise.reject('network failure');
+        }
+        return okJson({ id: 1, username: 'test', role: 'superadmin', email: 'test@test.com' });
+      }
+      return okJson({});
+    }) as unknown as typeof fetch;
+    global.fetch = realFetch;
+
+    const { getByText, getByRole, container } = renderWithProviders(<ProfilePage />);
+    await waitFor(() => expect(getByText('Personal Information')).toBeInTheDocument());
+
+    const inputs = container.querySelectorAll('input[type="text"], input[type="email"]');
+    fireEvent.change(inputs[0], { target: { value: 'newusername' } });
+
+    const saveBtn = getByRole('button', { name: /Save Changes/i });
+    fireEvent.click(saveBtn);
+
+    await waitFor(() => {
+      expect(goeyToast.error).toHaveBeenCalledWith('Error', { description: 'Terjadi kesalahan' });
+    });
+  });
+
   test('changes password successfully', async () => {
-    const { getByText, getByLabelText, getByRole, getByPlaceholderText } = render(<ProfilePage />);
+    const { getByText, getByLabelText, getByRole, getByPlaceholderText } = renderWithProviders(<ProfilePage />);
     await waitFor(() => expect(getByText('Change Password')).toBeInTheDocument());
     
     const oldPasswordInput = getByPlaceholderText('Enter current password to verify');
@@ -219,7 +268,7 @@ describe('profile module', () => {
   });
 
   test('handles password mismatch', async () => {
-    const { getByText, getByPlaceholderText, getByRole } = render(<ProfilePage />);
+    const { getByText, getByPlaceholderText, getByRole } = renderWithProviders(<ProfilePage />);
     await waitFor(() => expect(getByText('Change Password')).toBeInTheDocument());
     
     const oldPasswordInput = getByPlaceholderText('Enter current password to verify');
@@ -243,13 +292,35 @@ describe('profile module', () => {
   });
 
   test('handles password change error', async () => {
+    const { goeyToast } = require('@/components/ui/goey-toaster');
     global.fetch = jest.fn((input: RequestInfo) => {
       const url = typeof input === 'string' ? input : input.url;
       if (url.includes('/api/profile/password')) return errorJson({ message: 'Test error' });
       return okJson({ id: 1, username: 'test', role: 'superadmin', email: 'test@test.com' });
     }) as unknown as typeof fetch;
     
-    const { getByText, getByPlaceholderText, getByRole } = render(<ProfilePage />);
+    const { getByText, getByPlaceholderText, getByRole } = renderWithProviders(<ProfilePage />);
+    await waitFor(() => expect(getByText('Change Password')).toBeInTheDocument());
+    
+    fireEvent.change(getByPlaceholderText('Enter current password to verify'), { target: { value: 'oldpass123' } });
+    fireEvent.change(getByPlaceholderText('Min. 6 characters'), { target: { value: 'newpass123' } });
+    fireEvent.change(getByPlaceholderText('Re-enter new password'), { target: { value: 'newpass123' } });
+    
+    fireEvent.click(getByRole('button', { name: /Update Password/i }));
+    
+    await waitFor(() => {
+      expect(goeyToast.error).toHaveBeenCalledWith('Error', { description: 'Test error' });
+    });
+  });
+
+  test('handles password change with non-Error object', async () => {
+    global.fetch = jest.fn((input: RequestInfo) => {
+      const url = typeof input === 'string' ? input : input.url;
+      if (url.includes('/api/profile/password')) return Promise.reject('This is a string error');
+      return okJson({ id: 1, username: 'test', role: 'superadmin', email: 'test@test.com' });
+    }) as unknown as typeof fetch;
+    
+    const { getByText, getByPlaceholderText, getByRole } = renderWithProviders(<ProfilePage />);
     await waitFor(() => expect(getByText('Change Password')).toBeInTheDocument());
     
     const oldPasswordInput = getByPlaceholderText('Enter current password to verify');
@@ -269,30 +340,70 @@ describe('profile module', () => {
     });
   });
 
-  test('handles password change with non-Error object', async () => {
+  test('handles fetchProfile server error response', async () => {
     global.fetch = jest.fn((input: RequestInfo) => {
       const url = typeof input === 'string' ? input : input.url;
-      if (url.includes('/api/profile/password')) return Promise.reject('This is a string error');
-      return okJson({ id: 1, username: 'test', role: 'superadmin', email: 'test@test.com' });
+      if (url.includes('/api/profile') && !url.includes('password')) return errorJson({ message: 'Server error' }, 500);
+      return okJson({});
     }) as unknown as typeof fetch;
     
-    const { getByText, getByPlaceholderText, getByRole } = render(<ProfilePage />);
-    await waitFor(() => expect(getByText('Change Password')).toBeInTheDocument());
-    
-    const oldPasswordInput = getByPlaceholderText('Enter current password to verify');
-    fireEvent.change(oldPasswordInput, { target: { value: 'oldpass123' } });
-    
-    const newPasswordInput = getByPlaceholderText('Min. 6 characters');
-    fireEvent.change(newPasswordInput, { target: { value: 'newpass123' } });
-    
-    const confirmPasswordInput = getByPlaceholderText('Re-enter new password');
-    fireEvent.change(confirmPasswordInput, { target: { value: 'newpass123' } });
-    
-    const updateBtn = getByRole('button', { name: /Update Password/i });
-    fireEvent.click(updateBtn);
+    renderWithProviders(<ProfilePage />);
     
     await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalled();
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining('/api/profile'),
+        expect.any(Object)
+      );
+    });
+  });
+
+  test('handles profile update with generic error message', async () => {
+    let callCount = 0;
+    global.fetch = jest.fn((input: RequestInfo) => {
+      callCount++;
+      const url = typeof input === 'string' ? input : input.url;
+      if (url.includes('/api/profile') && !url.includes('password') && callCount >= 2) {
+        return errorJson({}, 400);
+      }
+      return okJson({ id: 1, username: 'test', role: 'superadmin', email: 'test@test.com' });
+    }) as unknown as typeof fetch;
+
+    const { getByText, getByRole, container } = renderWithProviders(<ProfilePage />);
+    await waitFor(() => expect(getByText('Personal Information')).toBeInTheDocument());
+
+    const inputs = container.querySelectorAll('input[type="text"], input[type="email"]');
+    fireEvent.change(inputs[0], { target: { value: 'newusername' } });
+
+    const saveBtn = getByRole('button', { name: /Save Changes/i });
+    fireEvent.click(saveBtn);
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining('/api/profile'),
+        expect.objectContaining({ method: 'PUT' })
+      );
+    });
+  });
+
+  test('handles password change with generic error message', async () => {
+    global.fetch = jest.fn((input: RequestInfo) => {
+      const url = typeof input === 'string' ? input : input.url;
+      if (url.includes('/api/profile/password')) return errorJson({}, 400);
+      return okJson({ id: 1, username: 'test', role: 'superadmin', email: 'test@test.com' });
+    }) as unknown as typeof fetch;
+
+    const { goeyToast } = require('@/components/ui/goey-toaster');
+    const { getByText, getByPlaceholderText, getByRole } = renderWithProviders(<ProfilePage />);
+    await waitFor(() => expect(getByText('Change Password')).toBeInTheDocument());
+
+    fireEvent.change(getByPlaceholderText('Enter current password to verify'), { target: { value: 'oldpass123' } });
+    fireEvent.change(getByPlaceholderText('Min. 6 characters'), { target: { value: 'newpass123' } });
+    fireEvent.change(getByPlaceholderText('Re-enter new password'), { target: { value: 'newpass123' } });
+
+    fireEvent.click(getByRole('button', { name: /Update Password/i }));
+
+    await waitFor(() => {
+      expect(goeyToast.error).toHaveBeenCalledWith('Error', { description: 'Failed to change password' });
     });
   });
 });

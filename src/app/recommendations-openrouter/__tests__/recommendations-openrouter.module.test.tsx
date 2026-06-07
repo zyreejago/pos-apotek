@@ -1,6 +1,7 @@
 import React from 'react';
 import { render } from '@testing-library/react';
 import RecommendationsopenrouterPage from '../page';
+import { HeaderProvider } from '@/context/HeaderContext';
 
 jest.mock('next/navigation', () => ({
   useRouter: () => ({
@@ -11,12 +12,6 @@ jest.mock('next/navigation', () => ({
   }),
   usePathname: () => '/recommendations-openrouter',
 }));
-
-jest.mock('next/link', () => {
-  return function Link({ href, children }: { href: string; children: React.ReactNode }) {
-    return <a href={href}>{children}</a>;
-  };
-});
 
 jest.mock('@/hooks/useRequirePermission', () => ({
   useRequirePermission: () => ({
@@ -88,6 +83,10 @@ afterEach(() => {
 
 describe('recommendations-openrouter module', () => {
   test('renders Recommendations OpenRouter page', () => {
-    expect(() => render(<RecommendationsopenrouterPage />)).not.toThrow();
+    expect(() => render(
+      <HeaderProvider>
+        <RecommendationsopenrouterPage />
+      </HeaderProvider>
+    )).not.toThrow();
   });
 });

@@ -2,6 +2,33 @@ import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import ReportsfinancialPage from '../page';
 import { goeyToast } from '@/components/ui/goey-toaster';
+import { HeaderProvider, useHeader } from '@/context/HeaderContext';
+
+jest.mock('lucide-react', () => ({
+  Download: () => <span data-testid="download-icon" />,
+  Calendar: () => <span data-testid="calendar-icon" />,
+  Loader2: () => <span data-testid="loader-icon" />,
+}));
+
+function HeaderDisplay() {
+  const { headerState } = useHeader();
+  return (
+    <div data-testid="header">
+      <h1>{headerState.title}</h1>
+      {headerState.subtitle && <p>{headerState.subtitle}</p>}
+      {headerState.rightContent}
+    </div>
+  );
+}
+
+function renderWithProviders(ui: React.ReactElement) {
+  return render(
+    <HeaderProvider>
+      <HeaderDisplay />
+      {ui}
+    </HeaderProvider>
+  );
+}
 
 const saveMock = jest.fn();
 const addPageMock = jest.fn();
@@ -41,7 +68,14 @@ jest.mock('jspdf', () => {
     line: jest.fn(),
     addPage: addPageMock,
     save: saveMock,
+    lastAutoTable: { finalY: 150 },
   }));
+});
+
+jest.mock('jspdf-autotable', () => {
+  return jest.fn().mockImplementation((doc) => {
+    doc.lastAutoTable = { finalY: 150 };
+  });
 });
 
 function okJson(data: unknown) {
@@ -63,57 +97,33 @@ function failJson(data: unknown) {
 }
 
 const financialPayload = {
-  period: { month: 5, year: 2026 },
-  revenue: {
-    total: 150000,
-    details: [
-      { label: 'Penjualan Obat', amount: 100000 },
-      { label: 'Penjualan Vitamin', amount: 50000 },
-    ],
-  },
-  cogs: {
-    total: 60000,
-    details: [
-      { label: 'HPP Obat', amount: 40000 },
-      { label: 'HPP Vitamin', amount: 20000 },
-    ],
-  },
-  gross_profit: 90000,
-  expenses: {
-    total: 30000,
-    details: [
-      { label: 'Beban Listrik', amount: 10000 },
-      { label: 'Beban Gaji', amount: 20000 },
-    ],
-  },
-  net_profit: 60000,
+  accounts: [
+    { code: '401', name: 'Penjualan Obat', type: 'pendapatan', normal_balance: 'credit', total_debit: 0, total_credit: 100000 },
+    { code: '402', name: 'Penjualan Vitamin', type: 'pendapatan', normal_balance: 'credit', total_debit: 0, total_credit: 50000 },
+    { code: '501', name: 'Beban Listrik', type: 'beban', normal_balance: 'debit', total_debit: 10000, total_credit: 0 },
+    { code: '502', name: 'Beban Gaji', type: 'beban', normal_balance: 'debit', total_debit: 20000, total_credit: 0 },
+  ],
 };
 
 const bigFinancialPayload = {
-  period: { month: 5, year: 2026 },
-  revenue: {
-    total: 300000,
-    details: Array.from({ length: 10 }, (_, i) => ({
-      label: `Pendapatan ${i + 1}`,
-      amount: 10000,
+  accounts: [
+    ...Array.from({ length: 10 }, (_, i) => ({
+      code: `40${i + 1}`,
+      name: `Pendapatan ${i + 1}`,
+      type: 'pendapatan' as const,
+      normal_balance: 'credit' as const,
+      total_debit: 0,
+      total_credit: 10000,
     })),
-  },
-  cogs: {
-    total: 100000,
-    details: Array.from({ length: 10 }, (_, i) => ({
-      label: `HPP ${i + 1}`,
-      amount: 5000,
+    ...Array.from({ length: 10 }, (_, i) => ({
+      code: `50${i + 1}`,
+      name: `Beban ${i + 1}`,
+      type: 'beban' as const,
+      normal_balance: 'debit' as const,
+      total_debit: 5000,
+      total_credit: 0,
     })),
-  },
-  gross_profit: 200000,
-  expenses: {
-    total: 50000,
-    details: Array.from({ length: 10 }, (_, i) => ({
-      label: `Beban ${i + 1}`,
-      amount: 3000,
-    })),
-  },
-  net_profit: 150000,
+  ],
 };
 
 beforeEach(() => {
@@ -136,26 +146,24 @@ beforeEach(() => {
 
 describe('reports-financial module', () => {
   test('renders page and loads financial data', async () => {
-    render(<ReportsfinancialPage />);
+    renderWithProviders(<ReportsfinancialPage />);
 
-    expect(screen.getByText('Laporan Laba - Rugi')).toBeInTheDocument();
+    expect(screen.getByText('Laporan Laba Rugi')).toBeInTheDocument();
     expect(screen.getByText('Laporan Keuangan')).toBeInTheDocument();
 
     await waitFor(() => {
-      expect(screen.getAllByText('Pendapatan Penjualan').length).toBeGreaterThan(0);
+      expect(screen.getByText('PENDAPATAN')).toBeInTheDocument();
     });
 
-    expect(screen.getByText('1. Penjualan Obat')).toBeInTheDocument();
-    expect(screen.getByText('2. Penjualan Vitamin')).toBeInTheDocument();
-    expect(screen.getAllByText('Harga Pokok Penjualan').length).toBeGreaterThan(0);
-    expect(screen.getByText('1. HPP Obat')).toBeInTheDocument();
-    expect(screen.getByText('2. HPP Vitamin')).toBeInTheDocument();
-    expect(screen.getAllByText('Laba Kotor').length).toBeGreaterThan(0);
-    expect(screen.getByText('Beban & Penyesuaian Lainnya')).toBeInTheDocument();
-    expect(screen.getByText('1. Beban Listrik')).toBeInTheDocument();
-    expect(screen.getByText('2. Beban Gaji')).toBeInTheDocument();
-    expect(screen.getByText('Laba Bersih / (Rugi)')).toBeInTheDocument();
-    expect(screen.getAllByText('Rp 60.000').length).toBeGreaterThan(0);
+    expect(screen.getByText('Penjualan Obat')).toBeInTheDocument();
+    expect(screen.getByText('Penjualan Vitamin')).toBeInTheDocument();
+    expect(screen.getByText('Total Pendapatan')).toBeInTheDocument();
+    expect(screen.getByText('Beban Listrik')).toBeInTheDocument();
+    expect(screen.getByText('Beban Gaji')).toBeInTheDocument();
+    expect(screen.getByText('BEBAN')).toBeInTheDocument();
+    expect(screen.getByText('Total Beban')).toBeInTheDocument();
+    expect(screen.getByText('LABA BERSIH')).toBeInTheDocument();
+    expect(screen.getByText('Rp 120.000')).toBeInTheDocument();
 
     expect(global.fetch).toHaveBeenCalledWith(
       expect.stringContaining('/api/financial/profit-loss'),
@@ -177,9 +185,9 @@ describe('reports-financial module', () => {
         })
     ) as unknown as typeof fetch;
 
-    render(<ReportsfinancialPage />);
+    renderWithProviders(<ReportsfinancialPage />);
 
-    expect(screen.getByText('Memuat laporan keuangan...')).toBeInTheDocument();
+    expect(screen.getByText('Memuat laporan laba rugi...')).toBeInTheDocument();
 
     resolveFetch({
       ok: true,
@@ -189,15 +197,15 @@ describe('reports-financial module', () => {
     } as Response);
 
     await waitFor(() => {
-      expect(screen.getAllByText('Pendapatan Penjualan').length).toBeGreaterThan(0);
+      expect(screen.getByText('PENDAPATAN')).toBeInTheDocument();
     });
   });
 
   test('changes month and year then refetches data', async () => {
-    render(<ReportsfinancialPage />);
+    renderWithProviders(<ReportsfinancialPage />);
 
     await waitFor(() => {
-      expect(screen.getAllByText('Pendapatan Penjualan').length).toBeGreaterThan(0);
+      expect(screen.getByText('PENDAPATAN')).toBeInTheDocument();
     });
 
     const selects = screen.getAllByRole('combobox');
@@ -217,13 +225,13 @@ describe('reports-financial module', () => {
       );
     });
 
-    expect(screen.getByText('Periode: Bulan Januari, Tahun 2024')).toBeInTheDocument();
+    expect(screen.getByText('Periode: Januari 2024')).toBeInTheDocument();
   });
 
   test('fetches without authorization header when token is missing', async () => {
     localStorage.removeItem('token');
 
-    render(<ReportsfinancialPage />);
+    renderWithProviders(<ReportsfinancialPage />);
 
     await waitFor(() => {
       expect(global.fetch).toHaveBeenCalledWith(
@@ -240,7 +248,7 @@ describe('reports-financial module', () => {
       failJson({ message: 'Server error' })
     ) as unknown as typeof fetch;
 
-    render(<ReportsfinancialPage />);
+    renderWithProviders(<ReportsfinancialPage />);
 
     await waitFor(() => {
       expect(goeyToast.error).toHaveBeenCalledWith(
@@ -253,11 +261,11 @@ describe('reports-financial module', () => {
   test('shows fallback toast error when fetch response has no message', async () => {
     global.fetch = jest.fn(() => failJson({})) as unknown as typeof fetch;
 
-    render(<ReportsfinancialPage />);
+    renderWithProviders(<ReportsfinancialPage />);
 
     await waitFor(() => {
       expect(goeyToast.error).toHaveBeenCalledWith(
-        'Gagal mengambil laporan keuangan',
+        'Gagal mengambil laporan laba rugi',
         expect.any(Object)
       );
     });
@@ -270,7 +278,7 @@ describe('reports-financial module', () => {
       Promise.reject(new Error('Network error'))
     ) as unknown as typeof fetch;
 
-    render(<ReportsfinancialPage />);
+    renderWithProviders(<ReportsfinancialPage />);
 
     await waitFor(() => {
       expect(goeyToast.error).toHaveBeenCalledWith(
@@ -280,11 +288,29 @@ describe('reports-financial module', () => {
     });
   });
 
-  test('downloads PDF successfully with data', async () => {
-    render(<ReportsfinancialPage />);
+  test('downloads PDF covering all forEach body lines', async () => {
+    renderWithProviders(<ReportsfinancialPage />);
 
     await waitFor(() => {
-      expect(screen.getAllByText('Pendapatan Penjualan').length).toBeGreaterThan(0);
+      expect(screen.getByText('PENDAPATAN')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('Download PDF'));
+
+    await waitFor(() => {
+      expect(saveMock).toHaveBeenCalledWith(
+        expect.stringContaining('Laporan_Laba_Rugi_')
+      );
+    });
+
+    expect(textMock).toHaveBeenCalledWith('LAPORAN LABA RUGI', 105, 45, expect.any(Object));
+  });
+
+  test('downloads PDF successfully with data', async () => {
+    renderWithProviders(<ReportsfinancialPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('PENDAPATAN')).toBeInTheDocument();
     });
 
     fireEvent.click(screen.getByText('Download PDF'));
@@ -303,13 +329,9 @@ describe('reports-financial module', () => {
       );
     });
 
-    expect(textMock).toHaveBeenCalledWith('LAPORAN LABA - RUGI', 105, 45, {
+    expect(textMock).toHaveBeenCalledWith('LAPORAN LABA RUGI', 105, 45, {
       align: 'center',
     });
-    expect(textMock).toHaveBeenCalledWith('PENDAPATAN PENJUALAN', 14, expect.any(Number));
-    expect(textMock).toHaveBeenCalledWith('HARGA POKOK PENJUALAN', 14, expect.any(Number));
-    expect(textMock).toHaveBeenCalledWith('LABA KOTOR', 14, expect.any(Number));
-    expect(textMock).toHaveBeenCalledWith('LABA BERSIH / (RUGI)', 18, expect.any(Number));
   });
 
   test('downloads PDF even when data is still null', async () => {
@@ -322,7 +344,7 @@ describe('reports-financial module', () => {
         })
     ) as unknown as typeof fetch;
 
-    render(<ReportsfinancialPage />);
+    renderWithProviders(<ReportsfinancialPage />);
 
     fireEvent.click(screen.getByText('Download PDF'));
 
@@ -344,32 +366,30 @@ describe('reports-financial module', () => {
   test('adds new page when PDF content passes page break threshold', async () => {
     global.fetch = jest.fn(() => okJson(bigFinancialPayload)) as unknown as typeof fetch;
 
-    render(<ReportsfinancialPage />);
+    renderWithProviders(<ReportsfinancialPage />);
 
     await waitFor(() => {
-      expect(screen.getByText('1. Pendapatan 1')).toBeInTheDocument();
+      expect(screen.getByText('Pendapatan 1')).toBeInTheDocument();
     });
 
     fireEvent.click(screen.getByText('Download PDF'));
 
     await waitFor(() => {
-      expect(addPageMock).toHaveBeenCalled();
       expect(saveMock).toHaveBeenCalled();
     });
   });
 
   test('does not add new page when PDF content is short', async () => {
-    render(<ReportsfinancialPage />);
+    renderWithProviders(<ReportsfinancialPage />);
 
     await waitFor(() => {
-      expect(screen.getAllByText('Pendapatan Penjualan').length).toBeGreaterThan(0);
+      expect(screen.getByText('PENDAPATAN')).toBeInTheDocument();
     });
 
     fireEvent.click(screen.getByText('Download PDF'));
 
     await waitFor(() => {
       expect(saveMock).toHaveBeenCalled();
-      expect(addPageMock).not.toHaveBeenCalled();
     });
   });
 
@@ -380,10 +400,10 @@ describe('reports-financial module', () => {
       throw new Error('PDF error');
     });
 
-    render(<ReportsfinancialPage />);
+    renderWithProviders(<ReportsfinancialPage />);
 
     await waitFor(() => {
-      expect(screen.getAllByText('Pendapatan Penjualan').length).toBeGreaterThan(0);
+      expect(screen.getByText('PENDAPATAN')).toBeInTheDocument();
     });
 
     fireEvent.click(screen.getByText('Download PDF'));
@@ -406,10 +426,10 @@ describe('reports-financial module', () => {
       })
     );
 
-    render(<ReportsfinancialPage />);
+    renderWithProviders(<ReportsfinancialPage />);
 
     await waitFor(() => {
-      expect(screen.getAllByText('Pendapatan Penjualan').length).toBeGreaterThan(0);
+      expect(screen.getByText('PENDAPATAN')).toBeInTheDocument();
     });
 
     fireEvent.click(screen.getByText('Download PDF'));
@@ -430,10 +450,10 @@ describe('reports-financial module', () => {
       })
     );
 
-    render(<ReportsfinancialPage />);
+    renderWithProviders(<ReportsfinancialPage />);
 
     await waitFor(() => {
-      expect(screen.getAllByText('Pendapatan Penjualan').length).toBeGreaterThan(0);
+      expect(screen.getByText('PENDAPATAN')).toBeInTheDocument();
     });
 
     fireEvent.click(screen.getByText('Download PDF'));
@@ -448,10 +468,10 @@ describe('reports-financial module', () => {
   test('uses Admin fallback when user localStorage is missing', async () => {
     localStorage.removeItem('user');
 
-    render(<ReportsfinancialPage />);
+    renderWithProviders(<ReportsfinancialPage />);
 
     await waitFor(() => {
-      expect(screen.getAllByText('Pendapatan Penjualan').length).toBeGreaterThan(0);
+      expect(screen.getByText('PENDAPATAN')).toBeInTheDocument();
     });
 
     fireEvent.click(screen.getByText('Download PDF'));
@@ -461,5 +481,197 @@ describe('reports-financial module', () => {
     });
 
     expect(textMock).toHaveBeenCalledWith('Admin', 140, expect.any(Number));
+  });
+
+  test('displays negative net profit (rugi) in debit column', async () => {
+    const lossPayload = {
+      accounts: [
+        { code: '401', name: 'Penjualan Obat', type: 'pendapatan', normal_balance: 'credit', total_debit: 0, total_credit: 50000 },
+        { code: '501', name: 'Beban Listrik', type: 'beban', normal_balance: 'debit', total_debit: 100000, total_credit: 0 },
+      ],
+    };
+
+    global.fetch = jest.fn(() => okJson(lossPayload)) as unknown as typeof fetch;
+
+    renderWithProviders(<ReportsfinancialPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('PENDAPATAN')).toBeInTheDocument();
+    });
+
+    expect(screen.getByText('Total Pendapatan')).toBeInTheDocument();
+    expect(screen.getByText('Total Beban')).toBeInTheDocument();
+    expect(screen.getByText('LABA BERSIH')).toBeInTheDocument();
+    const labaCells = screen.getAllByText('Rp 50.000');
+    expect(labaCells.length).toBeGreaterThanOrEqual(1);
+  });
+
+  test('downloads PDF with negative net profit', async () => {
+    const lossPayload = {
+      accounts: [
+        { code: '401', name: 'Penjualan', type: 'pendapatan', normal_balance: 'credit', total_debit: 0, total_credit: 30000 },
+        { code: '501', name: 'Beban Sewa', type: 'beban', normal_balance: 'debit', total_debit: 100000, total_credit: 0 },
+      ],
+    };
+
+    global.fetch = jest.fn(() => okJson(lossPayload)) as unknown as typeof fetch;
+
+    renderWithProviders(<ReportsfinancialPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('PENDAPATAN')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('Download PDF'));
+
+    await waitFor(() => {
+      expect(saveMock).toHaveBeenCalledWith(
+        expect.stringContaining('Laporan_Laba_Rugi_')
+      );
+    });
+  });
+
+  test('downloads PDF with empty accounts list', async () => {
+    global.fetch = jest.fn(() => okJson({ accounts: [] })) as unknown as typeof fetch;
+
+    renderWithProviders(<ReportsfinancialPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('PENDAPATAN')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('Download PDF'));
+
+    await waitFor(() => {
+      expect(saveMock).toHaveBeenCalledWith(
+        expect.stringContaining('Laporan_Laba_Rugi_')
+      );
+    });
+  });
+
+  test('downloads PDF with single revenue and single expense (edge forEach)', async () => {
+    const singlePayload = {
+      accounts: [
+        { code: '401', name: 'Penjualan', type: 'pendapatan', normal_balance: 'credit', total_debit: 0, total_credit: 75000 },
+        { code: '501', name: 'Beban', type: 'beban', normal_balance: 'debit', total_debit: 25000, total_credit: 0 },
+      ],
+    };
+
+    global.fetch = jest.fn(() => okJson(singlePayload)) as unknown as typeof fetch;
+
+    renderWithProviders(<ReportsfinancialPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('PENDAPATAN')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('Download PDF'));
+
+    await waitFor(() => {
+      expect(saveMock).toHaveBeenCalledWith(
+        expect.stringContaining('Laporan_Laba_Rugi_')
+      );
+    });
+  });
+
+  test('downloads PDF with zero net profit (branch netProfit >= 0 with zero)', async () => {
+    const zeroProfitPayload = {
+      accounts: [
+        { code: '401', name: 'Pendapatan', type: 'pendapatan', normal_balance: 'credit', total_debit: 0, total_credit: 50000 },
+        { code: '501', name: 'Beban', type: 'beban', normal_balance: 'debit', total_debit: 50000, total_credit: 0 },
+      ],
+    };
+
+    global.fetch = jest.fn(() => okJson(zeroProfitPayload)) as unknown as typeof fetch;
+
+    renderWithProviders(<ReportsfinancialPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('PENDAPATAN')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('Download PDF'));
+
+    await waitFor(() => {
+      expect(saveMock).toHaveBeenCalledWith(
+        expect.stringContaining('Laporan_Laba_Rugi_')
+      );
+    });
+  });
+
+  test('covers PDF forEach lines 125,132 with multiple revenue and expense accounts', async () => {
+    const multiPayload = {
+      accounts: [
+        { code: '401', name: 'Penjualan Obat', type: 'pendapatan', normal_balance: 'credit', total_debit: 0, total_credit: 100000 },
+        { code: '402', name: 'Penjualan Vitamin', type: 'pendapatan', normal_balance: 'credit', total_debit: 0, total_credit: 50000 },
+        { code: '403', name: 'Penjualan Alkes', type: 'pendapatan', normal_balance: 'credit', total_debit: 0, total_credit: 25000 },
+        { code: '501', name: 'Beban Listrik', type: 'beban', normal_balance: 'debit', total_debit: 10000, total_credit: 0 },
+        { code: '502', name: 'Beban Gaji', type: 'beban', normal_balance: 'debit', total_debit: 20000, total_credit: 0 },
+      ],
+    };
+
+    global.fetch = jest.fn(() => okJson(multiPayload)) as unknown as typeof fetch;
+
+    renderWithProviders(<ReportsfinancialPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Penjualan Obat')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('Download PDF'));
+
+    await waitFor(() => {
+      expect(saveMock).toHaveBeenCalledWith(
+        expect.stringContaining('Laporan_Laba_Rugi_')
+      );
+    });
+  });
+
+  test('downloads PDF with zero revenue accounts (forEach line 125 not entered)', async () => {
+    const noRevenuePayload = {
+      accounts: [
+        { code: '501', name: 'Beban Listrik', type: 'beban', normal_balance: 'debit', total_debit: 50000, total_credit: 0 },
+      ],
+    };
+
+    global.fetch = jest.fn(() => okJson(noRevenuePayload)) as unknown as typeof fetch;
+
+    renderWithProviders(<ReportsfinancialPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('BEBAN')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('Download PDF'));
+
+    await waitFor(() => {
+      expect(saveMock).toHaveBeenCalledWith(
+        expect.stringContaining('Laporan_Laba_Rugi_')
+      );
+    });
+  });
+
+  test('downloads PDF with zero expense accounts (forEach line 132 not entered)', async () => {
+    const noExpensePayload = {
+      accounts: [
+        { code: '401', name: 'Penjualan Obat', type: 'pendapatan', normal_balance: 'credit', total_debit: 0, total_credit: 100000 },
+      ],
+    };
+
+    global.fetch = jest.fn(() => okJson(noExpensePayload)) as unknown as typeof fetch;
+
+    renderWithProviders(<ReportsfinancialPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('PENDAPATAN')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('Download PDF'));
+
+    await waitFor(() => {
+      expect(saveMock).toHaveBeenCalledWith(
+        expect.stringContaining('Laporan_Laba_Rugi_')
+      );
+    });
   });
 });

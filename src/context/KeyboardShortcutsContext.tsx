@@ -33,8 +33,21 @@ export function KeyboardShortcutsProvider({ children }: { children: ReactNode })
         return;
       }
 
-      // Skip if already typing or it's a modifier key
-      if (isTyping || e.ctrlKey || e.metaKey || e.altKey) {
+      // Skip if already typing
+      if (isTyping) {
+        return;
+      }
+
+      // Search combo: Ctrl/Cmd + K (check before general modifier skip)
+      if (searchInputRef?.current && (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        searchInputRef.current.focus();
+        searchInputRef.current.select();
+        return;
+      }
+
+      // Skip if modifier keys pressed (no navigation with modifiers)
+      if (e.ctrlKey || e.metaKey || e.altKey) {
         return;
       }
 
@@ -69,10 +82,9 @@ export function KeyboardShortcutsProvider({ children }: { children: ReactNode })
       // Search shortcuts
       if (searchInputRef?.current) {
         const isSlash = e.key === '/';
-        const isSearchCombo = (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k';
         const isAlpha = /^[a-zA-Z]$/.test(e.key); // Only letters, not numbers (numbers are for navigation)
 
-        if (isSlash || isSearchCombo) {
+        if (isSlash) {
           e.preventDefault();
           searchInputRef.current.focus();
           searchInputRef.current.select();

@@ -27,6 +27,15 @@ interface Pagination {
   totalPages: number;
 }
 
+export function formatDate(dateString: string) {
+  const date = new Date(dateString);
+  return date.toLocaleDateString('id-ID', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric'
+  });
+}
+
 export default function AuditTrailsPage() {
   const { setSearchInputRef } = useKeyboardShortcuts();
   const searchRef = useRef<HTMLInputElement>(null);
@@ -100,15 +109,6 @@ export default function AuditTrailsPage() {
   useEffect(() => {
     fetchAuditTrails();
   }, [fetchAuditTrails]);
-
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('id-ID', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric'
-    });
-  };
 
   const formatDateTime = (dateString: string) => {
     const date = new Date(dateString);

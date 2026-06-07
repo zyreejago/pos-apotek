@@ -1,6 +1,7 @@
 import React from 'react';
 import { render, waitFor, fireEvent } from '@testing-library/react';
 import SubstitutionsPage from '../page';
+import { HeaderProvider } from '@/context/HeaderContext';
 
 jest.mock('next/navigation', () => ({
   useRouter: () => ({
@@ -97,7 +98,7 @@ afterEach(() => {
 
 describe('substitutions module', () => {
   test('renders Substitutions page', () => {
-    expect(() => render(<SubstitutionsPage />)).not.toThrow();
+    expect(() => render(<HeaderProvider><SubstitutionsPage /></HeaderProvider>)).not.toThrow();
   });
 
   test('handles search successfully', async () => {
@@ -112,7 +113,7 @@ describe('substitutions module', () => {
     
     global.fetch = jest.fn().mockResolvedValue(okJson(testData));
     
-    const { getByPlaceholderText, getByText } = render(<SubstitutionsPage />);
+    const { getByPlaceholderText, getByText } = render(<HeaderProvider><SubstitutionsPage /></HeaderProvider>);
     
     const searchInput = getByPlaceholderText('Input Keluhan');
     fireEvent.change(searchInput, { target: { value: 'demam' } });
@@ -129,7 +130,7 @@ describe('substitutions module', () => {
   test('handles search error', async () => {
     global.fetch = jest.fn().mockResolvedValue(errorJson({ error: 'Test error' }));
     
-    const { getByPlaceholderText, getByText } = render(<SubstitutionsPage />);
+    const { getByPlaceholderText, getByText } = render(<HeaderProvider><SubstitutionsPage /></HeaderProvider>);
     
     const searchInput = getByPlaceholderText('Input Keluhan');
     fireEvent.change(searchInput, { target: { value: 'demam' } });
@@ -145,7 +146,7 @@ describe('substitutions module', () => {
   test('handles search error with non-Error instance', async () => {
     global.fetch = jest.fn().mockRejectedValue('string error');
     
-    const { getByPlaceholderText, getByText } = render(<SubstitutionsPage />);
+    const { getByPlaceholderText, getByText } = render(<HeaderProvider><SubstitutionsPage /></HeaderProvider>);
     
     const searchInput = getByPlaceholderText('Input Keluhan');
     fireEvent.change(searchInput, { target: { value: 'demam' } });
@@ -161,7 +162,7 @@ describe('substitutions module', () => {
   test('handles search error with no error field', async () => {
     global.fetch = jest.fn().mockResolvedValue(errorJson({}));
     
-    const { getByPlaceholderText, getByText } = render(<SubstitutionsPage />);
+    const { getByPlaceholderText, getByText } = render(<HeaderProvider><SubstitutionsPage /></HeaderProvider>);
     
     const searchInput = getByPlaceholderText('Input Keluhan');
     fireEvent.change(searchInput, { target: { value: 'demam' } });
@@ -175,7 +176,7 @@ describe('substitutions module', () => {
   });
 
   test('search button is disabled when input is empty', () => {
-    const { getByText } = render(<SubstitutionsPage />);
+    const { getByText } = render(<HeaderProvider><SubstitutionsPage /></HeaderProvider>);
     const searchBtn = getByText('Cari');
     expect(searchBtn).toBeDisabled();
   });
@@ -189,7 +190,7 @@ describe('substitutions module', () => {
     
     global.fetch = jest.fn().mockResolvedValue(okJson(testData));
     
-    const { getByPlaceholderText, getByText, getByRole } = render(<SubstitutionsPage />);
+    const { getByPlaceholderText, getByText, getByRole } = render(<HeaderProvider><SubstitutionsPage /></HeaderProvider>);
     
     const searchInput = getByPlaceholderText('Input Keluhan');
     fireEvent.change(searchInput, { target: { value: 'demam' } });

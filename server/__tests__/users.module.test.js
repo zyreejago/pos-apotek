@@ -13,8 +13,9 @@ function buildApp({ pool, bcrypt, user }) {
   };
 
   const checkPermission = () => (_req, _res, next) => next();
+  const createAuditTrail = jest.fn().mockResolvedValue(undefined);
 
-  registerUserRoutes(app, pool, bcrypt, authenticate, checkPermission);
+  registerUserRoutes(app, pool, bcrypt, authenticate, checkPermission, createAuditTrail);
   return app;
 }
 
