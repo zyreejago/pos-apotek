@@ -3,7 +3,7 @@ module.exports = function registerProfileRoutes(app, pool, bcrypt, authenticate)
   app.get('/api/profile', authenticate, async (req, res) => {
     try {
       const [users] = await pool.query(
-        'SELECT id, username, email, role, outlet_id, status, created_at FROM users WHERE id = ?',
+        'SELECT id, username, email, role, status, created_at FROM users WHERE id = ?',
         [req.user.id]
       );
 
