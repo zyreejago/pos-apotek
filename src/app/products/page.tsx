@@ -2168,15 +2168,47 @@ export default function ProductsPage() {
                               })()}
                             </div>
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setMultipleProducts(multipleProducts.filter(p => p.id !== item.id));
-                            }}
-                            className="text-red-500 hover:text-red-700"
-                          >
-                            <Trash2 size={18} />
-                          </button>
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setFormData({
+                                  name: item.name,
+                                  cost_price: item.cost_price,
+                                  selling_price: item.selling_price,
+                                  stock: item.stock,
+                                  unit: item.unit,
+                                  expired_date: item.expired_date,
+                                  location_code: item.location_code,
+                                  supplier_id: item.supplier_id,
+                                  stock_type: item.stock_type,
+                                  purchase_date: item.purchase_date,
+                                  invoice_number: item.invoice_number || '',
+                                  dp_amount: item.dp_amount || '',
+                                  due_date: item.due_date || '',
+                                  purchase_unit: item.purchase_unit,
+                                  unit_multiplier: item.unit_multiplier,
+                                  purchase_unit_stock: item.purchase_unit_stock || '',
+                                  product_category: item.product_category
+                                });
+                                setMultipleProducts(multipleProducts.filter(p => p.id !== item.id));
+                              }}
+                              className="text-blue-500 hover:text-blue-700"
+                              title="Edit"
+                            >
+                              <Edit size={16} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setMultipleProducts(multipleProducts.filter(p => p.id !== item.id));
+                              }}
+                              className="text-red-500 hover:text-red-700"
+                              title="Hapus"
+                            >
+                              <Trash2 size={18} />
+                            </button>
+                          </div>
                         </div>
                       ))}
                     </div>
