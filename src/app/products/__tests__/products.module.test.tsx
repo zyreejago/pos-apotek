@@ -5030,7 +5030,7 @@ expect(screen.getByText(/Rp\s*2\.000/)).toBeInTheDocument();
 
     // FileReader onload fires synchronously, productFormImagePreview should be set
     await waitFor(() => {
-      expect(screen.getByAltText('Preview')).toBeInTheDocument();
+      expect(screen.getByAltText('Preview 1')).toBeInTheDocument();
     });
 
     // Click the image preview delete button (trash icon in the preview overlay)

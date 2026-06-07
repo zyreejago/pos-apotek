@@ -247,10 +247,12 @@ function registerInventoryRoutes(app, pool, authenticate, checkPermission, uploa
   };
 
   // Create a new batch
-  app.post('/api/inventory/batches', authenticate, checkPermission('Management Product', 'create'), upload.single('image'), async (req, res) => {
+  app.post('/api/inventory/batches', authenticate, checkPermission('Management Product', 'create'), upload.array('images', 10), async (req, res) => {
     try {
       const { product_id, supplier_id, batch_number, stock_type, purchase_date, initial_quantity, cost_price, expired_date, dp_amount, due_date, notes } = req.body;
-      const image_url = req.file ? `/uploads/${req.file.filename}` : null;
+      const files = req.files;
+      const imageUrls = files && Array.isArray(files) && files.length > 0 ? files.map(f => `/uploads/${f.filename}`) : [];
+      const image_url = imageUrls.length > 0 ? JSON.stringify(imageUrls) : null;
 
       const formattedPurchaseDate = formatDate(purchase_date);
       const formattedExpiredDate = formatDate(expired_date);
@@ -360,7 +362,7 @@ function registerInventoryRoutes(app, pool, authenticate, checkPermission, uploa
   });
 
   // Update a batch
-  app.put('/api/inventory/batches/:id', authenticate, checkPermission('Management Product', 'edit'), upload.single('image'), async (req, res) => {
+  app.put('/api/inventory/batches/:id', authenticate, checkPermission('Management Product', 'edit'), upload.array('images', 10), async (req, res) => {
     try {
       const { id } = req.params;
       const { supplier_id, batch_number, stock_type, purchase_date, initial_quantity, remaining_quantity, cost_price, expired_date, dp_amount, due_date, notes } = req.body;
@@ -382,8 +384,11 @@ function registerInventoryRoutes(app, pool, authenticate, checkPermission, uploa
       const product_id = oldBatch[0].product_id;
       const current_image_url = oldBatch[0].image_url;
       const oldStatus = oldBatch[0].status;
-      const new_image_url = req.file ? `/uploads/${req.file.filename}` : null;
-      const image_url = new_image_url || current_image_url;
+      const files = req.files;
+      const newUrls = files && Array.isArray(files) && files.length > 0 ? files.map(f => `/uploads/${f.filename}`) : [];
+      const image_url = newUrls.length > 0
+        ? JSON.stringify(newUrls)
+        : (current_image_url || null);
 
       const formattedPurchaseDate = formatDate(purchase_date);
       const formattedExpiredDate = formatDate(expired_date);

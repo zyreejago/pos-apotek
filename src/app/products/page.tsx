@@ -120,7 +120,7 @@ interface ProductFormData {
 // For multiple products
 interface ProductItem extends ProductFormData {
   id: string;
-  imageFile: File | null;
+  imageFiles: File[];
 }
 
 
@@ -219,8 +219,8 @@ export default function ProductsPage() {
       expired_date: '',
     notes: ''
   });
-  const [fakturImageFile, setFakturImageFile] = useState<File | null>(null);
-  const [fakturImagePreview, setFakturImagePreview] = useState<string | null>(null);
+  const [fakturImageFiles, setFakturImageFiles] = useState<File[]>([]);
+  const [fakturImagePreviews, setFakturImagePreviews] = useState<string[]>([]);
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
   const [detailFaktur, setDetailFaktur] = useState<Faktur | null>(null);
   const [newDPAmount, setNewDPAmount] = useState('');
@@ -230,6 +230,8 @@ export default function ProductsPage() {
 
   // Form State
   const [isMultipleProducts, setIsMultipleProducts] = useState(false);
+  const [fakturBatchImages, setFakturBatchImages] = useState<File[]>([]);
+  const [fakturBatchPreviews, setFakturBatchPreviews] = useState<string[]>([]);
   const [formData, setFormData] = useState<ProductFormData>({
     name: '',
     cost_price: '',
@@ -248,8 +250,8 @@ export default function ProductsPage() {
     unit_multiplier: '1',
     product_category: 'OBAT'
   });
-  const [productFormImageFile, setProductFormImageFile] = useState<File | null>(null);
-  const [productFormImagePreview, setProductFormImagePreview] = useState<string | null>(null);
+  const [productFormImageFiles, setProductFormImageFiles] = useState<File[]>([]);
+  const [productFormImagePreviews, setProductFormImagePreviews] = useState<string[]>([]);
   const [multipleProducts, setMultipleProducts] = useState<ProductItem[]>([]);
 
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
@@ -390,8 +392,7 @@ export default function ProductsPage() {
       expired_date: '',
       notes: ''
     });
-    setFakturImageFile(null);
-    setFakturImagePreview(null);
+    setFakturImageFiles([]); setFakturImagePreviews([]);
   };
 
   const handleOpenEditFakturModal = (faktur: Faktur, customProduct?: Product) => {
@@ -428,8 +429,11 @@ export default function ProductsPage() {
       expired_date: formatDateForInput(faktur.expired_date),
       notes: faktur.notes || ''
     });
-    setFakturImageFile(null);
-    setFakturImagePreview(faktur.image_url ? `http://localhost:5000${faktur.image_url}` : null);
+    setFakturImageFiles([]); setFakturImagePreviews([]);
+    if (faktur.image_url) {
+      const urls = getImageUrls(faktur.image_url);
+      setFakturImagePreviews(urls.map(u => `http://localhost:5000${u}`));
+    }
   };
 
   const handleFakturInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
@@ -438,27 +442,36 @@ export default function ProductsPage() {
   };
 
   const handleProductImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      setProductFormImageFile(file);
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        setProductFormImagePreview(event.target?.result as string);
-      };
-      reader.readAsDataURL(file);
+    if (e.target.files) {
+      const files = Array.from(e.target.files);
+      setProductFormImageFiles(prev => [...prev, ...files]);
+      files.forEach(file => {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          setProductFormImagePreviews(prev => [...prev, event.target?.result as string]);
+        };
+        reader.readAsDataURL(file);
+      });
     }
   };
 
   const handleFakturImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      setFakturImageFile(file);
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        setFakturImagePreview(event.target?.result as string);
-      };
-      reader.readAsDataURL(file);
+    if (e.target.files) {
+      const files = Array.from(e.target.files);
+      setFakturImageFiles(prev => [...prev, ...files]);
+      files.forEach(file => {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          setFakturImagePreviews(prev => [...prev, event.target?.result as string]);
+        };
+        reader.readAsDataURL(file);
+      });
     }
+  };
+
+  const removeFakturImage = (index: number) => {
+    setFakturImageFiles(prev => prev.filter((_, i) => i !== index));
+    setFakturImagePreviews(prev => prev.filter((_, i) => i !== index));
   };
 
   const handleAddDP = async () => {
@@ -658,9 +671,9 @@ export default function ProductsPage() {
         formData.append('due_date', fakturFormData.due_date);
       }
       formData.append('notes', fakturFormData.notes || '');
-      if (fakturImageFile) {
-        formData.append('image', fakturImageFile);
-      }
+      fakturImageFiles.forEach(file => {
+        formData.append('images', file);
+      });
 
       const headers = {
         ...authHeaders
@@ -700,7 +713,7 @@ export default function ProductsPage() {
       expired_date: '',
           notes: ''
         });
-        setFakturImageFile(null);
+        setFakturImageFiles([]); setFakturImagePreviews([]);
         setSelectedFaktur(null);
         setFakturModalMode('add');
         setShowFakturForm(false);
@@ -870,6 +883,12 @@ export default function ProductsPage() {
     });
   };
 
+  const getImageUrls = (url: string | null): string[] => {
+    if (!url) return [];
+    try { const parsed = JSON.parse(url); return Array.isArray(parsed) ? parsed : [url]; }
+    catch { return [url]; }
+  };
+
   const getExpiredStatusColor = (dateString: string | null) => {
     if (!dateString) return 'bg-gray-100 text-gray-600';
     const date = new Date(dateString);
@@ -959,6 +978,7 @@ export default function ProductsPage() {
     setProductOffCanvasMode('add');
     setIsMultipleProducts(false);
     setMultipleProducts([]);
+    setFakturImageFiles([]); setFakturImagePreviews([]);
     setFormData({
       name: '',
       cost_price: '',
@@ -1010,8 +1030,9 @@ export default function ProductsPage() {
   const handleCloseProductOffCanvas = () => {
     setIsProductOffCanvasOpen(false);
     setSelectedProduct(null);
-    setProductFormImageFile(null);
-    setProductFormImagePreview(null);
+    setProductFormImageFiles([]);
+    setProductFormImagePreviews([]);
+    setFakturImageFiles([]); setFakturImagePreviews([]);
     setFormData({
       name: '',
       cost_price: '',
@@ -1124,7 +1145,7 @@ export default function ProductsPage() {
     } else {
       // Add mode
       try {
-        const saveProductAndBatch = async (item: ProductFormData, imageFile: File | null = null) => {
+        const saveProductAndBatch = async (item: ProductFormData, imageFiles: File[] = []) => {
           // Check if product with same name exists in database
           const existingProduct = allProducts.find(
             p => p.name.trim().toLowerCase() === item.name.trim().toLowerCase()
@@ -1201,7 +1222,7 @@ export default function ProductsPage() {
             if (item.expired_date) batchFormData.append('expired_date', item.expired_date);
             if (item.dp_amount) batchFormData.append('dp_amount', item.dp_amount);
             if (item.due_date) batchFormData.append('due_date', item.due_date);
-            if (imageFile) batchFormData.append('image', imageFile);
+            imageFiles.forEach(f => batchFormData.append('images', f));
 
             const res = await fetch(`http://localhost:5000/api/inventory/batches`, {
               method: 'POST',
@@ -1228,11 +1249,11 @@ export default function ProductsPage() {
             return;
           }
           for (const item of multipleProducts) {
-            await saveProductAndBatch(item, item.imageFile);
+            await saveProductAndBatch(item, item.imageFiles || []);
           }
         } else {
           // Single product add
-          await saveProductAndBatch(formData, productFormImageFile);
+          await saveProductAndBatch(formData, [...productFormImageFiles, ...fakturImageFiles]);
         }
         
         handleCloseProductOffCanvas();
@@ -1585,7 +1606,7 @@ export default function ProductsPage() {
                           className="flex-1 flex items-center justify-center gap-2 py-3 px-4 border-2 border-dashed border-gray-300 rounded-xl hover:border-blue-500 hover:bg-blue-50 transition-colors text-sm font-medium text-gray-600"
                         >
                           <UploadCloud size={20} className="text-gray-400" />
-                          Pilih File
+                          {productFormImagePreviews.length > 0 ? 'Tambah File' : 'Pilih File'}
                         </button>
                         <button
                           type="button"
@@ -1602,6 +1623,7 @@ export default function ProductsPage() {
                         type="file"
                         ref={productFileInputRef}
                         accept="image/*"
+                        multiple
                         className="hidden"
                         onChange={handleProductImageChange}
                       />
@@ -1616,23 +1638,25 @@ export default function ProductsPage() {
                     </div>
 
                     {/* Preview */}
-                    {productFormImagePreview && (
-                      <div className="relative w-full max-w-sm h-48 shrink-0 rounded-xl overflow-hidden border-2 border-gray-200 group">
-                        <img src={productFormImagePreview} alt="Preview" className="w-full h-full object-cover" />
-                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setProductFormImageFile(null);
-                              setProductFormImagePreview(null);
-                            }}
-                            className="p-2 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors"
-                          >
-                            <Trash2 size={16} />
-                          </button>
+                    <div className="flex flex-wrap gap-3">
+                      {productFormImagePreviews.map((preview, idx) => (
+                        <div key={idx} className="relative w-24 h-24 shrink-0 rounded-xl overflow-hidden border-2 border-gray-200 group">
+                          <img src={preview} alt={`Preview ${idx + 1}`} className="w-full h-full object-cover" />
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setProductFormImageFiles(prev => prev.filter((_, i) => i !== idx));
+                                setProductFormImagePreviews(prev => prev.filter((_, i) => i !== idx));
+                              }}
+                              className="p-1.5 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors"
+                            >
+                              <Trash2 size={12} />
+                            </button>
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      ))}
+                    </div>
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
@@ -2084,7 +2108,7 @@ export default function ProductsPage() {
                           stock: (Number(existingItem.stock) + Number(formData.stock)).toString(),
                           cost_price: formData.cost_price, // Update with the latest cost price
                           selling_price: formData.selling_price || existingItem.selling_price, // Update with latest selling price
-                          imageFile: productFormImageFile
+                          imageFiles: productFormImageFiles
                         };
                         setMultipleProducts(updatedList);
                       } else {
@@ -2093,7 +2117,7 @@ export default function ProductsPage() {
                           {
                             ...formData,
                             id: Date.now().toString(),
-                            imageFile: productFormImageFile
+                            imageFiles: productFormImageFiles
                           }
                         ]);
                       }
@@ -2204,7 +2228,7 @@ export default function ProductsPage() {
       expired_date: '',
               notes: ''
             });
-            setFakturImageFile(null);
+            setFakturImageFiles([]); setFakturImagePreviews([]);
           }}
           title={`Faktur - ${selectedProduct.name}`}
           width="800px"
@@ -2348,9 +2372,9 @@ export default function ProductsPage() {
                         <td className="px-4 py-3 font-medium">{formatCurrency(totalAmount)}</td>
                         <td className="px-4 py-3 text-right">
                           <div className="flex justify-end gap-2">
-                            {faktur.image_url && (
+                            {faktur.image_url && getImageUrls(faktur.image_url).length > 0 && (
                               <button
-                                onClick={() => setPreviewImageUrl(`http://localhost:5000${faktur.image_url}`)}
+                                onClick={() => setPreviewImageUrl(`http://localhost:5000${getImageUrls(faktur.image_url)[0]}`)}
                                 className="p-1 text-green-600 hover:bg-green-50 rounded"
                                 title="Lihat Bukti"
                               >
@@ -2769,7 +2793,7 @@ export default function ProductsPage() {
                           className="flex-1 flex items-center justify-center gap-2 py-3 px-4 border-2 border-dashed border-gray-300 rounded-xl hover:border-blue-500 hover:bg-blue-50 transition-colors text-sm font-medium text-gray-600"
                         >
                           <UploadCloud size={20} className="text-gray-400" />
-                          Pilih File
+                          {fakturImagePreviews.length > 0 ? 'Tambah File' : 'Pilih File'}
                         </button>
                         <button
                           type="button"
@@ -2786,6 +2810,7 @@ export default function ProductsPage() {
                         type="file"
                         ref={fakturFileInputRef}
                         accept="image/*"
+                        multiple
                         className="hidden"
                         onChange={handleFakturImageChange}
                       />
@@ -2800,27 +2825,22 @@ export default function ProductsPage() {
                     </div>
 
                     {/* Preview */}
-                    {fakturImagePreview && (
-                      <div className="relative w-full max-w-sm h-48 shrink-0 rounded-xl overflow-hidden border-2 border-gray-200 group">
-                        <img src={fakturImagePreview} alt="Preview Bukti Faktur" className="w-full h-full object-cover" />
-                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setFakturImageFile(null);
-                              if (selectedFaktur?.image_url) {
-                                setFakturImagePreview(`http://localhost:5000${selectedFaktur.image_url}`);
-                              } else {
-                                setFakturImagePreview(null);
-                              }
-                            }}
-                            className="p-2 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors"
-                          >
-                            <Trash2 size={16} />
-                          </button>
+                    <div className="flex flex-wrap gap-3">
+                      {fakturImagePreviews.map((preview, idx) => (
+                        <div key={idx} className="relative w-32 h-32 shrink-0 rounded-xl overflow-hidden border-2 border-gray-200 group">
+                          <img src={preview} alt={`Preview ${idx + 1}`} className="w-full h-full object-cover" />
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                            <button
+                              type="button"
+                              onClick={() => removeFakturImage(idx)}
+                              className="p-2 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      ))}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -3004,9 +3024,9 @@ export default function ProductsPage() {
 
                           {/* Bukti & Edit Button */}
                           <div className={`flex flex-col gap-2 shrink-0 ${faktur.status === 'rejected' ? 'pr-8' : ''}`}>
-                            {faktur.image_url && (
+                            {faktur.image_url && getImageUrls(faktur.image_url).length > 0 && (
                               <button 
-                                onClick={() => setPreviewImageUrl(`http://localhost:5000${faktur.image_url}`)}
+                                onClick={() => setPreviewImageUrl(`http://localhost:5000${getImageUrls(faktur.image_url)[0]}`)}
                                 className="flex items-center gap-2 px-4 py-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-all text-xs font-bold border border-blue-100"
                               >
                                 <FileText size={18} />
@@ -3194,14 +3214,44 @@ export default function ProductsPage() {
               )}
 
               {/* Bukti Faktur */}
-              {detailFaktur.image_url && (
+              {detailFaktur.image_url && getImageUrls(detailFaktur.image_url).length > 0 && (
                 <div>
-                  <h4 className="text-sm font-bold text-gray-700 mb-2">Bukti Faktur</h4>
-                  <img 
-                    src={`http://localhost:5000${detailFaktur.image_url}`} 
-                    alt="Bukti Faktur" 
-                    className="max-w-full h-48 object-contain rounded-xl border border-gray-200"
-                  />
+                  <h4 className="text-sm font-bold text-gray-700 mb-2">Bukti Faktur ({getImageUrls(detailFaktur.image_url).length})</h4>
+                  <div className="flex flex-wrap gap-3">
+                    {getImageUrls(detailFaktur.image_url).map((url, idx) => (
+                      <div key={idx} className="relative inline-block group">
+                        <img 
+                          src={`http://localhost:5000${url}`} 
+                          alt={`Bukti Faktur ${idx + 1}`} 
+                          className="w-40 h-32 object-cover rounded-xl border border-gray-200 cursor-pointer"
+                          onClick={() => setPreviewImageUrl(`http://localhost:5000${url}`)}
+                        />
+                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors rounded-xl flex items-center justify-center gap-2">
+                          <button
+                            onClick={() => setPreviewImageUrl(`http://localhost:5000${url}`)}
+                            className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 bg-white/90 rounded-full shadow-md hover:bg-white"
+                            title="Perbesar"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+                          </button>
+                          <button
+                            onClick={() => {
+                              const link = document.createElement('a');
+                              link.href = `http://localhost:5000${url}`;
+                              link.download = `bukti_faktur_${idx + 1}.jpg`;
+                              document.body.appendChild(link);
+                              link.click();
+                              document.body.removeChild(link);
+                            }}
+                            className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 bg-white/90 rounded-full shadow-md hover:bg-white"
+                            title="Download"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
