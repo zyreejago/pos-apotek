@@ -230,6 +230,7 @@ export default function ProductsPage() {
 
   // Form State
   const [isMultipleProducts, setIsMultipleProducts] = useState(false);
+  const [hasPurchaseUnitForm, setHasPurchaseUnitForm] = useState(false);
   const [fakturBatchImages, setFakturBatchImages] = useState<File[]>([]);
   const [fakturBatchPreviews, setFakturBatchPreviews] = useState<string[]>([]);
   const [formData, setFormData] = useState<ProductFormData>({
@@ -978,6 +979,7 @@ export default function ProductsPage() {
     setProductOffCanvasMode('add');
     setIsMultipleProducts(false);
     setMultipleProducts([]);
+    setHasPurchaseUnitForm(false);
     setFakturImageFiles([]); setFakturImagePreviews([]);
     setFormData({
       name: '',
@@ -1719,7 +1721,7 @@ export default function ProductsPage() {
             {productOffCanvasMode === 'edit' || !isMultipleProducts ? (
               <React.Fragment>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Product Name</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Product Name <span className="text-red-500">*</span></label>
                   <input
                     type="text"
                     name="name"
@@ -1746,7 +1748,7 @@ export default function ProductsPage() {
                 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Cost Price (IDR)</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Cost Price (IDR) <span className="text-red-500">*</span></label>
                     <input
                       type="number"
                       name="cost_price"
@@ -1760,7 +1762,7 @@ export default function ProductsPage() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Selling Price (IDR)</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Selling Price (IDR) <span className="text-red-500">*</span></label>
                     <input
                       type="number"
                       name="selling_price"
@@ -1774,25 +1776,21 @@ export default function ProductsPage() {
                   </div>
                 </div>
                 
+                {/* Toggle Satuan Besar */}
+                <div className="flex items-center gap-3 py-2">
+                  <button
+                    type="button"
+                    onClick={() => setHasPurchaseUnitForm(!hasPurchaseUnitForm)}
+                    className={`relative w-11 h-6 rounded-full transition-colors ${hasPurchaseUnitForm ? 'bg-blue-600' : 'bg-gray-300'}`}
+                  >
+                    <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-transform ${hasPurchaseUnitForm ? 'translate-x-5' : ''}`} />
+                  </button>
+                  <span className="text-sm font-medium text-gray-700">Memiliki satuan besar?</span>
+                </div>
+
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Unit Pembelian</label>
-                    <select
-                      name="purchase_unit"
-                      value={formData.purchase_unit}
-                      onChange={handleInputChange}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                    >
-                      <option value="Box">Box</option>
-                      <option value="Strip">Strip</option>
-                      <option value="Botol">Botol</option>
-                      <option value="Tube">Tube</option>
-                      <option value="Pcs">Pcs</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Unit Dasar</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Unit Dasar <span className="text-red-500">*</span></label>
                     <select
                       name="unit"
                       value={formData.unit}
@@ -1810,41 +1808,61 @@ export default function ProductsPage() {
                       <option value="Pcs">Pcs</option>
                     </select>
                   </div>
+
+                  {hasPurchaseUnitForm && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Unit Satuan Besar <span className="text-red-500">*</span></label>
+                      <select
+                        name="purchase_unit"
+                        value={formData.purchase_unit}
+                        onChange={handleInputChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                      >
+                        <option value="Box">Box</option>
+                        <option value="Strip">Strip</option>
+                        <option value="Botol">Botol</option>
+                        <option value="Tube">Tube</option>
+                        <option value="Pcs">Pcs</option>
+                      </select>
+                    </div>
+                  )}
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Isi per Unit Pembelian</label>
-                    <input
-                      type="number"
-                      name="unit_multiplier"
-                      required
-                      min="1"
-                      value={formData.unit_multiplier}
-                      onChange={handleInputChange}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                      placeholder="1"
-                    />
-                  </div>
+                {hasPurchaseUnitForm && (
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Isi per Satuan Besar <span className="text-red-500">*</span></label>
+                      <input
+                        type="number"
+                        name="unit_multiplier"
+                        required
+                        min="1"
+                        value={formData.unit_multiplier}
+                        onChange={handleInputChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                        placeholder="1"
+                      />
+                    </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Stok (Dalam {formData.purchase_unit || 'Box'})</label>
-                    <input
-                      type="number"
-                      name="purchase_unit_stock"
-                      min="0"
-                      value={formData.purchase_unit_stock}
-                      onChange={handleInputChange}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                      placeholder="0"
-                    />
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Stok (Dalam {formData.purchase_unit || 'Box'})</label>
+                      <input
+                        type="number"
+                        name="purchase_unit_stock"
+                        min="0"
+                        value={formData.purchase_unit_stock}
+                        onChange={handleInputChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                        placeholder="0"
+                      />
+                    </div>
                   </div>
-                </div>
+                )}
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Stok (Dalam {formData.unit || 'Tablet'}) <span className="text-xs text-gray-400 font-normal">(Unit Dasar)</span>
+                      Stok (Dalam {formData.unit || 'Tablet'}) <span className="text-red-500">*</span> <span className="text-xs text-gray-400 font-normal">(Unit Dasar)</span>
                     </label>
                     <input
                       type="number"
@@ -1909,10 +1927,11 @@ export default function ProductsPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Expired Date</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Expired Date <span className="text-red-500">*</span></label>
                   <input
                     type="date"
                     name="expired_date"
+                    required
                     value={formData.expired_date}
                     onChange={handleInputChange}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
@@ -1926,7 +1945,7 @@ export default function ProductsPage() {
                   <h3 className="font-medium text-gray-700 mb-3">Tambahkan Produk</h3>
                   <div className="grid grid-cols-2 gap-4 mb-3">
                     <div>
-                      <label className="block text-xs text-gray-600 mb-1">Nama Produk</label>
+                      <label className="block text-xs text-gray-600 mb-1">Nama Produk <span className="text-red-500">*</span></label>
                       <input
                         type="text"
                         name="name"
@@ -1968,7 +1987,7 @@ export default function ProductsPage() {
                       </select>
                     </div>
                     <div>
-                      <label className="block text-xs text-gray-600 mb-1">Harga Beli</label>
+                      <label className="block text-xs text-gray-600 mb-1">Harga Beli <span className="text-red-500">*</span></label>
                       <input
                         type="number"
                         name="cost_price"
@@ -1979,7 +1998,7 @@ export default function ProductsPage() {
                       />
                     </div>
                     <div>
-                      <label className="block text-xs text-gray-600 mb-1">Harga Jual</label>
+                      <label className="block text-xs text-gray-600 mb-1">Harga Jual <span className="text-red-500">*</span></label>
                       <input
                         type="number"
                         name="selling_price"
@@ -1989,23 +2008,20 @@ export default function ProductsPage() {
                         placeholder="0"
                       />
                     </div>
-                    <div>
-                      <label className="block text-xs text-gray-600 mb-1">Unit Pembelian</label>
-                      <select
-                        name="purchase_unit"
-                        value={formData.purchase_unit}
-                        onChange={handleInputChange}
-                        className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm"
-                      >
-                        <option value="Box">Box</option>
-                        <option value="Strip">Strip</option>
-                        <option value="Botol">Botol</option>
-                        <option value="Tube">Tube</option>
-                        <option value="Pcs">Pcs</option>
-                      </select>
+                    <div className="col-span-2">
+                      <div className="flex items-center gap-2 mb-2">
+                        <button
+                          type="button"
+                          onClick={() => setHasPurchaseUnitForm(!hasPurchaseUnitForm)}
+                          className={`relative w-9 h-5 rounded-full transition-colors ${hasPurchaseUnitForm ? 'bg-blue-600' : 'bg-gray-300'}`}
+                        >
+                          <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow-sm transition-transform ${hasPurchaseUnitForm ? 'translate-x-4' : ''}`} />
+                        </button>
+                        <span className="text-xs font-medium text-gray-600">Memiliki satuan besar?</span>
+                      </div>
                     </div>
                     <div>
-                      <label className="block text-xs text-gray-600 mb-1">Unit Dasar</label>
+                      <label className="block text-xs text-gray-600 mb-1">Unit Dasar <span className="text-red-500">*</span></label>
                       <select
                         name="unit"
                         value={formData.unit}
@@ -2023,40 +2039,59 @@ export default function ProductsPage() {
                         <option value="Pcs">Pcs</option>
                       </select>
                     </div>
+                    {hasPurchaseUnitForm && (
+                      <>
+                        <div>
+                          <label className="block text-xs text-gray-600 mb-1">Unit Satuan Besar <span className="text-red-500">*</span></label>
+                          <select
+                            name="purchase_unit"
+                            value={formData.purchase_unit}
+                            onChange={handleInputChange}
+                            className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm"
+                          >
+                            <option value="Box">Box</option>
+                            <option value="Strip">Strip</option>
+                            <option value="Botol">Botol</option>
+                            <option value="Tube">Tube</option>
+                            <option value="Pcs">Pcs</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-xs text-gray-600 mb-1">Isi per Satuan Besar <span className="text-red-500">*</span></label>
+                          <input
+                            type="number"
+                            name="unit_multiplier"
+                            min="1"
+                            value={formData.unit_multiplier}
+                            onChange={(e) => {
+                              const multVal = e.target.value;
+                              const mult = Number(multVal) || 1;
+                              const pStock = Number(formData.purchase_unit_stock) || 0;
+                              setFormData({
+                                ...formData,
+                                unit_multiplier: multVal,
+                                stock: formData.purchase_unit_stock === '' ? '' : Math.round(pStock * mult).toString()
+                              });
+                            }}
+                            className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm"
+                            placeholder="1"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs text-gray-600 mb-1">Stock ({formData.purchase_unit || 'Box'})</label>
+                          <input
+                            type="number"
+                            name="purchase_unit_stock"
+                            value={formData.purchase_unit_stock || ''}
+                            onChange={handleInputChange}
+                            className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm"
+                            placeholder="0"
+                          />
+                        </div>
+                      </>
+                    )}
                     <div>
-                      <label className="block text-xs text-gray-600 mb-1">Isi per Unit Pembelian</label>
-                      <input
-                        type="number"
-                        name="unit_multiplier"
-                        min="1"
-                        value={formData.unit_multiplier}
-                        onChange={(e) => {
-                          const multVal = e.target.value;
-                          const mult = Number(multVal) || 1;
-                          const pStock = Number(formData.purchase_unit_stock) || 0;
-                          setFormData({
-                            ...formData,
-                            unit_multiplier: multVal,
-                            stock: formData.purchase_unit_stock === '' ? '' : Math.round(pStock * mult).toString()
-                          });
-                        }}
-                        className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm"
-                        placeholder="1"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-gray-600 mb-1">Stock ({formData.purchase_unit || 'Box'})</label>
-                      <input
-                        type="number"
-                        name="purchase_unit_stock"
-                        value={formData.purchase_unit_stock || ''}
-                        onChange={handleInputChange}
-                        className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm"
-                        placeholder="0"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-gray-600 mb-1">Stock ({formData.unit || 'Tablet'}) <span className="text-[10px] text-gray-400 font-normal">(Unit Dasar)</span></label>
+                      <label className="block text-xs text-gray-600 mb-1">Stock ({formData.unit || 'Tablet'}) <span className="text-red-500">*</span> <span className="text-[10px] text-gray-400 font-normal">(Unit Dasar)</span></label>
                       <input
                         type="number"
                         name="stock"
@@ -2067,10 +2102,11 @@ export default function ProductsPage() {
                       />
                     </div>
                     <div>
-                    <label className="block text-xs text-gray-600 mb-1">Tgl Kadaluarsa</label>
+                    <label className="block text-xs text-gray-600 mb-1">Tgl Kadaluarsa <span className="text-red-500">*</span></label>
                     <input
                       type="date"
                       name="expired_date"
+                      required
                       value={formData.expired_date}
                       onChange={handleInputChange}
                       className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm"
@@ -2513,7 +2549,7 @@ export default function ProductsPage() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Unit Pembelian
+                    Unit Satuan Besar
                   </label>
                   <select
                     name="purchase_unit"
@@ -2548,7 +2584,7 @@ export default function ProductsPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Isi per Unit Pembelian</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Isi per Satuan Besar</label>
                   <input
                     type="number"
                     name="unit_multiplier"

@@ -965,6 +965,11 @@ expect(screen.getByText(/Rp\s*2\.000/)).toBeInTheDocument();
       expect(screen.getByPlaceholderText('Enter product name')).toBeInTheDocument();
     });
 
+    // Toggle on "Memiliki satuan besar?" to show purchase unit fields
+    const toggleText = screen.getByText('Memiliki satuan besar?');
+    const toggleBtn = toggleText.closest('div')?.querySelector('button') || toggleText.previousElementSibling as HTMLElement;
+    if (toggleBtn) fireEvent.click(toggleBtn);
+
     // Find purchase_unit_stock input by name
     const purchaseStockInput = document.querySelector('[name="purchase_unit_stock"]') as HTMLInputElement;
     fireEvent.change(purchaseStockInput, {
@@ -979,6 +984,12 @@ expect(screen.getByText(/Rp\s*2\.000/)).toBeInTheDocument();
   });
 
   // ─── Form input: unit_multiplier changes calculate stock ───
+  function toggleSatuanBesar() {
+    const toggleText = screen.getByText('Memiliki satuan besar?');
+    const toggleBtn = toggleText.closest('div')?.querySelector('button');
+    if (toggleBtn) fireEvent.click(toggleBtn);
+  }
+
   test('calculates stock when unit_multiplier changes', async () => {
     renderPage();
     await waitLoaded();
@@ -987,6 +998,8 @@ expect(screen.getByText(/Rp\s*2\.000/)).toBeInTheDocument();
     await waitFor(() => {
       expect(screen.getByPlaceholderText('Enter product name')).toBeInTheDocument();
     });
+
+    toggleSatuanBesar();
 
     // First set purchase_unit_stock to 5
     const purchaseStockInput = document.querySelector('[name="purchase_unit_stock"]') as HTMLInputElement;
@@ -1016,6 +1029,8 @@ expect(screen.getByText(/Rp\s*2\.000/)).toBeInTheDocument();
     await waitFor(() => {
       expect(screen.getByPlaceholderText('Enter product name')).toBeInTheDocument();
     });
+
+    toggleSatuanBesar();
 
     // Change stock directly
     const stockInput = document.querySelector('[name="stock"]') as HTMLInputElement;
@@ -5136,6 +5151,8 @@ expect(screen.getByText(/Rp\s*2\.000/)).toBeInTheDocument();
 
     fireEvent.click(screen.getByText('Multiple Products'));
 
+    toggleSatuanBesar();
+
     // Find the unit_multiplier input in multi mode
     const multInput = document.querySelector('[name="unit_multiplier"]') as HTMLInputElement;
     fireEvent.change(multInput, { target: { value: '5' } });
@@ -5736,6 +5753,8 @@ expect(screen.getByText(/Rp\s*2\.000/)).toBeInTheDocument();
     await waitFor(() => {
       expect(screen.getByText('Edit Product')).toBeInTheDocument();
     });
+
+    toggleSatuanBesar();
 
     const purchaseStockInput = document.querySelector('[name="purchase_unit_stock"]') as HTMLInputElement;
     const unitMultiplierInput = document.querySelector('[name="unit_multiplier"]') as HTMLInputElement;
