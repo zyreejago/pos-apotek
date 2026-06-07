@@ -7,9 +7,10 @@ function registerInventoryRoutes(app, pool, authenticate, checkPermission, uploa
     try {
       const { productId } = req.params;
       const [rows] = await pool.query(`
-        SELECT b.*, s.name as supplier_name 
+        SELECT b.*, s.name as supplier_name, u.username as created_by_username, u.role as created_by_role
         FROM batches b 
         LEFT JOIN suppliers s ON b.supplier_id = s.id 
+        LEFT JOIN users u ON b.created_by = u.id
         WHERE b.product_id = ? AND b.is_archived = FALSE
         ORDER BY b.expired_date ASC, b.id ASC
       `, [productId]);
@@ -261,8 +262,8 @@ function registerInventoryRoutes(app, pool, authenticate, checkPermission, uploa
       const status = needsApproval ? 'pending' : 'approved';
 
       const [result] = await pool.query(`
-        INSERT INTO batches (product_id, supplier_id, batch_number, stock_type, purchase_date, initial_quantity, remaining_quantity, cost_price, expired_date, dp_amount, due_date, image_url, status, notes)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO batches (product_id, supplier_id, batch_number, stock_type, purchase_date, initial_quantity, remaining_quantity, cost_price, expired_date, dp_amount, due_date, image_url, status, notes, created_by)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `, [
         product_id, 
         supplier_id && supplier_id !== '' ? Number(supplier_id) : null, 
@@ -277,7 +278,8 @@ function registerInventoryRoutes(app, pool, authenticate, checkPermission, uploa
         formattedDueDate, 
         image_url,
         status,
-        notes || null
+        notes || null,
+        req.user.id
       ]);
       
       // Auto-create DP 1 payment record if dp_amount is filled
@@ -766,16 +768,16 @@ function registerInventoryRoutes(app, pool, authenticate, checkPermission, uploa
   // Create a prescription
   app.post('/api/inventory/prescriptions', authenticate, checkPermission('Resep Dokter', 'create'), upload.single('image'), async (req, res) => {
     try {
-      const { prescription_code, prescription_date, entered_by, transaction_id, notes, items } = req.body;
+      const { prescription_code, prescription_date, entered_by, transaction_id, notes, items, doctor_name, instansi } = req.body;
       const image_url = req.file ? `/uploads/${req.file.filename}` : null;
       
       // Format date to YYYY-MM-DD
       const formattedDate = prescription_date ? new Date(prescription_date).toISOString().split('T')[0] : null;
       
       const [result] = await pool.query(`
-        INSERT INTO prescriptions (prescription_code, image_url, prescription_date, entered_by, transaction_id, notes)
-        VALUES (?, ?, ?, ?, ?, ?)
-      `, [prescription_code, image_url, formattedDate, entered_by, transaction_id, notes]);
+        INSERT INTO prescriptions (prescription_code, image_url, prescription_date, entered_by, transaction_id, notes, doctor_name, instansi)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `, [prescription_code, image_url, formattedDate, entered_by, transaction_id, notes, doctor_name || null, instansi || null]);
       
       // Insert items if provided
       if (items) {
@@ -808,7 +810,7 @@ function registerInventoryRoutes(app, pool, authenticate, checkPermission, uploa
   app.put('/api/inventory/prescriptions/:id', authenticate, checkPermission('Resep Dokter', 'edit'), upload.single('image'), async (req, res) => {
     try {
       const { id } = req.params;
-      const { prescription_code, prescription_date, entered_by, transaction_id, notes, items } = req.body;
+      const { prescription_code, prescription_date, entered_by, transaction_id, notes, items, doctor_name, instansi } = req.body;
       
       // Format date to YYYY-MM-DD
       const formattedDate = prescription_date ? new Date(prescription_date).toISOString().split('T')[0] : null;
@@ -823,9 +825,9 @@ function registerInventoryRoutes(app, pool, authenticate, checkPermission, uploa
       
       await pool.query(`
         UPDATE prescriptions 
-        SET prescription_code = ?, image_url = ?, prescription_date = ?, entered_by = ?, transaction_id = ?, notes = ?
+        SET prescription_code = ?, image_url = ?, prescription_date = ?, entered_by = ?, transaction_id = ?, notes = ?, doctor_name = ?, instansi = ?
         WHERE id = ?
-      `, [prescription_code, image_url, formattedDate, entered_by, transaction_id, notes, id]);
+      `, [prescription_code, image_url, formattedDate, entered_by, transaction_id, notes, doctor_name || null, instansi || null, id]);
 
       // Update items if provided
       if (items) {

@@ -6032,4 +6032,130 @@ expect(screen.getByText(/Rp\s*2\.000/)).toBeInTheDocument();
     await waitFor(() => expect(screen.getByText(/Faktur - /)).toBeInTheDocument());
     await waitFor(() => expect(screen.getByText('BATCH-DPFALLBACK')).toBeInTheDocument());
   });
+
+  // ─── Detail Faktur button (eye icon) opens detail modal ───
+  test('opens detail faktur modal with eye icon', async () => {
+    const faktursData = {
+      data: [{
+        id: 701, product_id: 1, batch_number: 'BATCH-DETAIL01', invoice_number: 'BATCH-DETAIL01',
+        supplier_id: 1, supplier_name: 'Supplier A', purchase_date: '2024-01-15',
+        initial_quantity: 10, remaining_quantity: 8, quantity: 10,
+        cost_price: 5000, total_amount: 50000, stock_type: 'lunas', status: 'approved',
+        dp_amount: null, due_date: null, expired_date: '2025-06-01',
+        notes: 'Test notes', image_url: null,
+        created_at: '2024-01-15T00:00:00Z',
+        created_by_username: 'superadmin',
+        created_by_role: 'superadmin',
+      }],
+    };
+
+    global.fetch = jest.fn((input: RequestInfo) => {
+      const url = typeof input === 'string' ? input : input.url;
+      if (url.includes('/api/inventory/batches/')) return okJson(faktursData);
+      if (url.includes('/api/products')) return okJson(productsPayload);
+      if (url.includes('/api/suppliers')) return okJson({ data: [] });
+      return okJson({});
+    }) as unknown as typeof fetch;
+
+    renderPage();
+    await waitLoaded();
+
+    fireEvent.click((await screen.findAllByTitle('Faktur'))[0]);
+    await waitFor(() => expect(screen.getByText(/Faktur - /)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('BATCH-DETAIL01')).toBeInTheDocument());
+
+    // Click the eye icon (detail) button - first button in actions (before Edit)
+    const detailBtn = screen.getByTitle('Detail Faktur');
+    fireEvent.click(detailBtn);
+
+    // Detail modal should show
+    await waitFor(() => {
+      expect(screen.getByText('Detail Faktur')).toBeInTheDocument();
+    });
+    expect(screen.getAllByText('BATCH-DETAIL01').length).toBeGreaterThanOrEqual(2);
+  });
+
+  // ─── Detail modal shows created_by info (Dibuat Oleh) ───
+  test('detail modal displays created_by username and role', async () => {
+    const faktursData = {
+      data: [{
+        id: 702, product_id: 1, batch_number: 'BATCH-CREATEDBY', invoice_number: 'BATCH-CREATEDBY',
+        supplier_id: 1, supplier_name: 'Supplier A', purchase_date: '2024-01-15',
+        initial_quantity: 10, remaining_quantity: 8, quantity: 10,
+        cost_price: 5000, total_amount: 50000, stock_type: 'lunas', status: 'approved',
+        dp_amount: null, due_date: null, expired_date: '2025-06-01',
+        notes: null, image_url: null,
+        created_at: '2024-01-15T00:00:00Z',
+        created_by_username: 'admin_user',
+        created_by_role: 'admin',
+      }],
+    };
+
+    global.fetch = jest.fn((input: RequestInfo) => {
+      const url = typeof input === 'string' ? input : input.url;
+      if (url.includes('/api/inventory/batches/')) return okJson(faktursData);
+      if (url.includes('/api/products')) return okJson(productsPayload);
+      if (url.includes('/api/suppliers')) return okJson({ data: [] });
+      return okJson({});
+    }) as unknown as typeof fetch;
+
+    renderPage();
+    await waitLoaded();
+
+    fireEvent.click((await screen.findAllByTitle('Faktur'))[0]);
+    await waitFor(() => expect(screen.getByText(/Faktur - /)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('BATCH-CREATEDBY')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByTitle('Detail Faktur'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Detail Faktur')).toBeInTheDocument();
+      expect(screen.getByText('admin_user')).toBeInTheDocument();
+    });
+  });
+
+  // ─── Detail modal close button works ───
+  test('closes detail faktur modal via close button', async () => {
+    const faktursData = {
+      data: [{
+        id: 703, product_id: 1, batch_number: 'BATCH-DETAILCLOSE', invoice_number: 'BATCH-DETAILCLOSE',
+        supplier_id: 1, supplier_name: 'Supplier A', purchase_date: '2024-01-15',
+        initial_quantity: 10, remaining_quantity: 8, quantity: 10,
+        cost_price: 5000, total_amount: 50000, stock_type: 'lunas', status: 'approved',
+        dp_amount: null, due_date: null, expired_date: '2025-06-01',
+        notes: null, image_url: null,
+        created_at: '2024-01-15T00:00:00Z',
+        created_by_username: 'test_user',
+        created_by_role: 'admin',
+      }],
+    };
+
+    global.fetch = jest.fn((input: RequestInfo) => {
+      const url = typeof input === 'string' ? input : input.url;
+      if (url.includes('/api/inventory/batches/')) return okJson(faktursData);
+      if (url.includes('/api/products')) return okJson(productsPayload);
+      if (url.includes('/api/suppliers')) return okJson({ data: [] });
+      return okJson({});
+    }) as unknown as typeof fetch;
+
+    renderPage();
+    await waitLoaded();
+
+    fireEvent.click((await screen.findAllByTitle('Faktur'))[0]);
+    await waitFor(() => expect(screen.getByText(/Faktur - /)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('BATCH-DETAILCLOSE')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByTitle('Detail Faktur'));
+    await waitFor(() => {
+      expect(screen.getByText('Detail Faktur')).toBeInTheDocument();
+    });
+
+    // Close via Tutup button
+    const tutupBtn = screen.getByText('Tutup');
+    fireEvent.click(tutupBtn);
+
+    await waitFor(() => {
+      expect(screen.queryByText('Detail Faktur')).not.toBeInTheDocument();
+    });
+  });
 });

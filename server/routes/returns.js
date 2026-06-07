@@ -468,7 +468,7 @@ module.exports = function registerReturnRoutes(app, pool, authenticate, checkPer
       let nonObatHPP = 0;
 
       for (const item of items) {
-        const { sale_item_id, qty_returned } = item;
+        const { sale_item_id, qty_returned, condition } = item;
         if (!sale_item_id || !qty_returned) throw new Error('Setiap item wajib memiliki sale_item_id dan qty_returned');
         if (qty_returned <= 0) throw new Error('qty_returned harus > 0');
 
@@ -532,6 +532,7 @@ module.exports = function registerReturnRoutes(app, pool, authenticate, checkPer
           isObat,
           itemRefund,
           itemHPP,
+          condition: item.condition || 'baik',
         });
       }
 
@@ -546,23 +547,23 @@ module.exports = function registerReturnRoutes(app, pool, authenticate, checkPer
 
       for (const ri of returnItems) {
         await connection.query(
-          'INSERT INTO sale_return_items (return_id, sale_item_id, batch_id, product_id, qty_returned, price) VALUES (?, ?, ?, ?, ?, ?)',
-          [returnId, ri.sale_item_id, ri.batch_id, ri.product_id, ri.qty_returned, ri.price]
+          'INSERT INTO sale_return_items (return_id, sale_item_id, batch_id, product_id, qty_returned, price, `condition`) VALUES (?, ?, ?, ?, ?, ?, ?)',
+          [returnId, ri.sale_item_id, ri.batch_id, ri.product_id, ri.qty_returned, ri.price, ri.condition || 'baik']
         );
 
-        // Restore stock to batch
-        if (ri.batch_id) {
+        // Restore stock only if condition is 'baik' (not 'rusak')
+        if (ri.condition !== 'rusak') {
+          if (ri.batch_id) {
+            await connection.query(
+              'UPDATE batches SET remaining_quantity = remaining_quantity + ? WHERE id = ?',
+              [ri.qty_returned, ri.batch_id]
+            );
+          }
           await connection.query(
-            'UPDATE batches SET remaining_quantity = remaining_quantity + ? WHERE id = ?',
-            [ri.qty_returned, ri.batch_id]
+            'UPDATE products SET stock = stock + ? WHERE id = ?',
+            [ri.qty_returned, ri.product_id]
           );
         }
-
-        // Restore product stock
-        await connection.query(
-          'UPDATE products SET stock = stock + ? WHERE id = ?',
-          [ri.qty_returned, ri.product_id]
-        );
       }
 
       // Journal: Dr. Retur Penjualan, Dr. Persediaan, Cr. Kas/Piutang, Cr. HPP

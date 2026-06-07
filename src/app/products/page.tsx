@@ -66,6 +66,8 @@ interface Faktur {
   created_at: string;
   dp_payments?: DpPayment[];
   qty_returned?: number;
+  created_by_username?: string;
+  created_by_role?: string;
 }
 
 interface DbBatch {
@@ -220,6 +222,7 @@ export default function ProductsPage() {
   const [fakturImageFile, setFakturImageFile] = useState<File | null>(null);
   const [fakturImagePreview, setFakturImagePreview] = useState<string | null>(null);
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
+  const [detailFaktur, setDetailFaktur] = useState<Faktur | null>(null);
   const [newDPAmount, setNewDPAmount] = useState('');
   const [newDPDate, setNewDPDate] = useState(new Date().toISOString().split('T')[0]);
   const [newDPPaymentMethod, setNewDPPaymentMethod] = useState('cash');
@@ -2355,6 +2358,13 @@ export default function ProductsPage() {
                               </button>
                             )}
                             <button
+                              onClick={() => setDetailFaktur(faktur)}
+                              className="p-1 text-gray-500 hover:bg-gray-100 rounded"
+                              title="Detail Faktur"
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                            </button>
+                            <button
                               onClick={() => handleOpenEditFakturModal(faktur)}
                               className={`p-1 rounded ${faktur.status === 'revision' || faktur.status === 'rejected' ? 'text-orange-600 bg-orange-50 border border-orange-200' : 'text-blue-600 hover:bg-blue-50'}`}
                               title={faktur.status === 'revision' || faktur.status === 'rejected' ? 'Perbaiki' : 'Edit'}
@@ -3060,6 +3070,149 @@ export default function ProductsPage() {
                   Tutup
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Detail Faktur Modal */}
+      {detailFaktur && (
+        <div 
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[9999] p-4" 
+          onClick={() => setDetailFaktur(null)}
+        >
+          <div 
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto" 
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-center px-6 py-4 border-b border-gray-100 bg-gray-50/50 sticky top-0 bg-white">
+              <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                Detail Faktur
+              </h3>
+              <button 
+                onClick={() => setDetailFaktur(null)}
+                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-all"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-5">
+              {/* Info Umum */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-gray-50 p-3 rounded-xl">
+                  <p className="text-xs text-gray-500 font-medium uppercase tracking-wider">Nomor Batch</p>
+                  <p className="text-sm font-bold text-gray-900 mt-1">{detailFaktur.invoice_number || '-'}</p>
+                </div>
+                <div className="bg-gray-50 p-3 rounded-xl">
+                  <p className="text-xs text-gray-500 font-medium uppercase tracking-wider">Supplier</p>
+                  <p className="text-sm font-bold text-gray-900 mt-1">{detailFaktur.supplier_name || '-'}</p>
+                </div>
+                <div className="bg-gray-50 p-3 rounded-xl">
+                  <p className="text-xs text-gray-500 font-medium uppercase tracking-wider">Tipe Stok</p>
+                  <p className="text-sm font-bold text-gray-900 mt-1 capitalize">{detailFaktur.stock_type?.replace(/_/g, ' ') || '-'}</p>
+                </div>
+                <div className="bg-gray-50 p-3 rounded-xl">
+                  <p className="text-xs text-gray-500 font-medium uppercase tracking-wider">Status</p>
+                  <p className="text-sm font-bold text-gray-900 mt-1 capitalize">{detailFaktur.status || '-'}</p>
+                </div>
+                <div className="bg-gray-50 p-3 rounded-xl">
+                  <p className="text-xs text-gray-500 font-medium uppercase tracking-wider">Tgl Pembelian</p>
+                  <p className="text-sm font-bold text-gray-900 mt-1">{detailFaktur.purchase_date ? new Date(detailFaktur.purchase_date).toLocaleDateString('id-ID') : '-'}</p>
+                </div>
+                <div className="bg-gray-50 p-3 rounded-xl">
+                  <p className="text-xs text-gray-500 font-medium uppercase tracking-wider">Tgl Kadaluarsa</p>
+                  <p className="text-sm font-bold text-gray-900 mt-1">{detailFaktur.expired_date ? new Date(detailFaktur.expired_date).toLocaleDateString('id-ID') : '-'}</p>
+                </div>
+                <div className="bg-gray-50 p-3 rounded-xl">
+                  <p className="text-xs text-gray-500 font-medium uppercase tracking-wider">Qty Awal</p>
+                  <p className="text-sm font-bold text-gray-900 mt-1">{detailFaktur.initial_quantity || detailFaktur.quantity} {selectedProduct?.unit || 'Tablet'}</p>
+                </div>
+                <div className="bg-gray-50 p-3 rounded-xl">
+                  <p className="text-xs text-gray-500 font-medium uppercase tracking-wider">Qty Tersisa</p>
+                  <p className="text-sm font-bold text-gray-900 mt-1">{detailFaktur.remaining_quantity ?? detailFaktur.quantity} {selectedProduct?.unit || 'Tablet'}</p>
+                </div>
+                <div className="bg-gray-50 p-3 rounded-xl">
+                  <p className="text-xs text-gray-500 font-medium uppercase tracking-wider">Harga Beli</p>
+                  <p className="text-sm font-bold text-gray-900 mt-1">{formatCurrency(detailFaktur.cost_price)}</p>
+                </div>
+                <div className="bg-gray-50 p-3 rounded-xl">
+                  <p className="text-xs text-gray-500 font-medium uppercase tracking-wider">Total Amount</p>
+                  <p className="text-sm font-bold text-gray-900 mt-1">{formatCurrency(Number(detailFaktur.total_amount) || (detailFaktur.cost_price * (detailFaktur.initial_quantity || detailFaktur.quantity)))}</p>
+                </div>
+              </div>
+
+              {/* Dibuat Oleh */}
+              {(detailFaktur as any).created_by_username && (
+                <div className="bg-blue-50 border border-blue-100 p-3 rounded-xl">
+                  <p className="text-xs text-blue-600 font-medium uppercase tracking-wider">Dibuat Oleh</p>
+                  <p className="text-sm font-bold text-blue-800 mt-1">
+                    {(detailFaktur as any).created_by_username}
+                    <span className="text-blue-500 font-normal ml-2">({(detailFaktur as any).created_by_role || '-'})</span>
+                  </p>
+                </div>
+              )}
+
+              {/* Catatan */}
+              {detailFaktur.notes && (
+                <div className="bg-orange-50 border border-orange-100 p-3 rounded-xl">
+                  <p className="text-xs text-orange-600 font-medium uppercase tracking-wider">Catatan</p>
+                  <p className="text-sm text-orange-800 mt-1">{detailFaktur.notes}</p>
+                </div>
+              )}
+
+              {/* DP Payments */}
+              {detailFaktur.stock_type === 'dp' && (
+                <div>
+                  <h4 className="text-sm font-bold text-gray-700 mb-3 flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+                    Riwayat Pembayaran DP
+                  </h4>
+                  <div className="space-y-2">
+                    {(detailFaktur.dp_payments && detailFaktur.dp_payments.length > 0 ? detailFaktur.dp_payments : 
+                      detailFaktur.dp_amount ? [{ id: -1, amount: detailFaktur.dp_amount, payment_date: detailFaktur.purchase_date, payment_method: 'cash' }] : []
+                    ).map((dp: any, i: number) => (
+                      <div key={dp.id} className="flex justify-between items-center bg-gray-50 p-3 rounded-xl">
+                        <div>
+                          <p className="text-sm font-medium text-gray-800">DP {i + 1}</p>
+                          <p className="text-xs text-gray-500">{dp.payment_date ? new Date(dp.payment_date).toLocaleDateString('id-ID') : '-'}</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className={`text-xs font-medium px-1.5 py-0.5 rounded ${dp.payment_method === 'transfer' ? 'bg-purple-100 text-purple-700' : 'bg-green-100 text-green-700'}`}>
+                            {dp.payment_method === 'transfer' ? 'TF' : 'Cash'}
+                          </span>
+                          <span className="text-sm font-bold text-blue-700">{formatCurrency(Number(dp.amount))}</span>
+                        </div>
+                      </div>
+                    ))}
+                    {(!detailFaktur.dp_payments || detailFaktur.dp_payments.length === 0) && !detailFaktur.dp_amount && (
+                      <p className="text-sm text-gray-400 italic">Belum ada pembayaran DP</p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Bukti Faktur */}
+              {detailFaktur.image_url && (
+                <div>
+                  <h4 className="text-sm font-bold text-gray-700 mb-2">Bukti Faktur</h4>
+                  <img 
+                    src={`http://localhost:5000${detailFaktur.image_url}`} 
+                    alt="Bukti Faktur" 
+                    className="max-w-full h-48 object-contain rounded-xl border border-gray-200"
+                  />
+                </div>
+              )}
+            </div>
+
+            <div className="px-6 py-4 border-t border-gray-100 flex justify-end">
+              <button
+                onClick={() => setDetailFaktur(null)}
+                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors"
+              >
+                Tutup
+              </button>
             </div>
           </div>
         </div>

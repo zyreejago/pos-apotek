@@ -44,6 +44,8 @@ interface Prescription {
   notes: string | null;
   created_at: string;
   entered_by_name: string | null;
+  doctor_name: string | null;
+  instansi: string | null;
   items?: PrescriptionItem[];
 }
 
@@ -53,6 +55,8 @@ interface PrescriptionFormData {
   image_url: string;
   prescription_date: string;
   notes: string;
+  doctor_name: string;
+  instansi: string;
 }
 
 export default function PrescriptionsPage() {
@@ -88,7 +92,9 @@ export default function PrescriptionsPage() {
     image: null,
     image_url: '',
     prescription_date: new Date().toISOString().split('T')[0],
-    notes: ''
+    notes: '',
+    doctor_name: '',
+    instansi: ''
   });
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -274,9 +280,11 @@ export default function PrescriptionsPage() {
       prescription_code: '',
       image: null,
       image_url: '',
-      prescription_date: new Date().toISOString().split('T')[0],
-      notes: ''
-    });
+    prescription_date: new Date().toISOString().split('T')[0],
+    notes: '',
+    doctor_name: '',
+    instansi: ''
+  });
     setCart([]);
     setImagePreview(null);
     setSaveOption('save_and_pay');
@@ -291,7 +299,9 @@ export default function PrescriptionsPage() {
       image: null,
       image_url: prescription.image_url || '',
       prescription_date: prescription.prescription_date || new Date().toISOString().split('T')[0],
-      notes: prescription.notes || ''
+      notes: prescription.notes || '',
+      doctor_name: prescription.doctor_name || '',
+      instansi: prescription.instansi || ''
     });
     
     // Load prescription items into cart (handle case where items is undefined)
@@ -502,6 +512,12 @@ export default function PrescriptionsPage() {
       formDataToSend.append('prescription_code', formData.prescription_code);
       formDataToSend.append('prescription_date', formData.prescription_date);
       formDataToSend.append('notes', formData.notes);
+      if (formData.doctor_name) {
+        formDataToSend.append('doctor_name', formData.doctor_name);
+      }
+      if (formData.instansi) {
+        formDataToSend.append('instansi', formData.instansi);
+      }
       formDataToSend.append('entered_by', currentUser?.id || '');
       // Set transaction_id (either existing or new one)
       if (transactionId) {
@@ -649,6 +665,12 @@ export default function PrescriptionsPage() {
       prescriptionFormData.append('prescription_code', formData.prescription_code);
       prescriptionFormData.append('prescription_date', formData.prescription_date);
       prescriptionFormData.append('notes', formData.notes);
+      if (formData.doctor_name) {
+        prescriptionFormData.append('doctor_name', formData.doctor_name);
+      }
+      if (formData.instansi) {
+        prescriptionFormData.append('instansi', formData.instansi);
+      }
       prescriptionFormData.append('entered_by', currentUser?.id || '');
       if (transactionId) {
         prescriptionFormData.append('transaction_id', transactionId.toString());
@@ -759,6 +781,8 @@ export default function PrescriptionsPage() {
                 <tr>
                   <th className="px-6 py-4">Kode Resep</th>
                   <th className="px-6 py-4">Tanggal</th>
+                  <th className="px-6 py-4">Dokter</th>
+                  <th className="px-6 py-4">Instansi</th>
                   <th className="px-6 py-4">Diupload Oleh</th>
                   <th className="px-6 py-4">Gambar</th>
                   <th className="px-6 py-4">Items</th>
@@ -768,13 +792,13 @@ export default function PrescriptionsPage() {
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
+                    <td colSpan={8} className="px-6 py-8 text-center text-gray-500">
                       Memuat resep...
                     </td>
                   </tr>
                 ) : prescriptions.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
+                    <td colSpan={8} className="px-6 py-8 text-center text-gray-500">
                       Belum ada resep yang ditambahkan
                     </td>
                   </tr>
@@ -786,6 +810,12 @@ export default function PrescriptionsPage() {
                       </td>
                       <td className="px-6 py-4 text-gray-600">
                         {formatDate(prescription.prescription_date)}
+                      </td>
+                      <td className="px-6 py-4 text-gray-600">
+                        {prescription.doctor_name || '-'}
+                      </td>
+                      <td className="px-6 py-4 text-gray-600">
+                        {prescription.instansi || '-'}
                       </td>
                       <td className="px-6 py-4 text-gray-600">
                         {prescription.entered_by_name || '-'}
@@ -949,18 +979,41 @@ export default function PrescriptionsPage() {
             </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Catatan</label>
-            <textarea 
-              name="notes"
-              className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="Catatan tambahan..."
-              rows={2}
-              value={formData.notes}
+          <div className="space-y-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Nama Dokter <span className="text-gray-400 font-normal">(opsional)</span></label>
+              <input 
+                type="text" 
+                name="doctor_name"
+                className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Nama Dokter"
+                value={formData.doctor_name}
+                onChange={handleInputChange}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Instansi <span className="text-gray-400 font-normal">(opsional)</span></label>
+              <input 
+                type="text" 
+                name="instansi"
+                className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Masukkan nama instansi"
+                value={formData.instansi || ''}
+                onChange={handleInputChange}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Catatan</label>
+              <textarea 
+                name="notes"
+                className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Catatan tambahan..."
+                rows={2}
+                value={formData.notes}
               onChange={handleInputChange}
             />
           </div>
-
+          </div>
 
             <div className="border-t border-gray-200 pt-6">
               <div className="flex items-center justify-between mb-4">

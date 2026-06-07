@@ -802,4 +802,61 @@ describe('SaleReturnsPage', () => {
       expect(screen.getByText('Total Retur')).toBeInTheDocument();
     });
   });
+
+  // --- Tests for condition field (baik/rusak) ---
+
+  test('shows condition dropdown with baik and rusak options when items are returnable', async () => {
+    setupHistoryFetch(emptyHistory);
+    global.fetch = makeFetch({
+      '/api/returns/sales/lookup?sale_id=1': () => okJson(saleLookupResponse),
+    }) as unknown as typeof fetch;
+    renderPage();
+    await waitInitialRender();
+    fireEvent.change(screen.getByPlaceholderText('Masukkan ID transaksi...'), { target: { value: '1' } });
+    fireEvent.click(screen.getByText('Cari'));
+    await waitFor(() => expect(screen.getByText('Paracetamol')).toBeInTheDocument());
+    const selects = screen.getAllByRole('combobox');
+    const conditionSelects = selects.filter(s => (s as HTMLSelectElement).value === 'baik');
+    expect(conditionSelects.length).toBeGreaterThan(0);
+    const firstSelect = conditionSelects[0] as HTMLSelectElement;
+    expect(firstSelect).toHaveValue('baik');
+    fireEvent.change(firstSelect, { target: { value: 'rusak' } });
+    expect(firstSelect).toHaveValue('rusak');
+    fireEvent.change(firstSelect, { target: { value: 'baik' } });
+    expect(firstSelect).toHaveValue('baik');
+  });
+
+  test('shows dash for condition when item has 0 returnable qty', async () => {
+    setupHistoryFetch(emptyHistory);
+    global.fetch = makeFetch({
+      '/api/returns/sales/lookup?sale_id=1': () => okJson(saleLookupResponse),
+    }) as unknown as typeof fetch;
+    renderPage();
+    await waitInitialRender();
+    fireEvent.change(screen.getByPlaceholderText('Masukkan ID transaksi...'), { target: { value: '1' } });
+    fireEvent.click(screen.getByText('Cari'));
+    await waitFor(() => expect(screen.getByText('Amoxicillin')).toBeInTheDocument());
+    const rows = screen.getAllByRole('row');
+    const amoxRow = rows.find(r => r.textContent?.includes('Amoxicillin'));
+    expect(amoxRow?.textContent).toContain('-');
+  });
+
+  test('condition field defaults to baik when qty is entered', async () => {
+    setupHistoryFetch(emptyHistory);
+    global.fetch = makeFetch({
+      '/api/returns/sales/lookup?sale_id=1': () => okJson(saleLookupResponse),
+    }) as unknown as typeof fetch;
+    renderPage();
+    await waitInitialRender();
+    fireEvent.change(screen.getByPlaceholderText('Masukkan ID transaksi...'), { target: { value: '1' } });
+    fireEvent.click(screen.getByText('Cari'));
+    await waitFor(() => expect(screen.getByText('Vitamin C')).toBeInTheDocument());
+    const qtyInputs = screen.getAllByRole('spinbutton');
+    fireEvent.change(qtyInputs[0], { target: { value: '2' } });
+    await waitFor(() => {
+      const selects = screen.getAllByRole('combobox');
+      const conditionSelects = selects.filter(s => (s as HTMLSelectElement).value === 'baik');
+      expect(conditionSelects.length).toBeGreaterThan(0);
+    });
+  });
 });

@@ -33,6 +33,7 @@ export default function SaleReturnsPage() {
   const [reason, setReason] = useState('');
   const [refundMethod, setRefundMethod] = useState<'cash' | 'credit_note'>('cash');
   const [returnQuantities, setReturnQuantities] = useState<Record<number, number>>({});
+  const [returnConditions, setReturnConditions] = useState<Record<number, string>>({});
   const [searched, setSearched] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [historyList, setHistoryList] = useState<any[]>([]);
@@ -76,6 +77,8 @@ export default function SaleReturnsPage() {
       }
       const data = await res.json();
       setLookupResult(data);
+      setReturnQuantities({});
+      setReturnConditions({});
     } catch {
       goeyToast.error('Gagal terhubung ke server', {});
     } finally {
@@ -86,6 +89,15 @@ export default function SaleReturnsPage() {
   const handleQtyChange = (itemId: number, value: string) => {
     const num = parseInt(value) || 0;
     setReturnQuantities(prev => ({ ...prev, [itemId]: num }));
+    if (num <= 0) {
+      setReturnConditions(prev => { const c = { ...prev }; delete c[itemId]; return c; });
+    } else if (!returnConditions[itemId]) {
+      setReturnConditions(prev => ({ ...prev, [itemId]: 'baik' }));
+    }
+  };
+  
+  const handleConditionChange = (itemId: number, condition: string) => {
+    setReturnConditions(prev => ({ ...prev, [itemId]: condition }));
   };
 
   const handleSubmit = async () => {
@@ -127,6 +139,7 @@ export default function SaleReturnsPage() {
       .map(item => ({
         sale_item_id: item.sale_item_id,
         qty_returned: returnQuantities[item.sale_item_id],
+        condition: returnConditions[item.sale_item_id] || 'baik',
       }));
 
     if (items.length === 0) {
@@ -147,6 +160,7 @@ export default function SaleReturnsPage() {
       .map(item => ({
         sale_item_id: item.sale_item_id,
         qty_returned: returnQuantities[item.sale_item_id],
+        condition: returnConditions[item.sale_item_id] || 'baik',
       }));
 
     try {
@@ -374,6 +388,7 @@ export default function SaleReturnsPage() {
                         <th className="px-4 py-3 text-center font-medium text-gray-600">Sudah Retur</th>
                         <th className="px-4 py-3 text-center font-medium text-gray-600">Bisa Retur</th>
                         <th className="px-4 py-3 text-center font-medium text-gray-600">Qty Retur</th>
+                        <th className="px-4 py-3 text-center font-medium text-gray-600">Kondisi</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
@@ -404,6 +419,20 @@ export default function SaleReturnsPage() {
                                 value={returnQuantities[item.sale_item_id] || ''}
                                 onChange={e => handleQtyChange(item.sale_item_id, e.target.value)}
                               />
+                            </td>
+                            <td className="px-4 py-3 text-center">
+                              {disabled ? (
+                                <span className="text-gray-300">-</span>
+                              ) : (
+                                <select
+                                  value={returnConditions[item.sale_item_id] || 'baik'}
+                                  onChange={e => handleConditionChange(item.sale_item_id, e.target.value)}
+                                  className="px-2 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                >
+                                  <option value="baik">Baik</option>
+                                  <option value="rusak">Rusak</option>
+                                </select>
+                              )}
                             </td>
                           </tr>
                         );

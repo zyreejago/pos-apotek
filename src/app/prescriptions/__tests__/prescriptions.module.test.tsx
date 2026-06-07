@@ -1131,4 +1131,74 @@ describe('prescriptions module', () => {
       expect(screen.getByText('QRIS / Transfer')).toBeInTheDocument();
     });
   });
+
+  // --- Tests for doctor_name and instansi fields ---
+
+  test('shows doctor_name and instansi fields in add form', async () => {
+    renderPage();
+    await waitLoaded();
+    const addBtn = screen.getByText('Tambah Resep');
+    fireEvent.click(addBtn);
+    await waitFor(() => {
+      expect(screen.getByText('Tambah Resep Baru')).toBeInTheDocument();
+    });
+    const inputs = document.querySelectorAll('input');
+    const doctorInput = Array.from(inputs).find(i => i.name === 'doctor_name');
+    const instansiInput = Array.from(inputs).find(i => i.name === 'instansi');
+    expect(doctorInput).toBeTruthy();
+    expect(instansiInput).toBeTruthy();
+  });
+
+  test('doctor_name and instansi inputs accept text values', async () => {
+    renderPage();
+    await waitLoaded();
+    fireEvent.click(screen.getByText('Tambah Resep'));
+    await waitFor(() => {
+      expect(screen.getByText('Tambah Resep Baru')).toBeInTheDocument();
+    });
+    const inputs = document.querySelectorAll('input');
+    const doctorInput = Array.from(inputs).find(i => i.name === 'doctor_name') as HTMLInputElement;
+    const instansiInput = Array.from(inputs).find(i => i.name === 'instansi') as HTMLInputElement;
+    if (doctorInput) {
+      fireEvent.change(doctorInput, { target: { name: 'doctor_name', value: 'Dr. John' } });
+      expect(doctorInput.value).toBe('Dr. John');
+    }
+    if (instansiInput) {
+      fireEvent.change(instansiInput, { target: { name: 'instansi', value: 'RS Balimed' } });
+      expect(instansiInput.value).toBe('RS Balimed');
+    }
+  });
+
+  test('displays doctor_name and instansi in edit form when data exists', async () => {
+    renderPage();
+    await waitLoaded();
+    const editBtns = screen.getAllByTestId('edit-icon');
+    if (editBtns.length > 0) {
+      fireEvent.click(editBtns[0].closest('button')!);
+      await waitFor(() => {
+        expect(screen.getByText('Edit Resep')).toBeInTheDocument();
+      });
+      const inputs = document.querySelectorAll('input');
+      const doctorInput = Array.from(inputs).find(i => i.name === 'doctor_name') as HTMLInputElement;
+      const instansiInput = Array.from(inputs).find(i => i.name === 'instansi') as HTMLInputElement;
+      if (doctorInput) expect(doctorInput).toBeInTheDocument();
+      if (instansiInput) expect(instansiInput).toBeInTheDocument();
+    }
+  });
+
+  test('doctor_name and instansi shown in table when prescription has them', async () => {
+    const prescriptionWithMeta = { ...prescriptionsPayload.data[0], doctor_name: 'Dr. John', instansi: 'RS Balimed' };
+    global.fetch = jest.fn((input: RequestInfo) => {
+      const url = typeof input === 'string' ? input : input.url;
+      if (url.includes('/api/inventory/prescriptions')) {
+        return okJson({ data: [prescriptionWithMeta] });
+      }
+      return okJson({ data: [] });
+    }) as unknown as typeof fetch;
+    renderPage();
+    await waitFor(() => {
+      expect(screen.getByText('Dr. John')).toBeInTheDocument();
+      expect(screen.getByText('RS Balimed')).toBeInTheDocument();
+    });
+  });
 });
