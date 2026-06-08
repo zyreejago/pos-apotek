@@ -1659,17 +1659,19 @@ export default function ProductsPage() {
                       placeholder="Masukkan nomor faktur"
                     />
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">No. Batch (Opsional)</label>
-                    <input
-                      type="text"
-                      name="batch_number"
-                      value={(formData as any).batch_number ?? ''}
-                      onChange={handleInputChange}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                      placeholder="Masukkan nomor batch"
-                    />
-                  </div>
+                  {!isMultipleProducts && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">No. Batch (Opsional)</label>
+                      <input
+                        type="text"
+                        name="batch_number"
+                        value={(formData as any).batch_number ?? ''}
+                        onChange={handleInputChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                        placeholder="Masukkan nomor batch"
+                      />
+                    </div>
+                  )}
                 </div>
                 <div className="mb-4">
                   <label className="block text-sm font-medium text-gray-700 mb-2">Bukti Faktur</label>
@@ -2188,6 +2190,17 @@ export default function ProductsPage() {
                       className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm"
                     />
                   </div>
+                    <div>
+                      <label className="block text-xs text-gray-600 mb-1">No. Batch (Opsional)</label>
+                      <input
+                        type="text"
+                        name="batch_number"
+                        value={(formData as any).batch_number ?? ''}
+                        onChange={handleInputChange}
+                        className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm"
+                        placeholder="Masukkan nomor batch"
+                      />
+                    </div>
                 </div>
                   {/* DP Fields for multiple products */}
                 
@@ -2233,6 +2246,7 @@ export default function ProductsPage() {
                         selling_price: '',
                         stock: '',
                         invoice_number: '',
+                        batch_number: '',
                         dp_amount: '',
       dp_awal: '',
                         due_date: '',
@@ -2258,7 +2272,7 @@ export default function ProductsPage() {
                           <div className="text-sm">
                             <div className="font-medium text-gray-800">{index + 1}. {item.name}</div>
                              <div className="text-gray-600 text-xs">
-                              Kategori: {item.product_category === 'NON_OBAT' ? 'Non-Obat' : 'Obat'} | {formatCurrency(Number(item.cost_price))} | Stok: {item.stock} {item.purchase_unit} (isi: {item.unit_multiplier} {item.unit}) | Batch: {item.invoice_number || '-'} | {(() => {
+                              Kategori: {item.product_category === 'NON_OBAT' ? 'Non-Obat' : 'Obat'} | {formatCurrency(Number(item.cost_price))} | Stok: {item.stock} {item.purchase_unit} (isi: {item.unit_multiplier} {item.unit}) | Faktur: {item.invoice_number || '-'} | Batch: {item.batch_number || '-'} | {(() => {
                                 const typeMap: Record<string, string> = {
                                   belum_bayar: 'Belum Bayar',
                                   konsinyasi: 'Konsinyasi',
@@ -2286,6 +2300,7 @@ export default function ProductsPage() {
                                   stock_type: item.stock_type,
                                   purchase_date: item.purchase_date,
                                   invoice_number: item.invoice_number || '',
+                                  batch_number: item.batch_number || '',
                                   dp_amount: item.dp_amount || '',
                                   due_date: item.due_date || '',
                                   purchase_unit: item.purchase_unit,
