@@ -363,10 +363,10 @@ module.exports = function registerProductRoutes(app, pool, authenticate, checkPe
           // Create journal entry
           const journalItems = [];
           if (difference > 0) {
-            // Stock increased: Debit Persediaan (Obat/Non-Obat), Credit Beban Selisih Stok (527) as negative expense
+            // Stock increased: Debit Persediaan (Obat/Non-Obat), Credit Pendapatan Selisih Stok (404)
             journalItems.push(
               { accountCode: persediaanCode, debit: differenceValue },
-              { accountCode: '527', credit: differenceValue }
+              { accountCode: '404', credit: differenceValue }
             );
           } else {
             // Stock decreased: Debit Beban Selisih Stok (527), Credit Persediaan (Obat/Non-Obat)

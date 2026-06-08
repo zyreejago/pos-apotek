@@ -19,7 +19,7 @@ const createJournalEntry = async (connection, transactionId, date, description, 
 
   if (missingCodes.length > 0) {
     throw new Error(
-      `Jurnal tidak dapat dibuat: kode akun berikut tidak ditemukan di tabel accounts: ${missingCodes.join(', ')}. ` +
+      `Jurnal tidak dapat dibuat: kode akun berikut tidak ditemukan di tabel accounts: ${missingCodes.map(c => `'${c}'`).join(', ')}. ` +
       `Periksa konfigurasi jurnal otomatis di kode backend.`
     );
   }

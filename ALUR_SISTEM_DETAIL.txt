@@ -622,90 +622,281 @@ Catatan:
 
 
 ================================================================================
-                     ALUR 1: AUTHENTIKASI & LOGIN
+                      ALUR 1: AUTHENTIKASI & LOGIN
 ================================================================================
 
-1. User akses halaman manapun (selain /login, /register, /forgot-password)
+Flow Detail (Step-by-Step):
 
-2. Next.js Middleware (src/middleware.ts):
-   a. Baca cookie 'token'
-   b. Jika tidak ada → redirect ke /login
-   c. Jika ada → lanjut
+  1. USER: Akses halaman manapun (selain /login, /register, /forgot-password)
+     Misal: ketika /dashboard
 
-3. Client-side AuthProvider (src/components/AuthProvider.tsx):
-   a. Cek localStorage.getItem('token')
-   b. Jika tidak ada → redirect ke /login
-   c. Jika ada → render children
+  2. NEXT.JS MIDDLEWARE (src/middleware.ts):
+     a. Middleware berjalan SEBELUM halaman dirender (server-side)
+     b. Baca cookie 'token' dari request headers (cookies parser)
+     c. JIKA token tidak ada:
+        - Matcher: cek apakah path dilindungi (semua kecuali /login, /register, /forgot-password)
+        - Jika path dilindungi → redirect ke /login dengan returnUrl
+        - Contoh: Response.redirect(new URL('/login', request.url))
+     d. JIKA token ada:
+        - Lanjut ke halaman yang diminta (NextResponse.next())
+     e. Catatan: Middleware hanya cek KEBERADAAN token, TIDAK memvalidasi token
 
-4. Halaman Login (src/app/login/page.tsx):
-   a. Form: username, password
-   b. Klik "Login"
-   c. Fetch POST http://localhost:5000/api/auth/login
-      - Body: { username, password }
-   d. Backend:
-      - Cari user di tabel users WHERE username = ? AND status = 'active'
-      - Jika tidak ditemukan → 401
-      - Compare password dengan bcrypt
-      - Jika salah → 401
-      - Jika benar:
-        * Generate JWT: jwt.sign({ id: user.id, username, role }, SECRET, { expiresIn: '24h' })
-        * Return 200: { token, user: { id, username, role, full_name } }
-   e. Frontend:
-      - Simpan token di localStorage
-      - Simpan user (JSON) di localStorage
-      - Set cookie 'token' = token
-      - Dispatch event 'auth:changed' di window
-      - Redirect ke /dashboard
+  3. CLIENT-SIDE AuthProvider (src/components/AuthProvider.tsx):
+     a. Component mount → useEffect berjalan
+     b. Cek localStorage.getItem('token'):
+        - Jika null/undefined → redirect ke /login via router.push()
+        - JIka ada → set state isAuthenticated = true, render children
+     c. Cek localStorage.getItem('user'):
+        - Jika ada → parse JSON → set state currentUser
+        - Jika tidak ada → set null
+     d. Listener event 'auth:changed' dan 'storage':
+        - Jika ada perubahan token di tab lain → sync otomatis
+        - Auto-logout jika API return 401 (401 handler interceptor)
 
-5. Auto-logout (terjadi ketika):
-   - API return 401 → localStorage.clear() + cookie dihapus + redirect /login
-   - Token expired → middleware redirect ke /login
+  4. HALAMAN LOGIN (src/app/login/page.tsx):
+     
+     Tampilan Form Login:
+     ┌────────────────────────────────────┐
+     │       APOTEK SUMBER WARAS          │
+     │          (logo apotek)             │
+     │                                    │
+     │  Username    [________________] *  │
+     │  Password    [________________] *  │
+     │  [👁] show/hide password           │
+     │                                    │
+     │  [           Login          ]      │
+     │                                    │
+     │  Belum punya akun? Register        │
+     │  Lupa password? Klik di sini       │
+     └────────────────────────────────────┘
+
+     Flow Login:
+     a. USER: Input username & password
+     b. USER: Klik tombol "Login" (atau tekan Enter)
+     c. FRONTEND: Validasi form:
+        - username.trim() === '' → goeyToast.error('Username wajib diisi')
+        - password.trim() === '' → goeyToast.error('Password wajib diisi')
+        - Jika validasi gagal → return
+     d. FRONTEND: fetch POST http://localhost:5000/api/auth/login
+        Headers: { 'Content-Type': 'application/json' }
+        Body: { username: string, password: string }
+
+     e. BACKEND (server/routes/auth.js line ~150):
+        - Menerima request dengan body { username, password }
+        - Query: SELECT * FROM users WHERE username = ? AND status = 'active'
+        - JIKA user tidak ditemukan:
+          → Response 401: { message: 'Username atau password salah' }
+        - JIKA user ditemukan:
+          - Compare password dengan bcrypt.compare(password, user.password)
+          - JIKA password salah:
+            → Response 401: { message: 'Username atau password salah' }
+          - JIKA password cocok:
+            - Generate JWT token:
+              jwt.sign(
+                { id: user.id, username: user.username, role: user.role },
+                JWT_SECRET,
+                { expiresIn: '24h' }
+              )
+            - Response 200: {
+                token: 'eyJhbGciOiJIUzI1NiIs...',
+                user: { id, username, role, full_name, email }
+              }
+
+     f. FRONTEND (setelah response sukses):
+        - localStorage.setItem('token', response.token)
+        - localStorage.setItem('user', JSON.stringify(response.user))
+        - Set cookie 'token' = response.token
+          (document.cookie = `token=${response.token}; path=/; max-age=86400`)
+        - Dispatch event: window.dispatchEvent(new Event('auth:changed'))
+        - Redirect ke /dashboard via router.push('/dashboard')
+
+     g. FRONTEND (jika response error):
+        - goeyToast.error(response.message || 'Username atau password salah')
+        - Password field di-reset
+
+  5. AUTO-LOGOUT (terjadi ketika salah satu kondisi berikut terpenuhi):
+     a. API Response 401:
+        - Interceptor di AuthProvider menangkap semua response fetch
+        - Jika response.status === 401 dan URL bukan /api/auth/login:
+          * localStorage.clear()
+          * Hapus cookie: document.cookie = "token=; path=/; max-age=0"
+          * router.push('/login')
+     b. Token Expired:
+        - Middleware Next.js cek cookie 'token'
+        - Jika token expired → jwt.verify gagal → middleware redirect ke /login
+     c. Logout Manual:
+        - Klik ProfileDropdown > Logout
+        - localStorage.clear()
+        - Hapus cookie
+        - router.push('/login')
 
 
 ================================================================================
-                ALUR 1b: REGISTER & FORGOT PASSWORD
+                 ALUR 1b: REGISTER & FORGOT PASSWORD
 ================================================================================
 
 --- REGISTER ---
-1. Akses /register
-2. Isi form: username, password (min 6), konfirmasi password
-3. Submit → POST http://localhost:5000/api/auth/register
-4. Backend:
-   - Cek username unik
-   - Hash password dengan bcrypt
-   - INSERT ke tabel users, role default 'kasir', status 'active'
-   - Return 201 { message, id }
+Flow Detail (Step-by-Step):
+
+  1. USER: Akses /register via browser
+
+  2. TAMPILAN FORM REGISTER:
+     ┌──────────────────────────────────────┐
+     │         Daftar Akun Baru             │
+     │                                      │
+     │  Username *    [________________]    │
+     │  Password *    [________________]    │
+     │  Konfirmasi *  [________________]    │
+     │                                      │
+     │  [         Daftar           ]        │
+     │                                      │
+     │  Sudah punya akun? Login             │
+     └──────────────────────────────────────┘
+
+  3. USER: Isi form (semua wajib):
+     - username: string, minimum 1 karakter
+     - password: string, minimum 6 karakter
+     - confirm_password: string, harus sama dengan password
+
+  4. FRONTEND: Validasi sisi client:
+     - username.trim() === '' → "Username wajib diisi"
+     - password.length < 6 → "Password minimal 6 karakter"
+     - password !== confirmPassword → "Password tidak cocok"
+     - Jika validasi gagal → goeyToast.error() + return
+
+  5. FRONTEND: fetch POST http://localhost:5000/api/auth/register
+     Headers: { 'Content-Type': 'application/json' }
+     Body: { username, password }
+
+  6. BACKEND (server/routes/auth.js):
+     a. Validasi: username dan password wajib ada
+     b. Cek username UNIK:
+        SELECT COUNT(*) FROM users WHERE username = ?
+        Jika > 0 → Response 400: { message: 'Username sudah terdaftar' }
+     c. Hash password: bcrypt.hash(password, 10)
+     d. INSERT INTO users (username, password, role, status)
+        VALUES (?, hashedPassword, 'kasir', 'active')
+     e. INSERT audit trail: "Registrasi akun baru: {username}"
+     f. Response 201: { message: 'Registrasi berhasil', id: newUserId }
+
+  7. FRONTEND:
+     - goeyToast.success('Registrasi berhasil')
+     - Redirect ke /login via router.push('/login')
+
 
 --- FORGOT PASSWORD (4 Langkah) ---
 Langkah 1: Kirim Email
-   a. Akses /forgot-password, masukkan email
-   b. POST /api/forgot-password → { email }
-   c. Backend:
-      - Generate 6-digit random code
-      - Simpan di password_reset_requests (email, code hash, expires_at + 15 menit)
-      - Kirim email via nodemailer (Gmail SMTP)
-      - Return 200 { message }
-   d. Frontend → lanjut step 2
+  Flow Detail:
+  1. USER: Akses /forgot-password
+  
+  2. TAMPILAN:
+     ┌──────────────────────────────────────┐
+     │         Lupa Password                │
+     │  Masukkan email terdaftar            │
+     │  Email  [________________]           │
+     │  [   Kirim Kode Reset   ]            │
+     └──────────────────────────────────────┘
+
+  3. USER: Input email, klik "Kirim Kode Reset"
+
+  4. FRONTEND: fetch POST http://localhost:5000/api/forgot-password
+     Body: { email: string }
+
+  5. BACKEND (server/routes/password-reset.js):
+     a. Cek apakah email terdaftar di tabel users
+     b. Generate 6-digit random code (Math.random() * 900000 + 100000)
+     c. Hash code dengan bcrypt (simpan hash, bukan plain code)
+     d. INSERT INTO password_reset_requests (email, code, expires_at)
+        VALUES (?, hashedCode, NOW() + INTERVAL 15 MINUTE)
+        - expires_at = 15 menit dari sekarang
+     e. Kirim email via nodemailer (Gmail SMTP):
+        - Menggunakan transporter: nodemailer.createTransport(Gmail SMTP)
+        - Email berisi: "Kode reset password Anda: XXXXXX"
+     f. Response 200: { message: 'Kode reset telah dikirim ke email Anda' }
+        - TIDAK memberitahu apakah email terdaftar atau tidak (security)
+     g. Jika email tidak terdaftar:
+        - Tetap response 200 (agar tidak泄露 informasi)
+        - TAPI tidak mengirim email
+
+  6. FRONTEND:
+     - goeyToast.success('Kode reset telah dikirim')
+     - Lanjut ke step 2 (input kode)
 
 Langkah 2: Verifikasi Kode
-   a. Masukkan kode 6-digit
-   b. POST /api/verify-reset-code → { email, code }
-   c. Backend:
-      - Cari record di password_reset_requests WHERE email AND code AND expires_at > NOW()
-      - Jika cocok → set verified = true, return 200
-      - Jika tidak → 400
-   d. Frontend → lanjut step 3
+  Flow Detail:
+  1. TAMPILAN:
+     ┌──────────────────────────────────────┐
+     │         Verifikasi Kode              │
+     │  Masukkan kode 6-digit yang          │
+     │  dikirim ke email Anda               │
+     │                                      │
+     │  Kode  [__][__][__][__][__][__]      │
+     │                                      │
+     │  [   Verifikasi Kode   ]             │
+     └──────────────────────────────────────┘
+
+  2. USER: Masukkan kode 6-digit
+
+  3. FRONTEND: fetch POST http://localhost:5000/api/verify-reset-code
+     Body: { email, code: string }
+
+  4. BACKEND:
+     a. SELECT * FROM password_reset_requests
+        WHERE email = ? AND expires_at > NOW() AND used = FALSE
+        ORDER BY created_at DESC LIMIT 1
+     b. JIKA tidak ditemukan → Response 400: { message: 'Kode tidak valid atau sudah expired' }
+     c. JIKA ditemukan:
+        - Cek bcrypt.compare(code, record.code)
+        - JIKA cocok:
+          * UPDATE password_reset_requests SET verified = TRUE WHERE id = ?
+          * Response 200: { message: 'Kode valid' }
+        - JIKA tidak cocok:
+          * Response 400: { message: 'Kode yang dimasukkan salah' }
+
+  5. FRONTEND: Lanjut ke step 3 (reset password)
 
 Langkah 3: Reset Password
-   a. Masukkan password baru + konfirmasi
-   b. POST /api/reset-password → { email, code, new_password }
-   c. Backend:
-      - Verifikasi code & verified = true & belum used
-      - Hash password baru
-      - UPDATE users SET password = ?
-      - Tandai request sebagai used
-      - Return 200
-   d. Frontend → lanjut step 4 (Done, link ke /login)
+  Flow Detail:
+  1. TAMPILAN:
+     ┌──────────────────────────────────────┐
+     │         Reset Password               │
+     │                                      │
+     │  Password Baru *  [________________] │
+     │  Konfirmasi *     [________________] │
+     │                                      │
+     │  [   Reset Password   ]              │
+     └──────────────────────────────────────┘
+
+  2. USER: Masukkan password baru + konfirmasi
+
+  3. FRONTEND: Validasi:
+     - password.length >= 6
+     - password === confirmPassword
+     Jika gagal → tidak lanjut
+
+  4. FRONTEND: fetch POST http://localhost:5000/api/reset-password
+     Body: { email, code, new_password }
+
+  5. BACKEND:
+     a. SELECT * FROM password_reset_requests
+        WHERE email = ? AND verified = TRUE AND used = FALSE
+        AND expires_at > NOW()
+     b. Cek code dengan bcrypt.compare
+     c. JIKA valid:
+        - Hash password baru: bcrypt.hash(new_password, 10)
+        - UPDATE users SET password = ? WHERE email = ?
+        - UPDATE password_reset_requests SET used = TRUE WHERE id = ?
+        - Response 200: { message: 'Password berhasil direset' }
+     d. JIKA tidak valid:
+        - Response 400: { message: 'Link reset tidak valid atau sudah digunakan' }
+
+  6. FRONTEND:
+     - goeyToast.success('Password berhasil diubah')
+     - Redirect ke /login
+
+Langkah 4: Selesai (Done)
+  - Tampilkan halaman sukses
+  - Link ke /login
 
 
 ================================================================================
@@ -762,22 +953,165 @@ Langkah 3: Reset Password
    d. Pagination: Show per page (10/20/50)
 
 --- 3b. Menambah Produk Baru (Single) ---
-1. Klik "Add Product" → buka OffCanvas (lebar default 400px)
-2. State: showProductForm = true, productOffCanvasMode = 'add'
-3. Form: nama, harga beli, harga jual, kategori, stok minimal, unit,
-   unit pembelian, unit multiplier, supplier, lokasi rak, expired_date,
-   gambar, catatan
-4. POST /api/products (FormData — multipart, termasuk image)
-5. Backend: insert ke products + audit trail, return 201
+Flow Detail (Step-by-Step):
+  1. USER: Klik tombol "Add Products" di header halaman Products
+  2. FRONTEND: handleOpenAddOffCanvas() dipanggil
+     a. setProductOffCanvasMode('add')
+     b. setIsMultipleProducts(false) → mode single
+     c. setFormData di-reset ke default:
+        - name: ''
+        - cost_price: ''
+        - selling_price: ''
+        - stock: ''
+        - unit: 'Tablet'
+        - expired_date: ''
+        - location_code: ''
+        - supplier_id: ''
+        - stock_type: 'belum_bayar'
+        - purchase_date: (hari ini)
+        - invoice_number: ''
+        - purchase_unit: 'Box'
+        - unit_multiplier: '1'
+        - product_category: 'OBAT'
+        - dp_amount: ''
+        - due_date: ''
+        - purchase_unit_stok: ''
+     d. setIsProductOffCanvasOpen(true) → render OffCanvas
+
+  3. FRONTEND: OffCanvas terbuka dengan title "Add New Product"
+     Field-field form yang tampil (wajib = *):
+     ┌──────────────────────────────────────────────────┐
+     │ [Toggle] 1 Product  |  Multiple Products         │
+     ├──────────────────────────────────────────────────┤
+     │ Supplier:         [Pilih Supplier ▼]       (ops) │
+     │ Nomor Batch:      [_______________]        (ops) │
+     │ Bukti Faktur:     [Pilih File] [Ambil Foto] (ops)│
+     │ Stock Type:       [Belum Bayar ▼]                │
+     │ Purchase Date:    [____-__-__]                   │
+     │ [DP Amount] [Due Date] — hanya jika DP dipilih   │
+     ├──────────────────────────────────────────────────┤
+     │ Product Name *     [________________]            │
+     │ Product Category * [OBAT ▼]                      │
+     │ Cost Price *       [0]      Selling Price * [0]  │
+     ├──────────────────────────────────────────────────┤
+     │ Unit Dasar *       [Tablet ▼]                    │
+     │ [Toggle] Memiliki satuan besar?                  │
+     │   Jika ON: Unit Pembelian [Box ▼]                │
+     │            Isi per Unit    [1]                    │
+     │            Stok (Box)      [0]                    │
+     ├──────────────────────────────────────────────────┤
+     │ Kode Lokasi:       [Pilih Kode Lokasi ▼]   (ops) │
+     │ Stok (Tablet) *    [0]                           │
+     │ Expired Date *     [____-__-__]                  │
+     └──────────────────────────────────────────────────┘
+     Tombol: [Cancel] [Create Product]
+
+  4. USER: Isi form lalu klik "Create Product"
+  5. FRONTEND: handleSubmit(e) dipanggil:
+     a. Cek permission: checkActionPermission('create')
+        → Jika false: goeyToast.error('Akses Ditolak'), return
+     b. Karena productOffCanvasMode === 'add' → masuk ke mode ADD
+     c. Panggil saveProductAndBatch(formData, [...productFormImageFiles, ...fakturImageFiles])
+        - imageFiles berisi file gambae product + file bukti faktur
+
+  6. FUNGSI: saveProductAndBatch(item, imageFiles)
+     a. Cek apakah produk dengan nama sama sudah ada:
+        existingProduct = allProducts.find(p => p.name.toLowerCase() === item.name.toLowerCase())
+     
+     b. JIKA EXISTING (produk sudah ada):
+        - productId = existingProduct.id
+        - Hitung stock baru:
+          Jika ada supplier_id: stock = existingProduct.stock (biarkan batch yang handle)
+          Jika TIDAK ada supplier_id: stock = existingProduct.stock + calculatedStock
+        - PUT /api/products/:id → update: { name, cost_price, selling_price, stock, unit,
+          expired_date, location_code, purchase_unit, unit_multiplier, product_category }
+        - Jika ada image: upload juga
+     
+     c. JIKA BARU (produk belum ada):
+        - Hitung totalAmount & cek approval (needsApproval = total > 2jt)
+        - POST /api/products → body FormData:
+          { name, cost_price, selling_price, stock, unit, expired_date, location_code,
+            purchase_unit, unit_multiplier, needsApproval, product_category, (image) }
+        - Response: { id, message, status? }
+        - productId = json.id
+     
+     d. Jika productId ADA DAN item.supplier_id ADA:
+        - Buat batch/faktur via POST /api/inventory/batches:
+          FormData: { product_id, supplier_id, batch_number: item.invoice_number,
+            stock_type, purchase_date, initial_quantity, remaining_quantity,
+            cost_price, expired_date, dp_amount (jika stock_type=dp), due_date,
+            images[], notes }
+        - Jika batch response status = 'pending' → goeyToast.info('Persetujuan Diperlukan')
+     
+     e. handleCloseProductOffCanvas() → reset form, tutup offcanvas
+     f. fetchProducts() → refresh data
+     g. goeyToast.success('Produk berhasil disimpan')
+
+  7. BACKEND (POST /api/products):
+     a. Validasi: name wajib ada
+     b. Multer: upload image → simpan ke /uploads/ → image_url
+     c. INSERT INTO products (name, cost_price, selling_price, stock, ...)
+     d. Jika needsApproval=true → status='pending' else 'active'
+     e. INSERT audit trail
+     f. Return 201: { id, message, status }
+
+  8. BACKEND (POST /api/inventory/batches):
+     a. Multer: upload array 'images' → simpan ke /uploads/ → JSON array image_url
+     b. Hitung totalAmount = initial_quantity × cost_price
+     c. Jika total > 2jt → status='pending', else 'approved'
+     d. INSERT INTO batches (product_id, supplier_id, batch_number, stock_type, ...)
+     e. Jika stock_type='dp' dan dp_amount > 0:
+        - Auto-create batch_dp_payments: DP 1 (saat pembuatan faktur)
+     f. Jika status='approved':
+        - UPDATE products SET stock = stock + initial_quantity
+        - Buat jurnal:
+          Debit 103/104 (Persediaan) = totalAmount
+          Kredit 101/201 (Kas/Hutang) = totalAmount
+     g. INSERT audit trail
+     h. Return 201: { success, data: { id, status } }
 
 --- 3c. Menambah Banyak Produk Sekaligus (Multiple) ---
-1. Toggle "Multiple Products" di form Add Product
-2. Input Nomor Invoice + Upload Bukti Faktur
-3. Tabel: nama produk, jumlah (unit pembelian), harga beli, harga jual,
-   expired, unit multiplier — bisa tambah baris
-4. Klik "Simpan Semua"
-5. Backend: untuk setiap baris, cari produk by nama, insert batch baru
-   dengan supplier & image dari invoice
+Flow Detail (Step-by-Step):
+  1. USER: Klik "Add Products" → OffCanvas terbuka
+  2. USER: Klik toggle "Multiple Products"
+  3. FRONTEND: setIsMultipleProducts(true)
+     - Form berubah: muncul grid input untuk tambah produk ke daftar sementara
+     - Field yang tersedia (di grid 2 kolom):
+       ┌──────────────────────────────────────────────┐
+       │ Nama Produk *       [________]               │
+       │ Kategori Produk     [OBAT ▼]                 │
+       │ Kode Lokasi         [Pilih ▼]          (ops) │
+       │ Harga Beli *        [0]                      │
+       │ Harga Jual *        [0]                      │
+       │ Unit Pembelian      [Box ▼]                  │
+       │ Unit Dasar *        [Tablet ▼]               │
+       │ Isi per Unit *      [1]                      │
+       │ Stock (Box)         [0]                      │
+       │ Stock (Tablet) *    [0]                      │
+       │ Tgl Kadaluarsa *    [____-__-__]             │
+       │ Nomor Batch         [________]          (ops)│
+       └──────────────────────────────────────────────┘
+       Tombol: [+ Tambahkan ke Daftar]
+
+  4. USER: Isi per produk, klik "+ Tambahkan ke Daftar"
+  5. FRONTEND: onClick handler:
+     a. Validasi: name, cost_price, stock wajib diisi
+        Jika tidak → return (gagal)
+     b. Cek duplikat name di multipleProducts list:
+        - Jika name sudah ada → update item existing: stock += stock baru
+        - Jika belum ada → push item baru ke array:
+          { id: Date.now(), ...formData, imageFiles }
+     c. Reset form untuk input produk berikutnya
+     d. Tampilkan "Daftar Produk (N)" dengan detail per item:
+        [1. Nama Produk] [Edit ✏️] [Hapus 🗑]
+        Info: Kategori | Harga | Stok | Batch | Stock Type
+
+  6. USER: Klik "Create Product" untuk submit semua
+  7. FRONTEND: handleSubmit() → loop semua multipleProducts:
+     for (const item of multipleProducts) {
+       await saveProductAndBatch(item, item.imageFiles || [])
+     }
+  8. Backend: sama seperti single product (step 7-8 di 3b)
 
 --- 3d. Edit Produk ---
 Klik edit → OffCanvas mode 'edit' → PUT /api/products/:id

@@ -48,6 +48,7 @@ interface Faktur {
   product_purchase_unit?: string;
   product_unit_multiplier?: number;
   invoice_number: string;
+  batch_number?: string | null;
   supplier_id: number | null;
   supplier_name: string | null;
   purchase_date: string | null;
@@ -87,6 +88,7 @@ interface DbBatch {
   image_url: string | null;
   status: 'approved' | 'pending' | 'rejected' | 'revision';
   created_at: string;
+  invoice_number?: string | null;
   dp_payments?: DpPayment[];
 }
 
@@ -109,8 +111,10 @@ interface ProductFormData {
   stock_type: 'belum_bayar' | 'konsinyasi' | 'dp' | 'lunas' | 'retur';
   purchase_date: string;
   dp_amount?: string;
+  dp_awal?: string;
   due_date?: string;
   invoice_number?: string;
+  batch_number?: string;
   purchase_unit?: string;
   unit_multiplier?: string;
   purchase_unit_stock?: string;
@@ -126,6 +130,7 @@ interface ProductItem extends ProductFormData {
 
 interface FakturFormData {
   invoice_number: string;
+  batch_number: string;
   supplier_id: string;
   purchase_date: string;
   quantity: string;
@@ -136,6 +141,7 @@ interface FakturFormData {
   unit_multiplier: string;
   stock_type: 'belum_bayar' | 'konsinyasi' | 'dp' | 'lunas' | 'retur';
   dp_amount: string;
+  dp_awal: string;
   due_date: string;
   expired_date: string;
   notes: string;
@@ -205,6 +211,7 @@ export default function ProductsPage() {
   // Form States
   const [fakturFormData, setFakturFormData] = useState<FakturFormData>({
     invoice_number: '',
+    batch_number: '',
     supplier_id: '',
     purchase_date: new Date().toISOString().split('T')[0],
     quantity: '',
@@ -215,6 +222,7 @@ export default function ProductsPage() {
     unit_multiplier: '1',
     stock_type: 'belum_bayar',
     dp_amount: '',
+      dp_awal: '',
     due_date: '',
       expired_date: '',
     notes: ''
@@ -249,6 +257,7 @@ export default function ProductsPage() {
     purchase_date: new Date().toISOString().split('T')[0],
     invoice_number: '',
     dp_amount: '',
+      dp_awal: '',
     due_date: '',
     purchase_unit: 'Box',
     unit_multiplier: '1',
@@ -318,7 +327,8 @@ export default function ProductsPage() {
         // Backend returns `batch_number`, frontend expects `invoice_number` due to refactor
         const mappedFakturs = (json.data || []).map((batch: DbBatch) => ({
           ...batch,
-          invoice_number: batch.batch_number,
+          invoice_number: batch.invoice_number || batch.batch_number,
+          batch_number: batch.batch_number,
           quantity: batch.initial_quantity,
           total_amount: batch.cost_price * batch.initial_quantity,
           product_id: productId,
@@ -349,7 +359,7 @@ export default function ProductsPage() {
         const json = await res.json();
         const mapped = (json.data || []).map((batch: any) => ({
           ...batch,
-          invoice_number: batch.batch_number,
+          invoice_number: batch.invoice_number || batch.batch_number,
           quantity: batch.initial_quantity,
           total_amount: batch.cost_price * batch.initial_quantity
         }));
@@ -380,8 +390,10 @@ export default function ProductsPage() {
   const handleOpenAddFakturModal = () => {
     setFakturModalMode('add');
     setShowFakturForm(true);
+    setHasPurchaseUnitForm(false);
     setFakturFormData({
       invoice_number: '',
+      batch_number: '',
       supplier_id: selectedProduct?.supplier_id?.toString() || '',
       purchase_date: new Date().toISOString().split('T')[0],
       quantity: '',
@@ -392,6 +404,7 @@ export default function ProductsPage() {
       unit_multiplier: (selectedProduct?.unit_multiplier || 1).toString(),
       stock_type: selectedProduct?.stock_type || 'belum_bayar',
       dp_amount: '',
+      dp_awal: '',
       due_date: '',
       expired_date: '',
       notes: ''
@@ -417,9 +430,13 @@ export default function ProductsPage() {
 
     const multiplier = activeProduct?.unit_multiplier || 1;
 
+    const hasExistingPurchaseUnit = activeProduct?.purchase_unit && activeProduct?.unit_multiplier && activeProduct.unit_multiplier > 1;
+    setHasPurchaseUnitForm(!!hasExistingPurchaseUnit);
     setFakturFormData({
       invoice_number: faktur.invoice_number || '',
+      batch_number: faktur.batch_number || '',
       supplier_id: faktur.supplier_id?.toString() || '',
+
       purchase_date: formatDateForInput(faktur.purchase_date),
       quantity: (faktur.quantity / multiplier).toString(),
       cost_price: faktur.cost_price.toString(),
@@ -429,6 +446,7 @@ export default function ProductsPage() {
       unit_multiplier: (activeProduct?.unit_multiplier || 1).toString(),
       stock_type: faktur.stock_type as any,
       dp_amount: faktur.dp_amount?.toString() || '',
+      dp_awal: faktur.dp_payments && faktur.dp_payments.length > 0 ? faktur.dp_payments[0].amount.toString() : faktur.dp_amount?.toString() || '',
       due_date: formatDateForInput(faktur.due_date),
       expired_date: formatDateForInput(faktur.expired_date),
       notes: faktur.notes || ''
@@ -661,15 +679,16 @@ export default function ProductsPage() {
       const formData = new FormData();
       formData.append('product_id', selectedProduct.id.toString());
       formData.append('supplier_id', fakturFormData.supplier_id ? fakturFormData.supplier_id : '');
-      formData.append('batch_number', fakturFormData.invoice_number || '');
+      formData.append('invoice_number', fakturFormData.invoice_number || '');
+      formData.append('batch_number', fakturFormData.batch_number || '');
       formData.append('stock_type', fakturFormData.stock_type);
       formData.append('purchase_date', fakturFormData.purchase_date || '');
       formData.append('initial_quantity', qtyInBaseUnit.toString());
       formData.append('remaining_quantity', qtyInBaseUnit.toString());
       formData.append('cost_price', (Number(fakturFormData.cost_price) || 0).toString());
       formData.append('expired_date', fakturFormData.expired_date || '');
-      if (fakturFormData.stock_type === 'dp' && fakturFormData.dp_amount) {
-        formData.append('dp_amount', fakturFormData.dp_amount);
+      if (fakturFormData.stock_type === 'dp' && fakturFormData.dp_awal) {
+        formData.append('dp_awal', fakturFormData.dp_awal);
       }
       if (fakturFormData.stock_type === 'dp' && fakturFormData.due_date) {
         formData.append('due_date', fakturFormData.due_date);
@@ -703,6 +722,7 @@ export default function ProductsPage() {
         fetchProducts(); // refresh product stock
         setFakturFormData({
           invoice_number: '',
+          batch_number: '',
           supplier_id: '',
           purchase_date: new Date().toISOString().split('T')[0],
           quantity: '',
@@ -713,6 +733,7 @@ export default function ProductsPage() {
           unit_multiplier: '1',
           stock_type: 'belum_bayar',
           dp_amount: '',
+      dp_awal: '',
           due_date: '',
       expired_date: '',
           notes: ''
@@ -875,6 +896,20 @@ export default function ProductsPage() {
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     }).format(value);
+  };
+
+  const formatInputRupiah = (value: string) => {
+    const num = value.replace(/\D/g, '');
+    if (!num) return '';
+    return Number(num).toLocaleString('id-ID');
+  };
+
+  const onPriceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setFormData(prev => ({ ...prev, [e.target.name]: e.target.value.replace(/\D/g, '') }));
+  };
+
+  const onFakturPriceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setFakturFormData(prev => ({ ...prev, [e.target.name]: e.target.value.replace(/\D/g, '') }));
   };
 
   const formatDate = (dateString: string | null) => {
@@ -1058,6 +1093,7 @@ export default function ProductsPage() {
       purchase_date: new Date().toISOString().split('T')[0],
       invoice_number: '',
       dp_amount: '',
+      dp_awal: '',
       due_date: '',
       purchase_unit: 'Box',
       unit_multiplier: '1',
@@ -1225,13 +1261,15 @@ export default function ProductsPage() {
             const batchFormData = new FormData();
             batchFormData.append('product_id', productId.toString());
             batchFormData.append('supplier_id', item.supplier_id.toString());
-            if (item.invoice_number) batchFormData.append('batch_number', item.invoice_number);
+            if (item.invoice_number) batchFormData.append('invoice_number', item.invoice_number);
+            if (item.batch_number) batchFormData.append('batch_number', item.batch_number);
             batchFormData.append('stock_type', item.stock_type || 'belum_bayar');
             if (item.purchase_date) batchFormData.append('purchase_date', item.purchase_date);
             batchFormData.append('initial_quantity', calculatedStock.toString());
             batchFormData.append('remaining_quantity', calculatedStock.toString());
             batchFormData.append('cost_price', (Number(item.cost_price) || 0).toString());
             if (item.expired_date) batchFormData.append('expired_date', item.expired_date);
+            if (item.dp_awal) batchFormData.append('dp_awal', item.dp_awal);
             if (item.dp_amount) batchFormData.append('dp_amount', item.dp_amount);
             if (item.due_date) batchFormData.append('due_date', item.due_date);
             imageFiles.forEach(f => batchFormData.append('images', f));
@@ -1599,19 +1637,29 @@ export default function ProductsPage() {
                       ))}
                     </select>
                   </div>
-                  {!isMultipleProducts && (
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Nomor Batch (Opsional)</label>
-                      <input
-                        type="text"
-                        name="invoice_number"
-                        value={formData.invoice_number ?? ''}
-                        onChange={handleInputChange}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                        placeholder="Masukkan nomor batch"
-                      />
-                    </div>
-                  )}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">No. Faktur <span className="text-red-500">*</span></label>
+                    <input
+                      type="text"
+                      name="invoice_number"
+                      required
+                      value={formData.invoice_number ?? ''}
+                      onChange={handleInputChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                      placeholder="Masukkan nomor faktur"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">No. Batch (Opsional)</label>
+                    <input
+                      type="text"
+                      name="batch_number"
+                      value={(formData as any).batch_number ?? ''}
+                      onChange={handleInputChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                      placeholder="Masukkan nomor batch"
+                    />
+                  </div>
                 </div>
                 <div className="mb-4">
                   <label className="block text-sm font-medium text-gray-700 mb-2">Bukti Faktur</label>
@@ -1708,15 +1756,15 @@ export default function ProductsPage() {
                 {formData.stock_type === 'dp' && (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">DP Amount (IDR)</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">DP Pertama (IDR)</label>
                       <input
-                        type="number"
-                        name="dp_amount"
-                        min="0"
-                        value={formData.dp_amount ?? ''}
-                        onChange={handleInputChange}
+                        type="text"
+                        inputMode="numeric"
+                        name="dp_awal"
+                        value={formatInputRupiah(formData.dp_awal ?? '')}
+                        onChange={onPriceChange}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                        placeholder="0"
+                        placeholder="DP Pertama"
                       />
                     </div>
                     <div>
@@ -1765,28 +1813,28 @@ export default function ProductsPage() {
                 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Cost Price (IDR) <span className="text-red-500">*</span></label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Cost Price <span className="text-red-500">*</span></label>
                     <input
-                      type="number"
+                      type="text"
+                      inputMode="numeric"
                       name="cost_price"
                       required
-                      min="0"
-                      value={formData.cost_price}
-                      onChange={handleInputChange}
+                      value={formatInputRupiah(formData.cost_price)}
+                      onChange={onPriceChange}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                       placeholder="0"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Selling Price (IDR) <span className="text-red-500">*</span></label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Selling Price<span className="text-red-500">*</span></label>
                     <input
-                      type="number"
+                      type="text"
+                      inputMode="numeric"
                       name="selling_price"
                       required
-                      min="0"
-                      value={formData.selling_price}
-                      onChange={handleInputChange}
+                      value={formatInputRupiah(formData.selling_price)}
+                      onChange={onPriceChange}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                       placeholder="0"
                     />
@@ -2006,10 +2054,11 @@ export default function ProductsPage() {
                     <div>
                       <label className="block text-xs text-gray-600 mb-1">Harga Beli <span className="text-red-500">*</span></label>
                       <input
-                        type="number"
+                        type="text"
+                        inputMode="numeric"
                         name="cost_price"
-                        value={formData.cost_price}
-                        onChange={handleInputChange}
+                        value={formatInputRupiah(formData.cost_price)}
+                        onChange={onPriceChange}
                         className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm"
                         placeholder="0"
                       />
@@ -2017,10 +2066,11 @@ export default function ProductsPage() {
                     <div>
                       <label className="block text-xs text-gray-600 mb-1">Harga Jual <span className="text-red-500">*</span></label>
                       <input
-                        type="number"
+                        type="text"
+                        inputMode="numeric"
                         name="selling_price"
-                        value={formData.selling_price}
-                        onChange={handleInputChange}
+                        value={formatInputRupiah(formData.selling_price)}
+                        onChange={onPriceChange}
                         className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm"
                         placeholder="0"
                       />
@@ -2129,17 +2179,6 @@ export default function ProductsPage() {
                       className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm"
                     />
                   </div>
-                  <div>
-                    <label className="block text-xs text-gray-600 mb-1">Nomor Batch (Opsional)</label>
-                    <input
-                      type="text"
-                      name="invoice_number"
-                      value={formData.invoice_number ?? ''}
-                      onChange={handleInputChange}
-                      className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm"
-                      placeholder="Masukkan nomor batch"
-                    />
-                  </div>
                 </div>
                   {/* DP Fields for multiple products */}
                 
@@ -2186,6 +2225,7 @@ export default function ProductsPage() {
                         stock: '',
                         invoice_number: '',
                         dp_amount: '',
+      dp_awal: '',
                         due_date: '',
       expired_date: '',
                         purchase_unit: 'Box',
@@ -2297,8 +2337,10 @@ export default function ProductsPage() {
             setIsFakturOffCanvasOpen(false);
             setShowFakturForm(false);
             setSelectedFaktur(null);
+            setHasPurchaseUnitForm(false);
             setFakturFormData({
               invoice_number: '',
+              batch_number: '',
               supplier_id: '',
               purchase_date: new Date().toISOString().split('T')[0],
               quantity: '',
@@ -2309,6 +2351,7 @@ export default function ProductsPage() {
               unit_multiplier: '1',
               stock_type: 'belum_bayar',
               dp_amount: '',
+      dp_awal: '',
               due_date: '',
       expired_date: '',
               notes: ''
@@ -2519,11 +2562,23 @@ export default function ProductsPage() {
               </h3>
               <div className="grid grid-cols-2 md:grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Nomor Batch (Opsional)</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">No. Faktur <span className="text-red-500">*</span></label>
                   <input
                     type="text"
                     name="invoice_number"
+                    required
                     value={fakturFormData.invoice_number}
+                    onChange={handleFakturInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                    placeholder="Masukkan nomor faktur"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">No. Batch (Opsional)</label>
+                  <input
+                    type="text"
+                    name="batch_number"
+                    value={fakturFormData.batch_number}
                     onChange={handleFakturInputChange}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                     placeholder="Masukkan nomor batch"
@@ -2567,25 +2622,20 @@ export default function ProductsPage() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                   />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Unit Satuan Besar
-                  </label>
-                  <select
-                    name="purchase_unit"
-                    value={fakturFormData.purchase_unit}
-                    onChange={handleFakturInputChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                  >
-                    <option value="Box">Box</option>
-                    <option value="Strip">Strip</option>
-                    <option value="Botol">Botol</option>
-                    <option value="Tube">Tube</option>
-                    <option value="Pcs">Pcs</option>
-                  </select>
+                <div className="col-span-2 md:col-span-3">
+                  <div className="flex items-center gap-3 py-1 mb-2">
+                    <button
+                      type="button"
+                      onClick={() => setHasPurchaseUnitForm(!hasPurchaseUnitForm)}
+                      className={`relative w-11 h-6 rounded-full transition-colors ${hasPurchaseUnitForm ? 'bg-blue-600' : 'bg-gray-300'}`}
+                    >
+                      <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-transform ${hasPurchaseUnitForm ? 'translate-x-5' : ''}`} />
+                    </button>
+                    <span className="text-sm font-medium text-gray-700">Memiliki satuan besar?</span>
+                  </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Unit Dasar</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Unit Dasar <span className="text-red-500">*</span></label>
                   <select
                     name="unit"
                     value={fakturFormData.unit}
@@ -2603,8 +2653,26 @@ export default function ProductsPage() {
                     <option value="Pcs">Pcs</option>
                   </select>
                 </div>
+                {hasPurchaseUnitForm && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Isi per Satuan Besar</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Unit Satuan Besar <span className="text-red-500">*</span></label>
+                  <select
+                    name="purchase_unit"
+                    value={fakturFormData.purchase_unit}
+                    onChange={handleFakturInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  >
+                    <option value="Box">Box</option>
+                    <option value="Strip">Strip</option>
+                    <option value="Botol">Botol</option>
+                    <option value="Tube">Tube</option>
+                    <option value="Pcs">Pcs</option>
+                  </select>
+                </div>
+                )}
+                {hasPurchaseUnitForm && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Isi per Satuan Besar <span className="text-red-500">*</span></label>
                   <input
                     type="number"
                     name="unit_multiplier"
@@ -2615,9 +2683,10 @@ export default function ProductsPage() {
                     placeholder="1"
                   />
                 </div>
+                )}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Jumlah (dalam {fakturFormData.purchase_unit || 'Box'})
+                    Jumlah (dalam {hasPurchaseUnitForm && fakturFormData.purchase_unit ? fakturFormData.purchase_unit : fakturFormData.unit || 'Tablet'})
                   </label>
                   <input
                     type="number"
@@ -2637,10 +2706,11 @@ export default function ProductsPage() {
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Harga Beli</label>
                   <input
-                    type="number"
+                    type="text"
+                    inputMode="numeric"
                     name="cost_price"
-                    value={fakturFormData.cost_price}
-                    onChange={handleFakturInputChange}
+                    value={formatInputRupiah(fakturFormData.cost_price)}
+                    onChange={onFakturPriceChange}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                     placeholder="0"
                   />
@@ -2648,10 +2718,11 @@ export default function ProductsPage() {
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Harga Jual</label>
                   <input
-                    type="number"
+                    type="text"
+                    inputMode="numeric"
                     name="selling_price"
-                    value={fakturFormData.selling_price}
-                    onChange={handleFakturInputChange}
+                    value={formatInputRupiah(fakturFormData.selling_price)}
+                    onChange={onFakturPriceChange}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                     placeholder="0"
                   />
@@ -2659,15 +2730,15 @@ export default function ProductsPage() {
                 {fakturFormData.stock_type === 'dp' && (
                   <>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Jumlah DP (IDR)</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">DP Pertama (IDR)</label>
                       <input
-                        type="number"
-                        name="dp_amount"
-                        min="0"
-                        value={fakturFormData.dp_amount}
-                        onChange={handleFakturInputChange}
+                        type="text"
+                        inputMode="numeric"
+                        name="dp_awal"
+                        value={formatInputRupiah(fakturFormData.dp_awal)}
+                        onChange={onFakturPriceChange}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                        placeholder="0"
+                        placeholder="DP Pertama"
                       />
                     </div>
                     <div>
@@ -2938,6 +3009,7 @@ export default function ProductsPage() {
                   onClick={() => {
                     setFakturFormData({
                       invoice_number: '',
+                      batch_number: '',
                       supplier_id: '',
                       purchase_date: new Date().toISOString().split('T')[0],
                       quantity: '',
@@ -2948,6 +3020,7 @@ export default function ProductsPage() {
                       unit_multiplier: '1',
                       stock_type: 'belum_bayar',
                       dp_amount: '',
+      dp_awal: '',
                       due_date: '',
       expired_date: '',
                       notes: ''
@@ -3360,6 +3433,10 @@ export default function ProductsPage() {
                   <p className="text-sm font-bold text-gray-900 mt-1">{formatCurrency(detailFaktur.cost_price)}</p>
                 </div>
                 <div className="bg-gray-50 p-3 rounded-xl">
+                  <p className="text-xs text-gray-500 font-medium uppercase tracking-wider">Harga Jual</p>
+                  <p className="text-sm font-bold text-gray-900 mt-1">{selectedProduct ? formatCurrency(selectedProduct.selling_price) : '-'}</p>
+                </div>
+                <div className="bg-gray-50 p-3 rounded-xl">
                   <p className="text-xs text-gray-500 font-medium uppercase tracking-wider">Total Amount</p>
                   <p className="text-sm font-bold text-gray-900 mt-1">{formatCurrency(Number(detailFaktur.total_amount) || (detailFaktur.cost_price * (detailFaktur.initial_quantity || detailFaktur.quantity)))}</p>
                 </div>
@@ -3387,6 +3464,32 @@ export default function ProductsPage() {
               {/* DP Payments */}
               {detailFaktur.stock_type === 'dp' && (
                 <div>
+                  {/* Ringkasan DP */}
+                  <div className="grid grid-cols-3 gap-3 mb-4">
+                    <div className="bg-blue-50 p-3 rounded-xl">
+                      <p className="text-xs text-blue-600 font-medium uppercase tracking-wider">Total Hutang</p>
+                      <p className="text-sm font-bold text-blue-800 mt-1">
+                        {formatCurrency(Number(detailFaktur.total_amount) || (detailFaktur.cost_price * (detailFaktur.initial_quantity || detailFaktur.quantity)))}
+                      </p>
+                    </div>
+                    <div className="bg-green-50 p-3 rounded-xl">
+                      <p className="text-xs text-green-600 font-medium uppercase tracking-wider">Total Dibayar</p>
+                      <p className="text-sm font-bold text-green-800 mt-1">
+                        {formatCurrency(
+                          (detailFaktur.dp_payments || []).reduce((sum: number, dp: any) => sum + Number(dp.amount), 0)
+                        )}
+                      </p>
+                    </div>
+                    <div className="bg-orange-50 p-3 rounded-xl">
+                      <p className="text-xs text-orange-600 font-medium uppercase tracking-wider">Sisa DP</p>
+                      <p className="text-sm font-bold text-orange-800 mt-1">
+                        {formatCurrency(
+                          Math.max(0, (detailFaktur.dp_amount ? Number(detailFaktur.dp_amount) : 0) - 
+                          (detailFaktur.dp_payments || []).reduce((sum: number, dp: any) => sum + Number(dp.amount), 0))
+                        )}
+                      </p>
+                    </div>
+                  </div>
                   <h4 className="text-sm font-bold text-gray-700 mb-3 flex items-center gap-2">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
                     Riwayat Pembayaran DP

@@ -490,8 +490,8 @@ expect(screen.getByText(/Rp\s*2\.000/)).toBeInTheDocument();
     fillForm();
 
     expect(screen.getByDisplayValue('Produk Baru')).toBeInTheDocument();
-    expect(screen.getByDisplayValue('1000')).toBeInTheDocument();
-    expect(screen.getByDisplayValue('2000')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('1.000')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('2.000')).toBeInTheDocument();
   });
 
   test('creates product successfully', async () => {
@@ -895,7 +895,7 @@ expect(screen.getByText(/Rp\s*2\.000/)).toBeInTheDocument();
     // Selling price should be auto-filled to 2000
     await waitFor(() => {
       const sellingInput = document.querySelector('[name="selling_price"]') as HTMLInputElement;
-      expect(sellingInput.value).toBe('2000');
+      expect(sellingInput.value).toBe('2.000');
     });
   });
 
@@ -2332,12 +2332,12 @@ expect(screen.getByText(/Rp\s*2\.000/)).toBeInTheDocument();
     fireEvent.change(stockTypeSelect, { target: { name: 'stock_type', value: 'dp' } });
 
     await waitFor(() => {
-      const dpAmountInput = document.querySelector('[name="dp_amount"]') as HTMLInputElement;
-      expect(dpAmountInput).toBeInTheDocument();
+      const dpAwalInput = document.querySelector('[name="dp_awal"]') as HTMLInputElement;
+      expect(dpAwalInput).toBeInTheDocument();
     });
 
-    const dpAmountInput = document.querySelector('[name="dp_amount"]') as HTMLInputElement;
-    fireEvent.change(dpAmountInput, { target: { name: 'dp_amount', value: '5000' } });
+    const dpAwalInput = document.querySelector('[name="dp_awal"]') as HTMLInputElement;
+    fireEvent.change(dpAwalInput, { target: { name: 'dp_awal', value: '5000' } });
 
     const dueDateInput = document.querySelector('[name="due_date"]') as HTMLInputElement;
     fireEvent.change(dueDateInput, { target: { name: 'due_date', value: '2024-06-15' } });
@@ -3515,7 +3515,7 @@ expect(screen.getByText(/Rp\s*2\.000/)).toBeInTheDocument();
     fireEvent.change(stockTypeSelect, { target: { name: 'stock_type', value: 'dp' } });
 
     await waitFor(() => {
-      expect(screen.getByText('DP Amount (IDR)')).toBeInTheDocument();
+      expect(screen.getByText('DP Pertama (IDR)')).toBeInTheDocument();
       expect(screen.getByText('Due Date')).toBeInTheDocument();
     });
   });
@@ -3963,7 +3963,7 @@ expect(screen.getByText(/Rp\s*2\.000/)).toBeInTheDocument();
     fireEvent.change(stockTypeSelect, { target: { name: 'stock_type', value: 'dp' } });
 
     await waitFor(() => {
-      expect(screen.getByText('Jumlah DP (IDR)')).toBeInTheDocument();
+      expect(screen.getByText('DP Pertama (IDR)')).toBeInTheDocument();
       expect(screen.getByText('Jatuh Tempo')).toBeInTheDocument();
     });
   });
@@ -5070,12 +5070,12 @@ expect(screen.getByText(/Rp\s*2\.000/)).toBeInTheDocument();
     fireEvent.change(stockTypeSelect, { target: { name: 'stock_type', value: 'dp' } });
 
     await waitFor(() => {
-      expect(screen.getByText('DP Amount (IDR)')).toBeInTheDocument();
+      expect(screen.getByText('DP Pertama (IDR)')).toBeInTheDocument();
     });
 
-    const dpAmountInput = document.querySelector('[name="dp_amount"]') as HTMLInputElement;
-    fireEvent.change(dpAmountInput, { target: { name: 'dp_amount', value: '50000' } });
-    expect(dpAmountInput.value).toBe('50000');
+    const dpAwalInput = document.querySelector('[name="dp_awal"]') as HTMLInputElement;
+    fireEvent.change(dpAwalInput, { target: { name: 'dp_awal', value: '50000' } });
+    expect(dpAwalInput.value).toBe('50.000');
 
     const dueDateInput = document.querySelector('[name="due_date"]') as HTMLInputElement;
     fireEvent.change(dueDateInput, { target: { name: 'due_date', value: '2024-07-15' } });
@@ -5125,6 +5125,8 @@ expect(screen.getByText(/Rp\s*2\.000/)).toBeInTheDocument();
 
     fireEvent.click(screen.getByText('Tambah Faktur'));
     await waitFor(() => expect(screen.getByText('Tambah Faktur Baru')).toBeInTheDocument());
+
+    toggleSatuanBesar();
 
     // Change multiplier to > 1
     const multInput = document.querySelector('[name="unit_multiplier"]') as HTMLInputElement;

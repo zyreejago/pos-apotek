@@ -237,3 +237,366 @@ BEBAN OPERASIONAL (Tipe: Beban | Normal: Debit)
 * 527 - Beban Selisih Stok          : Kerugian otomatis dari selisih kurang barang di opname.
 * 529 - Beban Lain-lain             : Biaya insidental tak terduga lainnya.
 ================================================================================
+
+================================================================================
+8. ALIRAN KAS (CASHFLOW) & JURNAL SISTEM OTOMATIS
+================================================================================
+
+Setiap transaksi bisnis memicu jurnal otomatis. Berikut alur lengkapnya:
+
+A. PENJUALAN TUNAI (POS Cash)
+────────────────────────────────────────────────────────────────────────────────
+Flow:
+  Pelanggan bayar → Kasir input di POS → Sistem catat transaksi + jurnal
+
+Jurnal Otomatis:
+  [Debit]  101 Kas                        = Total bayar (termasuk PPN)
+  [Kredit] 401 Penjualan Obat             = Harga jual tanpa PPN (porsi OBAT)
+  [Kredit] 402 Penjualan Non-Obat         = Harga jual tanpa PPN (porsi NON_OBAT)
+  [Kredit] 202 Hutang Pajak               = PPN 11% dari total penjualan
+  [Debit]  501 HPP Obat                   = Harga beli produk OBAT (dari batch FEFO)
+  [Kredit] 103 Persediaan Obat            = Harga beli produk OBAT (dari batch FEFO)
+  [Debit]  502 HPP Non-Obat               = Harga beli produk NON_OBAT
+  [Kredit] 104 Persediaan Non-Obat        = Harga beli produk NON_OBAT
+
+Cashflow Effect:
+  KAS (+total bayar) | PERSEDIAAN (-HPP) | HUTANG PAJAK (+PPN)
+
+Sumber Kode: server/routes/transactions.js baris 110-138
+
+
+B. PENJUALAN MIDTRANS (QRIS/Transfer)
+────────────────────────────────────────────────────────────────────────────────
+Flow:
+  Pelanggan scan QRIS → Midtrans proses → Callback masuk → Sistem proses
+
+Jurnal Otomatis (saat callback settlement):
+  [Debit]  102 Bank                       = Total bayar (dari Midtrans)
+  [Kredit] 401 Penjualan Obat             = Harga jual tanpa PPN (porsi OBAT)
+  [Kredit] 402 Penjualan Non-Obat         = Harga jual tanpa PPN (porsi NON_OBAT)
+  [Kredit] 202 Hutang Pajak               = PPN 11%
+  [Debit]  501 HPP Obat                   = Harga beli produk OBAT
+  [Kredit] 103 Persediaan Obat            = Harga beli produk OBAT
+  [Debit]  502 HPP Non-Obat               = Harga beli produk NON_OBAT
+  [Kredit] 104 Persediaan Non-Obat        = Harga beli produk NON_OBAT
+
+Cashflow Effect:
+  BANK (+total) | PERSEDIAAN (-HPP) | HUTANG PAJAK (+PPN)
+
+Sumber Kode: server/routes/transactions.js baris 482-509
+
+
+C. PEMBELIAN STOK LUNAS (Bayar Langsung)
+────────────────────────────────────────────────────────────────────────────────
+Flow:
+  Beli stok ke supplier → Bayar langsung → Batch/faktur dibuat → Jurnal otomatis
+
+Jurnal Otomatis (saat batch di-approve & stock_type = 'lunas'):
+  [Debit]  103/104 Persediaan (OBAT/NON_OBAT) = Total harga beli
+  [Kredit] 101 Kas                            = Total harga beli
+
+Cashflow Effect:
+  PERSEDIAAN (+total) | KAS (-total)
+
+Sumber Kode: server/routes/inventory.js baris 316-335
+
+
+D. PEMBELIAN STOK KREDIT (Belum Bayar / Tempo)
+────────────────────────────────────────────────────────────────────────────────
+Flow:
+  Beli stok ke supplier → Bayar nanti → Batch dibuat → Jurnal otomatis
+
+Jurnal Otomatis (stock_type = 'belum_bayar'):
+  [Debit]  103/104 Persediaan = Total harga beli
+  [Kredit] 201 Hutang Usaha    = Total harga beli
+
+Cashflow Effect:
+  PERSEDIAAN (+total) | HUTANG USAHA (+total) | KAS (0 — belum bayar)
+
+Sumber Kode: server/routes/inventory.js baris 316-335
+
+
+E. PEMBELIAN STOK DP (Bayar Sebagian)
+────────────────────────────────────────────────────────────────────────────────
+Flow:
+  Bayar DP dulu → Stok masuk → Sisa bayar nanti
+
+Jurnal Otomatis (stock_type = 'dp', ada dp_amount):
+  [Debit]  103/104 Persediaan  = Total harga beli
+  [Kredit] 101 Kas              = Jumlah DP yang dibayar
+  [Kredit] 201 Hutang Usaha     = Sisa harga (total - DP)
+
+Saat Pelunasan DP (via batch_dp_payments):
+  [Debit]  201 Hutang Usaha     = Jumlah DP dibayar
+  [Kredit] 101 Kas / 102 Bank   = Jumlah DP dibayar
+
+Cashflow Effect:
+  PERSEDIAAN (+total) | KAS (-DP) | HUTANG USAHA (+sisa)
+
+
+F. RETUR PEMBELIAN (Barang dikembalikan ke supplier)
+────────────────────────────────────────────────────────────────────────────────
+Jurnal Otomatis (tergantung metode handling):
+  a) reduce_payable (kurangi hutang):
+     [Debit]  201 Hutang Usaha       = Nilai barang diretur
+     [Kredit] 103/104 Persediaan     = Nilai barang diretur
+  
+  b) credit_note (piutang ke supplier):
+     [Debit]  105 Piutang Kredit Supplier = Nilai barang diretur
+     [Kredit] 103/104 Persediaan          = Nilai barang diretur
+  
+  c) write_off_loss (anggap rugi):
+     [Debit]  528 Beban Kerugian Barang Rusak = Nilai barang diretur
+     [Kredit] 103/104 Persediaan              = Nilai barang diretur
+
+Cashflow Effect:
+  PERSEDIAAN (-nilai) | HUTANG/PIUTANG/BEBAN (+nilai)
+
+Sumber Kode: server/routes/returns.js (purchase returns section)
+
+
+G. RETUR PENJUALAN (Pembeli mengembalikan barang)
+────────────────────────────────────────────────────────────────────────────────
+Jurnal Otomatis:
+  [Debit]  403 Retur Penjualan       = Nilai jual barang diretur
+  [Debit]  103/104 Persediaan        = Harga beli barang diretur (restore stok)
+  [Kredit] 101 Kas / 106 Piutang Usaha = Uang dikembalikan ke pembeli
+  [Kredit] 501/502 HPP               = Harga beli barang diretur (balikin HPP)
+
+Cashflow Effect:
+  KAS (-refund) | PERSEDIAAN (+HPP) | RETUR PENJUALAN (+nilai jual)
+
+
+H. STOCK OPNAME (Penyesuaian Stok Fisik)
+────────────────────────────────────────────────────────────────────────────────
+Jika stok fisik > stok sistem (selisih lebih — surplus):
+  [Debit]  103/104 Persediaan                 = Nilai selisih × harga pokok
+  [Kredit] 404 Pendapatan Selisih Stok        = Nilai selisih × harga pokok
+
+Jika stok fisik < stok sistem (selisih kurang — shortage):
+  [Debit]  527 Beban Selisih Stok             = Nilai selisih × harga pokok
+  [Kredit] 103/104 Persediaan                 = Nilai selisih × harga pokok
+
+Cashflow Effect:
+  PERSEDIAAN (+/-selisih) | PENDAPATAN SELISIH STOK (+surplus) | BEBAN SELISIH STOK (+shortage)
+
+
+I. TRANSAKSI KEUANGAN MANUAL (via Menu Transaksi Keuangan)
+────────────────────────────────────────────────────────────────────────────────
+a) Biaya Operasional:
+  [Debit]  511-529 (akun beban sesuai jenis)
+  [Kredit] 101 Kas / 102 Bank
+
+b) Modal & Prive:
+  Setor Modal:      [Debit] 101/102 | [Kredit] 301
+  Tarik Prive:       [Debit] 302    | [Kredit] 101/102
+
+c) Aset Tetap:
+  Beli Aset:        [Debit] 121/122/123 | [Kredit] 101/102/201
+
+
+================================================================================
+9. LINK NERACA ↔ LABA RUGI (CLOSING ENTRIES)
+================================================================================
+
+Neraca dan Laba Rugi memiliki hubungan langsung melalui akun "311 - Laba Tahun Berjalan":
+
+  LABA BERSIH = Total Pendapatan (4xx) - Total Beban (5xx)  ← dari Laba Rugi
+  ↓
+  LABA BERSIH ditambahkan ke akun 311 di Neraca (sisi Modal)
+  ↓
+  RUMUS NERACA: TOTAL AKTIVA = TOTAL PASIVA + TOTAL MODAL
+                Total Modal = 301 + 310 + 311 - 302
+
+Tanpa laba tahun berjalan, neraca tidak akan balance.
+
+Proses di Sistem:
+  1. Backend query GET /api/reports/balance-accounting (server/routes/reports.js:132)
+  2. Ambil semua akun (1xx-3xx) dengan total_debit & total_credit dari journal_items
+  3. Ambil akun pendapatan (4xx) dan beban (5xx) periode Januari s/d bulan dipilih
+  4. Hitung netProfit = totalRevenue - totalExpenses
+  5. Tambahkan netProfit ke akun 311 (Laba Tahun Berjalan):
+     - Jika netProfit >= 0 → total_credit 311 += netProfit
+     - Jika netProfit < 0  → total_debit 311 += |netProfit|
+  6. Sajikan neraca dengan akun 1xx sebagai AKTIVA, 2xx sebagai PASIVA, 3xx sebagai MODAL
+
+
+================================================================================
+10. PER-ACCOUNT FORMULA DAN BACKEND LOGIC
+================================================================================
+
+Berikut detail formula & logika backend untuk setiap akun:
+
+101 - KAS
+────────────────────────────────────────────────────────────────────────────────
+  Saldo = total_debit - total_credit
+  Debit dari: Penjualan tunai (transactions.js:112), Setor modal, Transaksi Keuangan
+  Kredit dari: Pembelian stok lunas (inventory.js:322), Bayar hutang, Opname manual
+  Backend: journal_items WHERE account_id = (SELECT id FROM accounts WHERE code='101')
+  Validasi: Tidak boleh negatif (saldo minimal 0)
+
+102 - BANK
+────────────────────────────────────────────────────────────────────────────────
+  Saldo = total_debit - total_credit
+  Debit dari: Midtrans callback settlement (transactions.js:486)
+  Kredit dari: Transfer bayar hutang, Transaksi Keuangan
+  Backend: journal_items WHERE account_id = akun 102
+
+103 - PERSEDIAAN OBAT
+────────────────────────────────────────────────────────────────────────────────
+  Saldo = total_debit - total_credit
+  Debit dari: Pembelian stok kategori OBAT (inventory.js:318), Retur penjualan restore
+  Kredit dari: HPP penjualan OBAT (transactions.js:131), Retur pembelian, Opname
+  Backend: 
+    - INCREMENT: createJournalEntry dg accountCode='103' debit=totalAmount
+    - DECREMENT: createJournalEntry dg accountCode='103' credit=cogsAmount
+  RUMUS: Persediaan Akhir = Persediaan Awal + Pembelian - HPP - Retur Pembelian - Opname(-)
+
+104 - PERSEDIAAN NON-OBAT
+────────────────────────────────────────────────────────────────────────────────
+  Sama seperti 103, tapi untuk produk NON_OBAT.
+  Backend: pake accountCode='104'
+
+201 - HUTANG USAHA SUPPLIER
+────────────────────────────────────────────────────────────────────────────────
+  Saldo = total_kredit - total_debit
+  Kredit dari: Pembelian stok tempo (belum_bayar/dp) (inventory.js:329)
+  Debit dari: Pelunasan hutang, Retur pembelian (reduce_payable)
+  Backend: journal_items WHERE account_id = akun 201
+
+202 - HUTANG PAJAK (PPN)
+────────────────────────────────────────────────────────────────────────────────
+  Saldo = total_kredit - total_debit
+  Kredit dari: PPN 11% setiap penjualan (transactions.js:127)
+  Debit dari: Penyetoran PPN ke kas negara
+  RUMUS: PPN = (Subtotal Penjualan) × 11/111 (PPN termasuk dalam harga)
+
+301 - MODAL PEMILIK
+────────────────────────────────────────────────────────────────────────────────
+  Saldo = total_kredit - total_debit
+  Kredit dari: Setoran modal pemilik (via Transaksi Keuangan → Modal & Prive)
+  Backend: createJournalEntry dg accountCode='301' credit=amount
+
+302 - PRIVE PEMILIK (Kontra Modal)
+────────────────────────────────────────────────────────────────────────────────
+  Saldo = total_debit - total_kredit (DEBIT normal)
+  Debit dari: Penarikan pribadi pemilik
+  Backend: createJournalEntry dg accountCode='302' debit=amount
+
+311 - LABA TAHUN BERJALAN
+────────────────────────────────────────────────────────────────────────────────
+  TIDAK diisi manual. Dihitung OTOMATIS oleh sistem saat generate neraca.
+  Rumus: netProfit = Total Revenue(4xx) - Total Expenses(5xx)
+  Backend: server/routes/reports.js baris 187-217
+    const netProfit = totalRevenue - totalExpenses;
+    profitAcc.total_credit += netProfit (jika positif)
+    profitAcc.total_debit += |netProfit| (jika negatif)
+
+401 - PENJUALAN OBAT
+────────────────────────────────────────────────────────────────────────────────
+  Saldo = total_kredit - total_debit
+  Kredit dari: Setiap transaksi penjualan produk OBAT (transactions.js:125)
+  RUMUS: Penjualan OBAT = Σ(Harga Jual × Qty) untuk produk OBAT (TANPA PPN)
+  Backend: Hitung proporsi OBAT dari total penjualan
+    obatSalesWithoutTax = (obatSalesTotal / totalSalesWithTax) × salesTotalWithoutTax
+
+402 - PENJUALAN NON-OBAT
+────────────────────────────────────────────────────────────────────────────────
+  Sama seperti 401, untuk produk NON_OBAT
+
+404 - PENDAPATAN SELISIH STOK
+────────────────────────────────────────────────────────────────────────────────
+  Saldo = total_kredit - total_debit
+  Kredit dari: Stock Opname surplus (stok fisik > sistem) (products.js:369)
+  Backend: createJournalEntry dg accountCode='404' credit=differenceValue
+  Catatan: Ini adalah pendapatan non-operasional dari surplus stok hasil opname.
+
+501 - HPP OBAT
+────────────────────────────────────────────────────────────────────────────────
+  Saldo = total_debit - total_kredit
+  Debit dari: Harga beli produk OBAT yang terjual (transactions.js:130)
+  RUMUS: HPP = Σ(Harga Beli dari batch FEFO × Qty Terjual)
+  Backend: 
+    - Ambil batch dengan FEFO (expired_date ASC)
+    - Kurangi remaining_quantity
+    - Hitung cost_price × qty = HPP
+
+502 - HPP NON-OBAT
+────────────────────────────────────────────────────────────────────────────────
+  Sama seperti 501, untuk produk NON_OBAT
+
+511-529 BEBAN OPERASIONAL
+────────────────────────────────────────────────────────────────────────────────
+  Saldo = total_debit - total_kredit
+  Debit dari: Transaksi Keuangan → Biaya Operasional
+  Backend: createJournalEntry dg accountCode='5xx' debit=amount
+
+
+================================================================================
+11. LAPORAN KEUANGAN - BAGAN ALIR (FLOWCHART)
+================================================================================
+
+  TRANSAKSI PENJUALAN (POS)
+  │
+  ├──► transactions table (catatan kasir)
+  │     │
+  │     └──► Hitung: Subtotal, Diskon, PPN, Total Bayar
+  │
+  ├──► journal_entries + journal_items (jurnal otomatis)
+  │     │
+  │     ├──► Debit 101/102 (Kas/Bank)
+  │     ├──► Kredit 401/402 (Penjualan)
+  │     ├──► Kredit 202 (Hutang Pajak)
+  │     ├──► Debit 501/502 (HPP)
+  │     └──► Kredit 103/104 (Persediaan)
+  │
+  ├──► BUKU BESAR (per akun: 101, 201, 401, 501, 103, dll)
+  │     │
+  │     └──► Saldo Akhir = ΣDebit - ΣKredit (untuk normal DEBIT)
+  │         Saldo Akhir = ΣKredit - ΣDebit (untuk normal KREDIT)
+  │
+  ├──► LABA RUGI (dari akun 4xx - 5xx)
+  │     │
+  │     └──► Laba Bersih = ΣPendapatan - ΣBeban
+  │
+  └──► NERACA (dari akun 1xx + 2xx + 3xx)
+        │
+        └──► Total Aktiva = Total Pasiva + Total Modal
+             Total Modal = 301 + 310 + 311(Laba Bersih) - 302
+
+================================================================================
+12. VALIDASI & PENCEGAHAN ERROR
+================================================================================
+
+a) Jurnal Tidak Balance:
+   Sistem memvalidasi total DEBIT = total KREDIT setiap entri jurnal.
+   Validasi ada di kode pembuatan jurnal (tidak bisa insert jika tidak balance).
+
+b) Akun Tidak Ditemukan:
+   createJournalEntry() sekarang melakukan validasi awal:
+   SEMUA kode akun harus ada di tabel accounts sebelum jurnal dibuat.
+   Jika ada akun tidak ditemukan → throw Error jelas + ROLLBACK transaksi.
+   (Lihat server/utils/journal.js)
+
+c) Persediaan Negatif:
+   Sistem menggunakan metode FEFO pada saat penjualan:
+   - Ambil batch dengan expired_date paling awal
+   - Kurangi remaining_quantity batch
+   - Jika stok batch habis, lanjut ke batch berikutnya
+   - Jika semua batch habis, stok tidak bisa dikurangi lagi
+   Validasi: stok tidak boleh negatif di level produk maupun batch.
+
+d) Neraca Tidak Balance:
+   Jika total aktiva ≠ total pasiva + modal, penyebab biasanya:
+   1. Ada jurnal yang tidak balance (debit ≠ kredit) → cek journal_items
+   2. Akun revenue/expense (4xx/5xx) belum dimasukkan ke Laba Tahun Berjalan
+   3. Ada transaksi yang tidak membuat jurnal sama sekali
+   4. Kode akun di konfigurasi jurnal tidak ada di tabel accounts
+
+e) Laba Tahun Berjalan = 0:
+   Jika laba rugi menunjukkan angka tapi neraca menunjukkan 0:
+   - Pastikan period (bulan/tahun) yang dipilih sama
+   - Pastikan akun pendapatan (4xx) dan beban (5xx) memiliki jurnal items
+   - Akun 311 diisi OTOMATIS oleh backend di reports.js:187-217
+
+================================================================================

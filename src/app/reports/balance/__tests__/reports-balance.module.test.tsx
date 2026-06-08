@@ -549,14 +549,16 @@ describe('reports-balance module', () => {
     await waitFor(() => expect(saveMock).toHaveBeenCalled());
   });
 
-  test('PDF download with accounts that have zero total_debit and total_credit (covers formatCurrency amount || 0 branch)', async () => {
+  test('shows zero-balance account rows with empty value cells and download PDF still works', async () => {
     const zeroAccounts = [
       { id: 1, code: '111', name: 'Kas', type: 'aktiva', normal_balance: 'debit', total_debit: 0, total_credit: 0 },
       { id: 2, code: '211', name: 'Hutang', type: 'pasiva', normal_balance: 'kredit', total_debit: 0, total_credit: 0 },
     ];
     global.fetch = jest.fn(() => okJson({ accounts: zeroAccounts })) as unknown as typeof fetch;
     renderWithProviders(<ReportsbalancePage />);
-    await waitFor(() => expect(screen.getByText('Kas')).toBeInTheDocument());
+    await waitFor(() => {
+      expect(screen.getByText('Kas')).toBeInTheDocument();
+    });
     fireEvent.click(screen.getByText('Download PDF'));
     await waitFor(() => {
       expect(goeyToast.success).toHaveBeenCalled();

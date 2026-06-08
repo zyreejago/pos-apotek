@@ -60,12 +60,14 @@ export default function BalanceSheetAccountingPage() {
   }, [fetchData]);
 
   const formatCurrency = (amount: number) => {
+    const num = Number(amount);
+    if (!num) return '';
     return new Intl.NumberFormat('id-ID', {
       style: 'currency',
       currency: 'IDR',
       minimumFractionDigits: 0,
       maximumFractionDigits: 0
-    }).format(amount || 0);
+    }).format(num);
   };
 
   const getMonthName = (m: number) => {

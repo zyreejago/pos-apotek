@@ -249,7 +249,8 @@ function registerInventoryRoutes(app, pool, authenticate, checkPermission, uploa
   // Create a new batch
   app.post('/api/inventory/batches', authenticate, checkPermission('Management Product', 'create'), upload.array('images', 10), async (req, res) => {
     try {
-      const { product_id, supplier_id, batch_number, stock_type, purchase_date, initial_quantity, cost_price, expired_date, dp_amount, due_date, notes } = req.body;
+      const { product_id, supplier_id, batch_number, invoice_number, stock_type, purchase_date, initial_quantity, cost_price, expired_date, dp_amount: dpAmountRaw, dp_awal, due_date, notes } = req.body;
+      const dp_amount = dpAmountRaw && dpAmountRaw !== '' ? Number(dpAmountRaw) : (dp_awal && dp_awal !== '' ? Number(dp_awal) : null);
       const files = req.files;
       const imageUrls = files && Array.isArray(files) && files.length > 0 ? files.map(f => `/uploads/${f.filename}`) : [];
       const image_url = imageUrls.length > 0 ? JSON.stringify(imageUrls) : null;
@@ -264,19 +265,20 @@ function registerInventoryRoutes(app, pool, authenticate, checkPermission, uploa
       const status = needsApproval ? 'pending' : 'approved';
 
       const [result] = await pool.query(`
-        INSERT INTO batches (product_id, supplier_id, batch_number, stock_type, purchase_date, initial_quantity, remaining_quantity, cost_price, expired_date, dp_amount, due_date, image_url, status, notes, created_by)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO batches (product_id, supplier_id, batch_number, invoice_number, stock_type, purchase_date, initial_quantity, remaining_quantity, cost_price, expired_date, dp_amount, due_date, image_url, status, notes, created_by)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `, [
         product_id, 
         supplier_id && supplier_id !== '' ? Number(supplier_id) : null, 
         batch_number || null, 
+        invoice_number || null,
         stock_type, 
         formattedPurchaseDate, 
         Number(initial_quantity), 
         Number(initial_quantity), 
         Number(cost_price), 
         formattedExpiredDate, 
-        dp_amount && dp_amount !== '' ? Number(dp_amount) : null, 
+        dp_amount, 
         formattedDueDate, 
         image_url,
         status,
@@ -284,13 +286,14 @@ function registerInventoryRoutes(app, pool, authenticate, checkPermission, uploa
         req.user.id
       ]);
       
-      // Auto-create DP 1 payment record if dp_amount is filled
+      // Auto-create DP 1 payment record (use dp_awal if provided, otherwise dp_amount)
       const batchId = result.insertId;
-      if (stock_type === 'dp' && dp_amount && Number(dp_amount) > 0) {
+      const dpPaymentAmount = dp_awal && Number(dp_awal) > 0 ? Number(dp_awal) : (dp_amount && Number(dp_amount) > 0 ? Number(dp_amount) : 0);
+      if (stock_type === 'dp' && dpPaymentAmount > 0) {
         try {
           await pool.query(
             'INSERT INTO batch_dp_payments (batch_id, amount, payment_date, payment_method, notes) VALUES (?, ?, ?, ?, ?)',
-            [batchId, Number(dp_amount), formattedPurchaseDate || new Date().toISOString().split('T')[0], 'cash', 'DP 1 (saat pembuatan faktur)']
+            [batchId, dpPaymentAmount, formattedPurchaseDate || new Date().toISOString().split('T')[0], 'cash', 'DP 1 (saat pembuatan faktur)']
           );
         } catch (dpErr) {
           console.error('Error auto-creating DP payment:', dpErr);
@@ -324,8 +327,8 @@ function registerInventoryRoutes(app, pool, authenticate, checkPermission, uploa
             journalItems.push({ accountCode: '101', credit: totalAmount }); // Kas
           } else if (stock_type === 'dp' && dp_amount) {
             journalItems.push(
-              { accountCode: '101', credit: Number(dp_amount) }, // Kas (DP)
-              { accountCode: '201', credit: totalAmount - Number(dp_amount) } // Hutang Usaha (Sisa)
+              { accountCode: '101', credit: dp_amount }, // Kas (DP)
+              { accountCode: '201', credit: totalAmount - dp_amount } // Hutang Usaha (Sisa)
             );
           } else {
             journalItems.push({ accountCode: '201', credit: totalAmount }); // Hutang Usaha
@@ -367,7 +370,7 @@ function registerInventoryRoutes(app, pool, authenticate, checkPermission, uploa
   app.put('/api/inventory/batches/:id', authenticate, checkPermission('Management Product', 'edit'), upload.array('images', 10), async (req, res) => {
     try {
       const { id } = req.params;
-      const { supplier_id, batch_number, stock_type, purchase_date, initial_quantity, remaining_quantity, cost_price, expired_date, dp_amount, due_date, notes } = req.body;
+      const { supplier_id, batch_number, invoice_number, stock_type, purchase_date, initial_quantity, remaining_quantity, cost_price, expired_date, dp_amount, due_date, notes } = req.body;
       
       // Get the old batch first
       const [oldBatch] = await pool.query('SELECT remaining_quantity, product_id, image_url, status, stock_type FROM batches WHERE id = ?', [id]);
@@ -417,18 +420,19 @@ function registerInventoryRoutes(app, pool, authenticate, checkPermission, uploa
 
       await pool.query(`
         UPDATE batches 
-        SET supplier_id = ?, batch_number = ?, stock_type = ?, purchase_date = ?, initial_quantity = ?, remaining_quantity = ?, cost_price = ?, expired_date = ?, dp_amount = ?, due_date = ?, image_url = ?, status = ?, notes = ?
+        SET supplier_id = ?, batch_number = ?, invoice_number = ?, stock_type = ?, purchase_date = ?, initial_quantity = ?, remaining_quantity = ?, cost_price = ?, expired_date = ?, dp_amount = ?, due_date = ?, image_url = ?, status = ?, notes = ?
         WHERE id = ?
       `, [
         supplier_id && supplier_id !== '' ? Number(supplier_id) : null, 
         batch_number || null, 
+        invoice_number || null,
         stock_type, 
         formattedPurchaseDate, 
         Number(initial_quantity), 
         Number(remaining_quantity), 
         Number(cost_price), 
         formattedExpiredDate, 
-        dp_amount && dp_amount !== '' ? Number(dp_amount) : null, 
+        dp_amount, 
         formattedDueDate, 
         image_url, 
         status,

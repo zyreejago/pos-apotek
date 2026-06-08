@@ -642,6 +642,7 @@ const initDB = async () => {
       { code: '401', name: 'Penjualan Obat', type: 'pendapatan', normal_balance: 'kredit' },
       { code: '402', name: 'Penjualan Non-Obat', type: 'pendapatan', normal_balance: 'kredit' },
       { code: '403', name: 'Retur Penjualan', type: 'pendapatan', normal_balance: 'debit' },
+      { code: '404', name: 'Pendapatan Selisih Stok', type: 'pendapatan', normal_balance: 'kredit' },
       
       // Cost of Goods Sold (beban)
       { code: '501', name: 'HPP Obat', type: 'beban', normal_balance: 'debit' },

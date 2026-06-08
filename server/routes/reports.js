@@ -508,7 +508,22 @@ module.exports = function registerReportRoutes(app, pool, authenticate, checkPer
       await connection.beginTransaction();
 
       const { createJournalEntry } = require('../utils/journal');
-      await createJournalEntry(connection, null, date, description, items);
+      // Map items: if they have account_id but not accountCode, resolve the account code
+      const mappedItems = [];
+      for (const item of items) {
+        if (item.accountCode) {
+          mappedItems.push(item);
+        } else if (item.account_id) {
+          const [acc] = await connection.query('SELECT code FROM accounts WHERE id = ?', [item.account_id]);
+          if (acc.length === 0) {
+            throw new Error(`Akun dengan ID ${item.account_id} tidak ditemukan di tabel accounts`);
+          }
+          mappedItems.push({ accountCode: acc[0].code, debit: item.debit || 0, credit: item.credit || 0 });
+        } else {
+          throw new Error('Item jurnal harus memiliki accountCode atau account_id');
+        }
+      }
+      await createJournalEntry(connection, null, date, description, mappedItems);
 
       await connection.commit();
       res.json({ success: true, message: 'Journal entry created successfully' });
