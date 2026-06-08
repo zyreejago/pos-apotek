@@ -41,67 +41,55 @@ module.exports = function registerTransactionRoutes(app, pool, authenticate, che
       let nonObatCOGSTotal = 0;
 
       for (const item of items) {
-        // Get product cost price and product_category FIRST
-        const [productResult] = await connection.query('SELECT cost_price, product_category FROM products WHERE id = ?', [item.id]);
+        const [productResult] = await connection.query('SELECT cost_price, product_category, name FROM products WHERE id = ?', [item.id]);
+        const cost = productResult.length > 0 ? Number(productResult[0].cost_price || 0) : 0;
+        const isObat = productResult.length > 0 ? productResult[0].product_category === 'OBAT' : false;
+        const productName = productResult.length > 0 ? productResult[0].name : `Produk #${item.id}`;
+        const itemCOGS = cost * item.quantity;
+        const itemSales = Number(item.price) * item.quantity;
+        totalCOGS += itemCOGS;
+        if (isObat) { obatSalesTotal += itemSales; obatCOGSTotal += itemCOGS; }
+        else { nonObatSalesTotal += itemSales; nonObatCOGSTotal += itemCOGS; }
 
-        // Get invoice_number from FEFO batch for this product
-        let fefoInvoice = null;
-        if (productResult.length > 0 && ['cash', 'midtrans'].includes(payment_method)) {
-          const [batchRows] = await connection.query(
-            'SELECT invoice_number FROM batches WHERE product_id = ? AND remaining_quantity > 0 AND is_archived = FALSE ORDER BY expired_date ASC, created_at ASC LIMIT 1',
-            [item.id]
-          );
-          if (batchRows.length > 0) fefoInvoice = batchRows[0].invoice_number;
-        }
-        await connection.query(
-          'INSERT INTO transaction_items (transaction_id, product_id, invoice_number, quantity, price) VALUES (?, ?, ?, ?, ?)',
-          [transactionId, item.id, fefoInvoice, item.quantity, item.price]
-        );
-
-        if (productResult.length > 0) {
-          const cost = Number(productResult[0].cost_price || 0);
-          const itemCOGS = cost * item.quantity;
-          const itemSales = Number(item.price) * item.quantity;
-          totalCOGS += itemCOGS;
-
-          const isObat = productResult[0].product_category === 'OBAT';
-          if (isObat) {
-            obatSalesTotal += itemSales;
-            obatCOGSTotal += itemCOGS;
-          } else {
-            nonObatSalesTotal += itemSales;
-            nonObatCOGSTotal += itemCOGS;
-          }
-        }
-
-        if (payment_method === 'cash') {
-          // Implementasi FEFO! Kurangi stok dari batch yang expired paling cepat!
+        if (['cash', 'midtrans'].includes(payment_method)) {
+          // FEFO: ambil batch dengan expired paling awal, kurangi stok per batch
           let remainingToReduce = item.quantity;
-          
-          // Ambil batch yang masih ada stok, diurutkan by expired_date ASC
           const [batches] = await connection.query(
-            'SELECT id, remaining_quantity FROM batches WHERE product_id = ? AND remaining_quantity > 0 AND is_archived = FALSE ORDER BY expired_date ASC, created_at ASC',
+            "SELECT id, remaining_quantity, invoice_number FROM batches WHERE product_id = ? AND remaining_quantity > 0 AND is_archived = FALSE AND status = 'approved' ORDER BY expired_date ASC, created_at ASC",
             [item.id]
           );
 
           for (const batch of batches) {
             if (remainingToReduce <= 0) break;
-
             const reduceAmount = Math.min(remainingToReduce, batch.remaining_quantity);
-            
-            // Kurangi remaining_quantity batch
+            await connection.query('UPDATE batches SET remaining_quantity = remaining_quantity - ? WHERE id = ?', [reduceAmount, batch.id]);
+            // 1 baris transaction_items PER batch yang dikurangi
             await connection.query(
-              'UPDATE batches SET remaining_quantity = remaining_quantity - ? WHERE id = ?',
-              [reduceAmount, batch.id]
+              'INSERT INTO transaction_items (transaction_id, product_id, invoice_number, quantity, price) VALUES (?, ?, ?, ?, ?)',
+              [transactionId, item.id, batch.invoice_number || null, reduceAmount, item.price]
             );
-
             remainingToReduce -= reduceAmount;
           }
-
-          // Update total stok di products
+          await connection.query('UPDATE products SET stock = stock - ? WHERE id = ?', [item.quantity, item.id]);
+          // Jika FEFO tidak menemukan batch (stok habis), tetap catat 1 baris tanpa invoice
+          if (item.quantity - remainingToReduce === 0) {
+            // Check if any rows were inserted for this item
+            const [checkRows] = await connection.query(
+              'SELECT COUNT(*) as cnt FROM transaction_items WHERE transaction_id = ? AND product_id = ?',
+              [transactionId, item.id]
+            );
+            if (Number(checkRows[0].cnt) === 0) {
+              await connection.query(
+                'INSERT INTO transaction_items (transaction_id, product_id, invoice_number, quantity, price) VALUES (?, ?, ?, ?, ?)',
+                [transactionId, item.id, null, item.quantity, item.price]
+              );
+            }
+          }
+        } else {
+          // Non-cash (midtrans pending) — 1 baris tanpa invoice_number
           await connection.query(
-            'UPDATE products SET stock = stock - ? WHERE id = ?',
-            [item.quantity, item.id]
+            'INSERT INTO transaction_items (transaction_id, product_id, invoice_number, quantity, price) VALUES (?, ?, ?, ?, ?)',
+            [transactionId, item.id, null, item.quantity, item.price]
           );
         }
       }
@@ -262,7 +250,7 @@ module.exports = function registerTransactionRoutes(app, pool, authenticate, che
           
           // Ambil batch yang masih ada stok, diurutkan by expired_date ASC
           const [batches] = await connection.query(
-            'SELECT id, remaining_quantity FROM batches WHERE product_id = ? AND remaining_quantity > 0 AND is_archived = FALSE ORDER BY expired_date ASC, created_at ASC',
+            "SELECT id, remaining_quantity FROM batches WHERE product_id = ? AND remaining_quantity > 0 AND is_archived = FALSE AND status = 'approved' ORDER BY expired_date ASC, created_at ASC",
             [item.product_id]
           );
 
@@ -437,7 +425,7 @@ module.exports = function registerTransactionRoutes(app, pool, authenticate, che
           let remainingToReduce = item.quantity;
 
           const [batches] = await connection.query(
-            'SELECT id, remaining_quantity FROM batches WHERE product_id = ? AND remaining_quantity > 0 AND is_archived = FALSE ORDER BY expired_date ASC, created_at ASC',
+            "SELECT id, remaining_quantity FROM batches WHERE product_id = ? AND remaining_quantity > 0 AND is_archived = FALSE AND status = 'approved' ORDER BY expired_date ASC, created_at ASC",
             [item.product_id]
           );
 

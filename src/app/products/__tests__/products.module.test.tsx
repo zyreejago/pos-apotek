@@ -490,8 +490,8 @@ expect(screen.getByText(/Rp\s*2\.000/)).toBeInTheDocument();
     fillForm();
 
     expect(screen.getByDisplayValue('Produk Baru')).toBeInTheDocument();
-    expect(screen.getByDisplayValue('1.000')).toBeInTheDocument();
-    expect(screen.getByDisplayValue('2.000')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('1000')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('2000')).toBeInTheDocument();
   });
 
   test('creates product successfully', async () => {
@@ -895,7 +895,7 @@ expect(screen.getByText(/Rp\s*2\.000/)).toBeInTheDocument();
     // Selling price should be auto-filled to 2000
     await waitFor(() => {
       const sellingInput = document.querySelector('[name="selling_price"]') as HTMLInputElement;
-      expect(sellingInput.value).toBe('2.000');
+      expect(sellingInput.value).toBe('2000');
     });
   });
 
@@ -5075,7 +5075,7 @@ expect(screen.getByText(/Rp\s*2\.000/)).toBeInTheDocument();
 
     const dpAwalInput = document.querySelector('[name="dp_awal"]') as HTMLInputElement;
     fireEvent.change(dpAwalInput, { target: { name: 'dp_awal', value: '50000' } });
-    expect(dpAwalInput.value).toBe('50.000');
+    expect(dpAwalInput.value).toBe('50000');
 
     const dueDateInput = document.querySelector('[name="due_date"]') as HTMLInputElement;
     fireEvent.change(dueDateInput, { target: { name: 'due_date', value: '2024-07-15' } });

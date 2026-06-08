@@ -20,7 +20,8 @@ module.exports = function registerProductRoutes(app, pool, authenticate, checkPe
         SELECT p.*, 
                b.supplier_id, 
                s.name AS supplier_name, 
-               b.stock_type
+               b.stock_type,
+               (SELECT MIN(b2.expired_date) FROM batches b2 WHERE b2.product_id = p.id AND b2.is_archived = FALSE AND b2.status = 'approved') AS nearest_expired
         FROM products p
         LEFT JOIN (
           SELECT b1.product_id, b1.supplier_id, b1.stock_type

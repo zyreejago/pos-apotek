@@ -177,14 +177,14 @@ function registerInventoryRoutes(app, pool, authenticate, checkPermission, uploa
       const { is_archived } = req.body;
       
       // Get the batch first to check stock_type
-      const [batch] = await pool.query('SELECT stock_type, initial_quantity FROM batches WHERE id = ?', [id]);
+      const [batch] = await pool.query('SELECT stock_type, initial_quantity, notes FROM batches WHERE id = ?', [id]);
       if (batch.length === 0) {
         return res.status(404).json({ success: false, message: 'Batch tidak ditemukan' });
       }
       
-      // If trying to archive, check if stock_type is 'lunas' or 'retur'
-      if (is_archived && batch[0].stock_type !== 'lunas' && batch[0].stock_type !== 'retur') {
-        return res.status(400).json({ success: false, message: 'Hanya faktur dengan tipe stok \"lunas\" atau \"retur\" yang dapat diarsipkan' });
+      // If trying to archive, check if stock_type is 'lunas', 'retur', 'konsinyasi', or already expired
+      if (is_archived && batch[0].notes !== 'Expired' && batch[0].stock_type !== 'lunas' && batch[0].stock_type !== 'retur' && batch[0].stock_type !== 'konsinyasi') {
+        return res.status(400).json({ success: false, message: 'Hanya faktur dengan tipe stok \"lunas\", \"retur\", \"konsinyasi\", atau kadaluarsa yang dapat diarsipkan' });
       }
 
       // For 'retur' stock_type, only allow archive if all qty has been returned
@@ -249,7 +249,7 @@ function registerInventoryRoutes(app, pool, authenticate, checkPermission, uploa
   // Create a new batch
   app.post('/api/inventory/batches', authenticate, checkPermission('Management Product', 'create'), upload.array('images', 10), async (req, res) => {
     try {
-      const { product_id, supplier_id, batch_number, invoice_number, stock_type, purchase_date, initial_quantity, cost_price, expired_date, dp_amount: dpAmountRaw, dp_awal, due_date, notes } = req.body;
+      const { product_id, supplier_id, batch_number, invoice_number, stock_type, purchase_date, initial_quantity, cost_price, expired_date, dp_amount: dpAmountRaw, dp_awal, due_date, notes, has_purchase_unit } = req.body;
       const dp_amount = dpAmountRaw && dpAmountRaw !== '' ? Number(dpAmountRaw) : (dp_awal && dp_awal !== '' ? Number(dp_awal) : null);
       const files = req.files;
       const imageUrls = files && Array.isArray(files) && files.length > 0 ? files.map(f => `/uploads/${f.filename}`) : [];
@@ -265,8 +265,8 @@ function registerInventoryRoutes(app, pool, authenticate, checkPermission, uploa
       const status = needsApproval ? 'pending' : 'approved';
 
       const [result] = await pool.query(`
-        INSERT INTO batches (product_id, supplier_id, batch_number, invoice_number, stock_type, purchase_date, initial_quantity, remaining_quantity, cost_price, expired_date, dp_amount, due_date, image_url, status, notes, created_by)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO batches (product_id, supplier_id, batch_number, invoice_number, stock_type, purchase_date, initial_quantity, remaining_quantity, cost_price, expired_date, dp_amount, due_date, image_url, status, notes, created_by, has_purchase_unit)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `, [
         product_id, 
         supplier_id && supplier_id !== '' ? Number(supplier_id) : null, 
@@ -283,7 +283,8 @@ function registerInventoryRoutes(app, pool, authenticate, checkPermission, uploa
         image_url,
         status,
         notes || null,
-        req.user.id
+        req.user.id,
+        has_purchase_unit === '1' ? 1 : 0
       ]);
       
       // Auto-create DP 1 payment record (use dp_awal if provided, otherwise dp_amount)
@@ -565,57 +566,20 @@ function registerInventoryRoutes(app, pool, authenticate, checkPermission, uploa
     }
   });
 
-  // Mark batch as expired and record journaling
+  // Mark batch as expired (just add badge, don't change stock)
   app.put('/api/inventory/batches/:id/expire', authenticate, checkPermission('Management Product', 'edit'), async (req, res) => {
     const { id } = req.params;
-    const connection = await pool.getConnection();
     try {
-      await connection.beginTransaction();
-
-      const [batchRows] = await connection.query('SELECT * FROM batches WHERE id = ?', [id]);
+      const [batchRows] = await pool.query('SELECT * FROM batches WHERE id = ?', [id]);
       if (batchRows.length === 0) {
-        connection.release();
         return res.status(404).json({ success: false, message: 'Batch not found' });
       }
-      const batch = batchRows[0];
-      const qty = batch.remaining_quantity;
-      if (qty <= 0) {
-        connection.release();
-        return res.status(400).json({ success: false, message: 'Batch has no remaining stock to expire' });
-      }
-
-      // Update batch remaining quantity to 0 and note as Expired
-      await connection.query('UPDATE batches SET remaining_quantity = 0, notes = "Expired" WHERE id = ?', [id]);
-
-      // Reduce product stock
-      await connection.query('UPDATE products SET stock = GREATEST(stock - ?, 0) WHERE id = ?', [qty, batch.product_id]);
-
-      // Get product info
-      const [product] = await connection.query('SELECT name, product_category, cost_price FROM products WHERE id = ?', [batch.product_id]);
-      const productName = product[0]?.name || `Produk #${batch.product_id}`;
-      const isObat = product[0]?.product_category === 'OBAT';
-      const inventoryAccount = isObat ? '103' : '104';
-      const expiredValue = qty * Number(product[0]?.cost_price || 0);
-
-      // Create journal: Debit Beban Obat Expired (526), Credit Persediaan Obat/Non-Obat
-      const journalItems = [
-        { accountCode: '526', debit: expiredValue },
-        { accountCode: inventoryAccount, credit: expiredValue }
-      ];
-
-      await createJournalEntry(connection, null, new Date().toISOString().split('T')[0],
-        `Obat/Barang Expired: ${productName} (${qty} pcs)`,
-        journalItems
-      );
-
-      await connection.commit();
+      // Only add the Expired note — stock & qty terjual tetap (hanya badge)
+      await pool.query('UPDATE batches SET notes = "Expired" WHERE id = ?', [id]);
       res.json({ success: true });
     } catch (err) {
-      await connection.rollback();
       console.error('Error expiring batch:', err);
       res.status(500).json({ success: false, message: 'Failed to expire batch' });
-    } finally {
-      connection.release();
     }
   });
 

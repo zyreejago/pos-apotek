@@ -29,6 +29,7 @@ interface Product {
   purchase_unit?: string | null;
   unit_multiplier?: number;
   product_category?: 'OBAT' | 'NON_OBAT';
+  nearest_expired?: string | null;
 }
 
 interface DpPayment {
@@ -68,6 +69,7 @@ interface Faktur {
   dp_payments?: DpPayment[];
   qty_returned?: number;
   qty_restored?: number;
+  has_purchase_unit?: number;
   created_by_username?: string;
   created_by_role?: string;
 }
@@ -403,9 +405,9 @@ export default function ProductsPage() {
       quantity: '',
       cost_price: selectedProduct?.cost_price.toString() || '',
       selling_price: selectedProduct?.selling_price.toString() || '',
-      purchase_unit: selectedProduct?.purchase_unit || 'Box',
+      purchase_unit: 'Box',
       unit: selectedProduct?.unit || 'Tablet',
-      unit_multiplier: (selectedProduct?.unit_multiplier || 1).toString(),
+      unit_multiplier: '1',
       stock_type: selectedProduct?.stock_type || 'belum_bayar',
       dp_amount: '',
       dp_awal: '',
@@ -432,17 +434,18 @@ export default function ProductsPage() {
       return dateStr.substring(0, 10);
     };
 
-    const multiplier = activeProduct?.unit_multiplier || 1;
+    const batchHasPU = !!(faktur as any).has_purchase_unit;
+    const multiplier = batchHasPU ? (activeProduct?.unit_multiplier || 1) : 1;
 
-    const hasExistingPurchaseUnit = activeProduct?.purchase_unit && activeProduct?.unit_multiplier && activeProduct.unit_multiplier > 1;
-    setHasPurchaseUnitForm(!!hasExistingPurchaseUnit);
+    // Toggle ON kalo batch punya has_purchase_unit = 1
+    setHasPurchaseUnitForm(batchHasPU);
     setFakturFormData({
       invoice_number: faktur.invoice_number || '',
       batch_number: faktur.batch_number || '',
       supplier_id: faktur.supplier_id?.toString() || '',
 
       purchase_date: formatDateForInput(faktur.purchase_date),
-      quantity: (faktur.quantity / multiplier).toString(),
+      quantity: batchHasPU ? (faktur.quantity / multiplier).toString() : (faktur.initial_quantity || faktur.quantity).toString(),
       cost_price: faktur.cost_price.toString(),
       selling_price: activeProduct?.selling_price.toString() || '',
       purchase_unit: activeProduct?.purchase_unit || 'Box',
@@ -691,6 +694,7 @@ export default function ProductsPage() {
       formData.append('remaining_quantity', qtyInBaseUnit.toString());
       formData.append('cost_price', (Number(fakturFormData.cost_price) || 0).toString());
       formData.append('expired_date', fakturFormData.expired_date || '');
+      formData.append('has_purchase_unit', hasPurchaseUnitForm ? '1' : '0');
       if (fakturFormData.stock_type === 'dp' && fakturFormData.dp_awal) {
         formData.append('dp_awal', fakturFormData.dp_awal);
       }
@@ -824,12 +828,13 @@ export default function ProductsPage() {
   };
 
   const handleArchiveFaktur = async (faktur: Faktur) => {
-    if (faktur.stock_type !== 'lunas' && faktur.stock_type !== 'retur') {
-      goeyToast.error('Hanya faktur dengan tipe stok \"lunas\" atau \"retur\" yang dapat diarsipkan!');
+    const isExpired = faktur.notes === 'Expired';
+    if (!isExpired && faktur.stock_type !== 'lunas' && faktur.stock_type !== 'retur' && faktur.stock_type !== 'konsinyasi') {
+      goeyToast.error('Hanya faktur dengan tipe stok "lunas", "retur", atau "konsinyasi" yang dapat diarsipkan!');
       return;
     }
 
-    if (faktur.stock_type === 'retur' && (faktur.qty_returned ?? 0) < faktur.initial_quantity) {
+    if (!isExpired && faktur.stock_type === 'retur' && (faktur.qty_returned ?? 0) < faktur.initial_quantity) {
       goeyToast.error('Barang retur belum lengkap', {
         description: `Arsip hanya bisa dilakukan setelah semua qty diretur (${faktur.qty_returned ?? 0}/${faktur.initial_quantity})`,
       });
@@ -1420,9 +1425,9 @@ export default function ProductsPage() {
                 <SortableHeader field="location_code" label="Kode Lokasi" />
                 <SortableHeader field="supplier_name" label="Supplier" />
                 <SortableHeader field="stock_type" label="Stock Type" />
-                <SortableHeader field="cost_price" label="Cost Price" />
-                <SortableHeader field="selling_price" label="Selling Price" />
-                <SortableHeader field="expired_date" label="Expired Date" />
+                <SortableHeader field="cost_price" label="Harga Beli" />
+                <SortableHeader field="selling_price" label="Harga Jual" />
+                <SortableHeader field="expired_date" label="Kadaluarsa" />
                 <SortableHeader field="stock" label="Stock" />
                 <th className="px-6 py-4 text-right">Actions</th>
               </tr>
@@ -1482,8 +1487,8 @@ export default function ProductsPage() {
                     <td className="px-6 py-4 text-gray-600">{formatCurrency(product.cost_price)}</td>
                     <td className="px-6 py-4 text-gray-600">{formatCurrency(product.selling_price)}</td>
                     <td className="px-3 sm:px-6 py-4">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getExpiredStatusColor(product.expired_date)}`}>
-                        {formatDate(product.expired_date)}
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getExpiredStatusColor(product.nearest_expired || product.expired_date)}`}>
+                        {formatDate(product.nearest_expired || product.expired_date)}
                       </span>
                     </td>
                     <td className="px-6 py-4 text-gray-600">
@@ -1764,10 +1769,9 @@ export default function ProductsPage() {
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">DP Pertama (IDR)</label>
                       <input
-                        type="text"
-                        inputMode="numeric"
+                        type="number"
                         name="dp_awal"
-                        value={formatInputRupiah(formData.dp_awal ?? '')}
+                        value={formData.dp_awal ?? ''}
                         onChange={onPriceChange}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                         placeholder="DP Pertama"
@@ -1820,13 +1824,12 @@ export default function ProductsPage() {
                 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Cost Price <span className="text-red-500">*</span></label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Harga Beli <span className="text-red-500">*</span></label>
                     <input
-                      type="text"
-                      inputMode="numeric"
+                      type="number"
                       name="cost_price"
                       required
-                      value={formatInputRupiah(formData.cost_price)}
+                      value={formData.cost_price}
                       onChange={onPriceChange}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                       placeholder="0"
@@ -1834,13 +1837,12 @@ export default function ProductsPage() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Selling Price<span className="text-red-500">*</span></label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Harga Jual<span className="text-red-500">*</span></label>
                     <input
-                      type="text"
-                      inputMode="numeric"
+                      type="number"
                       name="selling_price"
                       required
-                      value={formatInputRupiah(formData.selling_price)}
+                      value={formData.selling_price}
                       onChange={onPriceChange}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                       placeholder="0"
@@ -1934,7 +1936,7 @@ export default function ProductsPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Stok (Dalam {formData.unit || 'Tablet'}) <span className="text-red-500">*</span> <span className="text-xs text-gray-400 font-normal">(Unit Dasar)</span>
+                      Stok (Dalam {formData.unit || 'Tablet'}) <span className="text-red-500">*</span> 
                     </label>
                     <input
                       type="number"
@@ -2001,10 +2003,11 @@ export default function ProductsPage() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Expired Date <span className="text-red-500">*</span></label>
-                  <input
+                    <input
                     type="date"
                     name="expired_date"
                     required
+                    min={new Date().toISOString().split('T')[0]}
                     value={formData.expired_date}
                     onChange={handleInputChange}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
@@ -2062,10 +2065,9 @@ export default function ProductsPage() {
                     <div>
                       <label className="block text-xs text-gray-600 mb-1">Harga Beli <span className="text-red-500">*</span></label>
                       <input
-                        type="text"
-                        inputMode="numeric"
+                        type="number"
                         name="cost_price"
-                        value={formatInputRupiah(formData.cost_price)}
+                        value={formData.cost_price}
                         onChange={onPriceChange}
                         className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm"
                         placeholder="0"
@@ -2074,10 +2076,9 @@ export default function ProductsPage() {
                     <div>
                       <label className="block text-xs text-gray-600 mb-1">Harga Jual <span className="text-red-500">*</span></label>
                       <input
-                        type="text"
-                        inputMode="numeric"
+                        type="number"
                         name="selling_price"
-                        value={formatInputRupiah(formData.selling_price)}
+                        value={formData.selling_price}
                         onChange={onPriceChange}
                         className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm"
                         placeholder="0"
@@ -2166,7 +2167,7 @@ export default function ProductsPage() {
                       </>
                     )}
                     <div>
-                      <label className="block text-xs text-gray-600 mb-1">Stock ({formData.unit || 'Tablet'}) <span className="text-red-500">*</span> <span className="text-[10px] text-gray-400 font-normal">(Unit Dasar)</span></label>
+                      <label className="block text-xs text-gray-600 mb-1">Stock ({formData.unit || 'Tablet'}) <span className="text-red-500">*</span> </label>
                       <input
                         type="number"
                         name="stock"
@@ -2182,7 +2183,7 @@ export default function ProductsPage() {
                       type="date"
                       name="expired_date"
                       required
-                      value={formData.expired_date}
+                      min={new Date().toISOString().split("T")[0]}                      value={formData.expired_date}
                       onChange={handleInputChange}
                       className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm"
                     />
@@ -2375,12 +2376,12 @@ export default function ProductsPage() {
 
           <div className="mb-4 flex justify-between items-center">
             <h3 className="font-semibold text-gray-700">Daftar Faktur</h3>
-            <button
+            {/* <button
               onClick={handleOpenAddFakturModal}
               className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium transition-colors"
             >
               <Plus size={16} /> Tambah Faktur
-            </button>
+            </button> */}
           </div>
 
           {fakturs.length === 0 ? (
@@ -2508,7 +2509,7 @@ export default function ProductsPage() {
                         <td className="px-4 py-3 font-medium">{formatCurrency(totalAmount)}</td>
                         <td className="px-4 py-3 text-right">
                           <div className="flex justify-end gap-2">
-                            {faktur.image_url && getImageUrls(faktur.image_url).length > 0 && (
+                            {/* {faktur.image_url && getImageUrls(faktur.image_url).length > 0 && (
                               <button
                                 onClick={() => {
                                   const urls = getImageUrls(faktur.image_url).map(u => `http://localhost:5000${u}`);
@@ -2519,7 +2520,7 @@ export default function ProductsPage() {
                               >
                                 <FileText size={14} />
                               </button>
-                            )}
+                            )} */}
                             <button
                               onClick={() => setDetailFaktur(faktur)}
                               className="p-1 text-gray-500 hover:bg-gray-100 rounded"
@@ -2534,7 +2535,7 @@ export default function ProductsPage() {
                             >
                               <Edit size={14} />
                             </button>
-                            {faktur.status === 'approved' && (
+                            {faktur.status === 'approved' && faktur.notes !== 'Expired' && (
                               <button
                                 onClick={() => handleExpireBatch(faktur)}
                                 className="p-1 text-amber-600 hover:bg-amber-50 rounded"
@@ -2543,7 +2544,7 @@ export default function ProductsPage() {
                                 <AlertTriangle size={14} />
                               </button>
                             )}
-                            {canArchive && (
+                            {(canArchive || faktur.notes === 'Expired') && (
                               <button
                                 onClick={() => handleArchiveFaktur(faktur)}
                                 className="p-1 text-gray-500 hover:bg-gray-100 rounded"
@@ -2742,11 +2743,10 @@ export default function ProductsPage() {
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Harga Beli <span className="text-red-500">*</span></label>
                   <input
-                    type="text"
-                    inputMode="numeric"
+                    type="number"
                     name="cost_price"
                     required
-                    value={formatInputRupiah(fakturFormData.cost_price)}
+                    value={fakturFormData.cost_price}
                     onChange={onFakturPriceChange}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                     placeholder="0"
@@ -2755,11 +2755,10 @@ export default function ProductsPage() {
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Harga Jual <span className="text-red-500">*</span></label>
                   <input
-                    type="text"
-                    inputMode="numeric"
+                    type="number"
                     name="selling_price"
                     required
-                    value={formatInputRupiah(fakturFormData.selling_price)}
+                    value={fakturFormData.selling_price}
                     onChange={onFakturPriceChange}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                     placeholder="0"
@@ -2770,10 +2769,9 @@ export default function ProductsPage() {
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">DP Pertama (IDR)</label>
                       <input
-                        type="text"
-                        inputMode="numeric"
+                        type="number"
                         name="dp_awal"
-                        value={formatInputRupiah(fakturFormData.dp_awal)}
+                        value={fakturFormData.dp_awal}
                         onChange={onFakturPriceChange}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                         placeholder="DP Pertama"
@@ -2799,7 +2797,7 @@ export default function ProductsPage() {
                     type="date"
                     name="expired_date"
                     required
-                    value={fakturFormData.expired_date}
+                    min={new Date().toISOString().split("T")[0]}                    value={fakturFormData.expired_date}
                     onChange={handleFakturInputChange}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                   />
@@ -3467,9 +3465,17 @@ export default function ProductsPage() {
                     <p className="text-sm font-bold text-gray-900 mt-1">{Math.floor((detailFaktur.remaining_quantity ?? detailFaktur.quantity) / selectedProduct.unit_multiplier)} {selectedProduct.purchase_unit}</p>
                   </div>
                 )}
+                <div className="bg-blue-50 p-3 rounded-xl">
+                  <p className="text-xs text-blue-600 font-medium uppercase tracking-wider">Qty Terjual</p>
+                  <p className="text-sm font-bold text-blue-800 mt-1">
+                    {((detailFaktur.initial_quantity || detailFaktur.quantity) - (detailFaktur.remaining_quantity ?? detailFaktur.quantity)) > 0
+                      ? `${(detailFaktur.initial_quantity || detailFaktur.quantity) - (detailFaktur.remaining_quantity ?? detailFaktur.quantity)} ${selectedProduct?.unit || 'Tablet'}`
+                      : '0'}
+                  </p>
+                </div>
                 {detailFaktur.qty_restored != null && (
                   <div className="bg-purple-50 p-3 rounded-xl">
-                    <p className="text-xs text-purple-600 font-medium uppercase tracking-wider">Qty Sales Retur</p>
+                    <p className="text-xs text-purple-600 font-medium uppercase tracking-wider">Qty Retur Penjualan</p>
                     <p className="text-sm font-bold text-purple-800 mt-1">{detailFaktur.qty_restored > 0 ? `${detailFaktur.qty_restored} ${selectedProduct?.unit || 'Tablet'}` : '0'}</p>
                   </div>
                 )}
