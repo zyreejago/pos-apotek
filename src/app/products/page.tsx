@@ -1600,7 +1600,7 @@ export default function ProductsPage() {
         onClose={handleCloseProductOffCanvas}
         title={productOffCanvasMode === 'add' ? 'Add New Product' : 'Edit Product'}
       >
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} noValidate>
           <div className="space-y-4">
             {/* Single/Multiple Toggle (only when adding) */}
             {productOffCanvasMode === 'add' && (
@@ -1627,9 +1627,10 @@ export default function ProductsPage() {
               <>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Supplier</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Supplier <span className="text-red-500">*</span></label>
                     <select
                       name="supplier_id"
+                      required
                       value={formData.supplier_id}
                       onChange={handleInputChange}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
@@ -1731,9 +1732,10 @@ export default function ProductsPage() {
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Stock Type</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Stock Type <span className="text-red-500">*</span></label>
                     <select
                       name="stock_type"
+                      required
                       value={formData.stock_type}
                       onChange={handleInputChange}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
@@ -1802,9 +1804,10 @@ export default function ProductsPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Product Category</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Product Category <span className="text-red-500">*</span></label>
                   <select
                     name="product_category"
+                    required
                     value={formData.product_category}
                     onChange={handleInputChange}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
@@ -1950,7 +1953,7 @@ export default function ProductsPage() {
                 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-2">
-                    Kode Lokasi
+                    Kode Lokasi <span className="text-red-500">*</span>
                     <button
                       type="button"
                       className="text-gray-500 hover:text-gray-700 transition-colors"
@@ -1978,6 +1981,7 @@ export default function ProductsPage() {
                   </label>
                   <select
                     name="location_code"
+                    required
                     value={formData.location_code}
                     onChange={handleInputChange}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
@@ -2613,9 +2617,10 @@ export default function ProductsPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Supplier</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Supplier <span className="text-red-500">*</span></label>
                   <select
                     name="supplier_id"
+                    required
                     value={fakturFormData.supplier_id}
                     onChange={handleFakturInputChange}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg"
@@ -2627,9 +2632,10 @@ export default function ProductsPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Tipe Stok</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Tipe Stok <span className="text-red-500">*</span></label>
                   <select
                     name="stock_type"
+                    required
                     value={fakturFormData.stock_type}
                     onChange={handleFakturInputChange}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg"
@@ -2641,7 +2647,7 @@ export default function ProductsPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Tgl Pembelian</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Tgl Pembelian <span className="text-red-500">*</span></label>
                   <input
                     type="date"
                     name="purchase_date"
@@ -2718,11 +2724,12 @@ export default function ProductsPage() {
                 )}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Jumlah (dalam {hasPurchaseUnitForm && fakturFormData.purchase_unit ? fakturFormData.purchase_unit : fakturFormData.unit || 'Tablet'})
+                    Jumlah (dalam {hasPurchaseUnitForm && fakturFormData.purchase_unit ? fakturFormData.purchase_unit : fakturFormData.unit || 'Tablet'}) <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="number"
                     name="quantity"
+                    required
                     value={fakturFormData.quantity}
                     onChange={handleFakturInputChange}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg"
@@ -2732,11 +2739,12 @@ export default function ProductsPage() {
 
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Harga Beli</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Harga Beli <span className="text-red-500">*</span></label>
                   <input
                     type="text"
                     inputMode="numeric"
                     name="cost_price"
+                    required
                     value={formatInputRupiah(fakturFormData.cost_price)}
                     onChange={onFakturPriceChange}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg"
@@ -2744,11 +2752,12 @@ export default function ProductsPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Harga Jual</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Harga Jual <span className="text-red-500">*</span></label>
                   <input
                     type="text"
                     inputMode="numeric"
                     name="selling_price"
+                    required
                     value={formatInputRupiah(fakturFormData.selling_price)}
                     onChange={onFakturPriceChange}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg"
@@ -2784,10 +2793,11 @@ export default function ProductsPage() {
                 
                 {/* EXPIRED DATE FOR FAKTUR */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Tgl Kadaluarsa</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Tgl Kadaluarsa <span className="text-red-500">*</span></label>
                   <input
                     type="date"
                     name="expired_date"
+                    required
                     value={fakturFormData.expired_date}
                     onChange={handleFakturInputChange}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
