@@ -886,7 +886,7 @@ async function runWeeklyForecastJob(pool, options = {}) {
   const leadTime = Number.isFinite(options.leadTime) ? options.leadTime : 7;
   const windowSize = Number.isFinite(options.windowSize) ? options.windowSize : 7;
 
-  const [products] = await pool.query('SELECT id, name, stock, unit FROM products ORDER BY id ASC');
+  const [products] = await pool.query('SELECT id, name, stock, unit FROM products WHERE is_active = 1 ORDER BY id ASC');
 
   const now = new Date();
   const jobKey = 'weekly_stock_forecast';
@@ -1008,9 +1008,9 @@ module.exports = function registerStockForecastOpenRouterRoutes(app, pool, authe
       const search = (req.query.search || '').toString().trim();
       try {
         const params = [];
-        let sql = 'SELECT id, name, stock, unit FROM products';
+        let sql = 'SELECT id, name, stock, unit FROM products WHERE is_active = 1';
         if (search) {
-          sql += ' WHERE name LIKE ?';
+          sql += ' AND name LIKE ?';
           params.push(`%${search}%`);
         }
         sql += ' ORDER BY name ASC LIMIT 200';
@@ -1058,9 +1058,10 @@ module.exports = function registerStockForecastOpenRouterRoutes(app, pool, authe
               GROUP BY product_id
             ) last ON last.product_id = sf.product_id AND last.max_id = sf.id
           ) f ON f.product_id = p.id
+          WHERE p.is_active = 1
         `;
         if (search) {
-          sql += ' WHERE p.name LIKE ?';
+          sql += ' AND p.name LIKE ?';
           params.push(`%${search}%`);
         }
         sql += ' ORDER BY p.name ASC LIMIT 500';

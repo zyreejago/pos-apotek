@@ -38,16 +38,16 @@ module.exports = function registerProductRoutes(app, pool, authenticate, checkPe
         ) b ON p.id = b.product_id
         LEFT JOIN suppliers s ON b.supplier_id = s.id
       `;
-      let countQuery = 'SELECT COUNT(*) as total FROM products';
+      let countQuery = 'SELECT COUNT(*) as total FROM products WHERE is_active = 1';
       let params = [];
 
       if (search) {
-        query += ' WHERE p.status = "active" AND p.name LIKE ?';
-        countQuery += ' WHERE status = "active" AND name LIKE ?';
+        query += ' WHERE p.status = "active" AND p.is_active = 1 AND p.name LIKE ?';
+        countQuery += ' AND status = "active" AND name LIKE ?';
         params.push(`%${search}%`);
       } else {
-        query += ' WHERE p.status = "active"';
-        countQuery += ' WHERE status = "active"';
+        query += ' WHERE p.status = "active" AND p.is_active = 1';
+        countQuery += ' AND status = "active"';
       }
 
       query += ' ORDER BY p.created_at DESC LIMIT ? OFFSET ?';
@@ -224,17 +224,7 @@ module.exports = function registerProductRoutes(app, pool, authenticate, checkPe
 
       const productName = rows[0].name;
 
-      await connection.query('DELETE FROM products WHERE id = ?', [id]);
-
-      await connection.query('UPDATE products SET id = id - 1 WHERE id > ?', [
-        id,
-      ]);
-
-      const [maxResult] = await connection.query(
-        'SELECT MAX(id) as maxId FROM products'
-      );
-      const nextId = (maxResult[0].maxId || 0) + 1;
-      await connection.query(`ALTER TABLE products AUTO_INCREMENT = ${nextId}`);
+      await connection.query('UPDATE products SET is_active = 0 WHERE id = ?', [id]);
 
       connection.release();
 
@@ -247,7 +237,7 @@ module.exports = function registerProductRoutes(app, pool, authenticate, checkPe
         description: `Menghapus produk: ${productName}`,
       });
 
-      res.json({ message: 'Product deleted and IDs reordered successfully' });
+      res.json({ message: 'Product deactivated successfully' });
     } catch (error) {
       console.error('Error deleting product:', error);
       res.status(500).json({ message: 'Server error' });

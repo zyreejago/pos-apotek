@@ -1470,7 +1470,7 @@ expect(screen.getByText(/Rp\s*2\.000/)).toBeInTheDocument();
     renderPage();
     await waitLoaded();
 
-    const expiredHeader = screen.getByText('Expired Date');
+    const expiredHeader = screen.getByText('Kadaluarsa');
     fireEvent.click(expiredHeader);
 
     const firstRow = screen.getAllByRole('row')[1];
@@ -1482,7 +1482,7 @@ expect(screen.getByText(/Rp\s*2\.000/)).toBeInTheDocument();
     renderPage();
     await waitLoaded();
 
-    const costHeader = screen.getByText('Cost Price');
+    const costHeader = screen.getByText('Harga Beli');
     fireEvent.click(costHeader);
     fireEvent.click(costHeader);
   });
@@ -2913,7 +2913,7 @@ expect(screen.getByText(/Rp\s*2\.000/)).toBeInTheDocument();
     fireEvent.click(archiveButton);
 
     await waitFor(() => {
-      expect(goeyToast.error).toHaveBeenCalledWith('Hanya faktur dengan tipe stok "lunas" atau "retur" yang dapat diarsipkan!');
+      expect(goeyToast.error).toHaveBeenCalledWith('Hanya faktur dengan tipe stok "lunas", "retur", atau "konsinyasi" yang dapat diarsipkan!');
     });
   });
 
@@ -6169,6 +6169,466 @@ expect(screen.getByText(/Rp\s*2\.000/)).toBeInTheDocument();
 
     await waitFor(() => {
       expect(screen.queryByText('Detail Faktur')).not.toBeInTheDocument();
+    });
+  });
+
+  // ─── Cancel delete product modal ───
+  test('cancels delete product modal', async () => {
+    mockDefaultFetch();
+    renderPage();
+    await waitLoaded();
+
+    const deleteBtns = screen.getAllByTitle('Delete');
+    fireEvent.click(deleteBtns[0]);
+
+    await waitFor(() => {
+      expect(screen.getByText('Delete Product')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('close-delete'));
+    await waitFor(() => {
+      expect(screen.queryByText('Delete Product')).not.toBeInTheDocument();
+    });
+  });
+
+  // ─── Cancel archive faktur modal ───
+  test('cancels archive faktur modal', async () => {
+    const faktursData = { data: [{ id: 81, product_id: 1, batch_number: 'BATCH-ARCCANCEL', invoice_number: 'BATCH-ARCCANCEL', supplier_id: 1, supplier_name: 'Supplier A', purchase_date: '2024-01-15', initial_quantity: 10, remaining_quantity: 8, quantity: 10, cost_price: 5000, total_amount: 50000, stock_type: 'lunas', status: 'approved', dp_amount: null, due_date: null, expired_date: '2025-06-01', notes: null, image_url: null, created_at: '2024-01-15T00:00:00Z' }] };
+    global.fetch = jest.fn((input: RequestInfo) => {
+      const url = typeof input === 'string' ? input : input.url;
+      if (url.includes('/api/inventory/batches/')) return okJson(faktursData);
+      if (url.includes('/api/products')) return okJson(productsPayload);
+      if (url.includes('/api/suppliers')) return okJson({ data: [] });
+      return okJson({});
+    }) as unknown as typeof fetch;
+
+    renderPage();
+    await waitLoaded();
+
+    fireEvent.click((await screen.findAllByTitle('Faktur'))[0]);
+    await waitFor(() => expect(screen.getByText(/Faktur - /)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('BATCH-ARCCANCEL')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByTitle('Arsipkan Faktur'));
+    await waitFor(() => expect(screen.getByText('Arsipkan Faktur')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByText('close-delete'));
+    await waitFor(() => {
+      expect(screen.queryByText('Arsipkan Faktur')).not.toBeInTheDocument();
+    });
+  });
+
+  // ─── Cancel expire batch modal ───
+  test('cancels expire batch modal', async () => {
+    const faktursData = { data: [{ id: 82, product_id: 1, batch_number: 'BATCH-EXPCANCEL', invoice_number: 'BATCH-EXPCANCEL', supplier_id: 1, supplier_name: 'Supplier A', purchase_date: '2024-01-15', initial_quantity: 10, remaining_quantity: 8, quantity: 10, cost_price: 5000, total_amount: 50000, stock_type: 'lunas', status: 'approved', dp_amount: null, due_date: null, expired_date: '2025-06-01', notes: null, image_url: null, created_at: '2024-01-15T00:00:00Z' }] };
+    global.fetch = jest.fn((input: RequestInfo) => {
+      const url = typeof input === 'string' ? input : input.url;
+      if (url.includes('/api/inventory/batches/')) return okJson(faktursData);
+      if (url.includes('/api/products')) return okJson(productsPayload);
+      if (url.includes('/api/suppliers')) return okJson({ data: [] });
+      return okJson({});
+    }) as unknown as typeof fetch;
+
+    renderPage();
+    await waitLoaded();
+
+    fireEvent.click((await screen.findAllByTitle('Faktur'))[0]);
+    await waitFor(() => expect(screen.getByText(/Faktur - /)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('BATCH-EXPCANCEL')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByTitle('Tandai Kadaluarsa'));
+    await waitFor(() => expect(screen.getByText('Tandai Kadaluarsa')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByText('close-delete'));
+    await waitFor(() => {
+      expect(screen.queryByText('Tandai Kadaluarsa')).not.toBeInTheDocument();
+    });
+  });
+
+  // ─── Detail Produk modal NON_OBAT & Satuan Besar ───
+  test('shows detail produk modal with NON_OBAT badge and purchase unit info', async () => {
+    const nonObatProduct = { ...productsPayload.data[0], id: 99, name: 'Non Obat Product', product_category: 'NON_OBAT', purchase_unit: 'Box', unit_multiplier: 10, unit: 'Tablet' };
+    const nonObatData = { data: [nonObatProduct], pagination: { total: 1, page: 1, limit: 10, totalPages: 1 } };
+
+    global.fetch = jest.fn((input: RequestInfo) => {
+      const url = typeof input === 'string' ? input : input.url;
+      if (url.includes('/api/products')) return okJson(nonObatData);
+      if (url.includes('/api/suppliers')) return okJson({ data: [] });
+      return okJson({});
+    }) as unknown as typeof fetch;
+
+    renderPage();
+    await waitFor(() => expect(screen.getByText('Non Obat Product')).toBeInTheDocument());
+
+    // The Detail Produk button is in opacity-0 group-hover div; in jsdom it's still in DOM
+    const detailBtns = screen.getAllByTitle('Detail Produk');
+    fireEvent.click(detailBtns[0]);
+    await waitFor(() => expect(screen.getByText('Detail Produk')).toBeInTheDocument());
+
+    // Verify NON_OBAT badge (appears twice: in table and in modal)
+    expect(screen.getAllByText('Non-Obat').length).toBeGreaterThanOrEqual(1);
+    // Verify Satuan Besar section
+    expect(screen.getByText('Informasi Satuan Besar')).toBeInTheDocument();
+    expect(screen.getByText('Box')).toBeInTheDocument();
+
+    // Close via Tutup
+    const tutupBtn = screen.getAllByText('Tutup');
+    fireEvent.click(tutupBtn[tutupBtn.length - 1]);
+    await waitFor(() => {
+      expect(screen.queryByText('Detail Produk')).not.toBeInTheDocument();
+    });
+  });
+
+  // ─── Detail Faktur modal full with DP, notes, creator, image, retur ───
+  test('shows detail faktur modal with DP payments, notes, creator, image, retur qty', async () => {
+    const productWithPU = { ...productsPayload.data[0], purchase_unit: 'Box', unit_multiplier: 10, unit: 'Tablet' };
+    const faktursData = {
+      data: [{
+        id: 90, product_id: 1, batch_number: 'BATCH-DETAILFULL', invoice_number: 'BATCH-DETAILFULL',
+        supplier_id: 1, supplier_name: 'Supplier A', purchase_date: '2024-01-15',
+        initial_quantity: 10, remaining_quantity: 6, quantity: 10,
+        cost_price: 5000, total_amount: 50000, stock_type: 'dp', status: 'approved',
+        dp_amount: 50000, due_date: '2024-06-15', expired_date: '2025-06-01',
+        notes: 'Test notes here', image_url: '/uploads/test.jpg',
+        created_at: '2024-01-15T00:00:00Z', created_by_username: 'admin_user', created_by_role: 'admin',
+        qty_restored: 2,
+        dp_payments: [
+          { id: 1, amount: 30000, payment_date: '2024-01-15', payment_method: 'cash', created_at: '2024-01-15T00:00:00Z' },
+          { id: 2, amount: 20000, payment_date: '2024-02-15', payment_method: 'tf', created_at: '2024-02-15T00:00:00Z' },
+        ],
+      }],
+    };
+
+    global.fetch = jest.fn((input: RequestInfo) => {
+      const url = typeof input === 'string' ? input : input.url;
+      if (url.includes('/api/inventory/batches/')) return okJson(faktursData);
+      if (url.includes('/api/products')) return okJson({ ...productsPayload, data: [productWithPU] });
+      if (url.includes('/api/suppliers')) return okJson({ data: [] });
+      return okJson({});
+    }) as unknown as typeof fetch;
+
+    renderPage();
+    await waitLoaded();
+
+    fireEvent.click((await screen.findAllByTitle('Faktur'))[0]);
+    await waitFor(() => expect(screen.getByText(/Faktur - /)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('BATCH-DETAILFULL')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByTitle('Detail Faktur'));
+    await waitFor(() => expect(screen.getByText('Detail Faktur')).toBeInTheDocument());
+
+    // Creator info
+    expect(screen.getByText('admin_user')).toBeInTheDocument();
+    // Notes
+    expect(screen.getByText('Test notes here')).toBeInTheDocument();
+    // Retur qty row
+    expect(screen.getByText('Qty Retur Penjualan')).toBeInTheDocument();
+    // DP section
+    expect(screen.getByText('Total Hutang')).toBeInTheDocument();
+    expect(screen.getByText('Total Dibayar')).toBeInTheDocument();
+    expect(screen.getByText('Sisa DP')).toBeInTheDocument();
+    // Payment badges (at least 2)
+    expect(screen.getAllByText(/Cash|TF/).length).toBeGreaterThanOrEqual(2);
+    // Image gallery
+    expect(screen.getByText(/Bukti Faktur/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getAllByText('Tutup')[0]);
+    await waitFor(() => {
+      expect(screen.queryByText('Detail Faktur')).not.toBeInTheDocument();
+    });
+  });
+
+  // ─── Detail Faktur DP fallback when dp_payments is empty ───
+  test('shows detail faktur DP fallback when dp_payments is empty', async () => {
+    const faktursData = { data: [{ id: 91, product_id: 1, batch_number: 'BATCH-DPFALLBACK', invoice_number: 'BATCH-DPFALLBACK', supplier_id: 1, supplier_name: 'Supplier A', purchase_date: '2024-01-15', initial_quantity: 10, remaining_quantity: 10, quantity: 10, cost_price: 5000, total_amount: 50000, stock_type: 'dp', status: 'approved', dp_amount: 25000, due_date: '2024-06-15', expired_date: null, notes: null, image_url: null, created_at: '2024-01-15T00:00:00Z' }] };
+
+    global.fetch = jest.fn((input: RequestInfo) => {
+      const url = typeof input === 'string' ? input : input.url;
+      if (url.includes('/api/inventory/batches/')) return okJson(faktursData);
+      if (url.includes('/api/products')) return okJson(productsPayload);
+      if (url.includes('/api/suppliers')) return okJson({ data: [] });
+      return okJson({});
+    }) as unknown as typeof fetch;
+
+    renderPage();
+    await waitLoaded();
+
+    fireEvent.click((await screen.findAllByTitle('Faktur'))[0]);
+    await waitFor(() => expect(screen.getByText(/Faktur - /)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('BATCH-DPFALLBACK')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByTitle('Detail Faktur'));
+    await waitFor(() => expect(screen.getByText('Detail Faktur')).toBeInTheDocument());
+    expect(screen.getByText('Total Dibayar')).toBeInTheDocument();
+  });
+
+  // ─── Detail Faktur no DP for non-DP ───
+  test('does not show DP section for non-DP faktur', async () => {
+    const faktursData = { data: [{ id: 92, product_id: 1, batch_number: 'BATCH-NODP', invoice_number: 'BATCH-NODP', supplier_id: 1, supplier_name: 'Supplier A', purchase_date: '2024-01-15', initial_quantity: 5, remaining_quantity: 3, quantity: 5, cost_price: 5000, total_amount: 25000, stock_type: 'lunas', status: 'approved', dp_amount: null, due_date: null, expired_date: null, notes: null, image_url: null, created_at: '2024-01-15T00:00:00Z' }] };
+
+    global.fetch = jest.fn((input: RequestInfo) => {
+      const url = typeof input === 'string' ? input : input.url;
+      if (url.includes('/api/inventory/batches/')) return okJson(faktursData);
+      if (url.includes('/api/products')) return okJson(productsPayload);
+      if (url.includes('/api/suppliers')) return okJson({ data: [] });
+      return okJson({});
+    }) as unknown as typeof fetch;
+
+    renderPage();
+    await waitLoaded();
+
+    fireEvent.click((await screen.findAllByTitle('Faktur'))[0]);
+    await waitFor(() => expect(screen.getByText(/Faktur - /)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('BATCH-NODP')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByTitle('Detail Faktur'));
+    await waitFor(() => expect(screen.getByText('Detail Faktur')).toBeInTheDocument());
+    expect(screen.queryByText('Ringkasan DP')).not.toBeInTheDocument();
+  });
+
+  // ─── Lihat Bukti image preview ───
+  test('opens and closes Lihat Bukti image preview', async () => {
+    const faktursData = { data: [{ id: 93, product_id: 1, batch_number: 'BATCH-IMGNAV', invoice_number: 'BATCH-IMGNAV', supplier_id: 1, supplier_name: 'Supplier A', purchase_date: '2024-01-15', initial_quantity: 10, remaining_quantity: 8, quantity: 10, cost_price: 5000, total_amount: 50000, stock_type: 'lunas', status: 'approved', dp_amount: null, due_date: null, expired_date: '2025-06-01', notes: null, image_url: '/uploads/img1.jpg', created_at: '2024-01-15T00:00:00Z' }] };
+
+    global.fetch = jest.fn((input: RequestInfo) => {
+      const url = typeof input === 'string' ? input : input.url;
+      if (url.includes('/api/inventory/batches/')) return okJson(faktursData);
+      if (url.includes('/api/products')) return okJson(productsPayload);
+      if (url.includes('/api/suppliers')) return okJson({ data: [] });
+      return okJson({});
+    }) as unknown as typeof fetch;
+
+    renderPage();
+    await waitLoaded();
+
+    fireEvent.click((await screen.findAllByTitle('Faktur'))[0]);
+    await waitFor(() => expect(screen.getByText(/Faktur - /)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('BATCH-IMGNAV')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByTitle('Lihat Bukti'));
+    await waitFor(() => expect(screen.getByText('Bukti Faktur')).toBeInTheDocument());
+
+    const closeBtns = screen.getAllByTestId('x-icon');
+    fireEvent.click(closeBtns[closeBtns.length - 1].closest('button')!);
+    await waitFor(() => {
+      expect(screen.queryByText('Bukti Faktur')).not.toBeInTheDocument();
+    });
+  });
+
+  // ─── Location code info modal ───
+  test('shows and closes location code info modal', async () => {
+    mockDefaultFetch();
+    renderPage();
+    await waitLoaded();
+
+    fireEvent.click(screen.getByText('Add Products'));
+    await waitFor(() => expect(screen.getByText('Add New Product')).toBeInTheDocument());
+
+    const infoBtns = screen.getAllByTestId('info-icon');
+    fireEvent.click(infoBtns[0]);
+
+    await waitFor(() => {
+      expect(screen.getByText('Format Kode Lokasi')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('close-delete'));
+    await waitFor(() => {
+      expect(screen.queryByText('Format Kode Lokasi')).not.toBeInTheDocument();
+    });
+  });
+
+  // ─── Faktur pagination next/prev buttons ───
+  test('faktur pagination next and prev buttons work', async () => {
+    const manyFakturs = Array.from({ length: 15 }, (_, i) => ({
+      id: 100 + i, product_id: 1, batch_number: `BATCH-PAGE${i}`, invoice_number: `BATCH-PAGE${i}`,
+      supplier_id: 1, supplier_name: 'Supplier A', purchase_date: '2024-01-15',
+      initial_quantity: 10, remaining_quantity: 8, quantity: 10,
+      cost_price: 5000, total_amount: 50000, stock_type: 'lunas', status: 'approved',
+      dp_amount: null, due_date: null, expired_date: '2025-06-01',
+      notes: null, image_url: null,
+      created_at: '2024-01-15T00:00:00Z',
+    }));
+    const faktursData = { data: manyFakturs };
+
+    global.fetch = jest.fn((input: RequestInfo) => {
+      const url = typeof input === 'string' ? input : input.url;
+      if (url.includes('/api/inventory/batches/')) return okJson(faktursData);
+      if (url.includes('/api/products')) return okJson(productsPayload);
+      if (url.includes('/api/suppliers')) return okJson({ data: [] });
+      return okJson({});
+    }) as unknown as typeof fetch;
+
+    renderPage();
+    await waitLoaded();
+
+    fireEvent.click((await screen.findAllByTitle('Faktur'))[0]);
+    await waitFor(() => expect(screen.getByText(/Faktur - /)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('BATCH-PAGE0')).toBeInTheDocument());
+
+    // On page 1, prev is disabled
+    const prevBtn = screen.getByText('← Prev').closest('button')!;
+    expect(prevBtn).toBeDisabled();
+
+    // Click Next to go to page 2
+    const nextBtn = screen.getByText('Next →').closest('button')!;
+    expect(nextBtn).not.toBeDisabled();
+    fireEvent.click(nextBtn);
+
+    // Now prev should be enabled
+    await waitFor(() => {
+      expect(prevBtn).not.toBeDisabled();
+    });
+
+    // Click Prev to go back to page 1
+    fireEvent.click(prevBtn);
+    await waitFor(() => {
+      expect(prevBtn).toBeDisabled();
+    });
+  });
+
+  // ─── Detail Produk close via backdrop and X button ───
+  test('closes detail produk modal via backdrop click and X button', async () => {
+    mockDefaultFetch();
+    renderPage();
+    await waitLoaded();
+
+    const detailBtns = screen.getAllByTitle('Detail Produk');
+    fireEvent.click(detailBtns[0]);
+    await waitFor(() => expect(screen.getByText('Detail Produk')).toBeInTheDocument());
+
+    // Close via X button (second close button in the modal)
+    const xBtns = screen.getAllByTestId('x-icon');
+    fireEvent.click(xBtns[0].closest('button')!);
+    await waitFor(() => {
+      expect(screen.queryByText('Detail Produk')).not.toBeInTheDocument();
+    });
+  });
+
+  // ─── Detail Faktur image click opens preview ───
+  test('clicking image in detail faktur opens preview', async () => {
+    const faktursData = { data: [{ id: 94, product_id: 1, batch_number: 'BATCH-IMGCLICK', invoice_number: 'BATCH-IMGCLICK', supplier_id: 1, supplier_name: 'Supplier A', purchase_date: '2024-01-15', initial_quantity: 10, remaining_quantity: 8, quantity: 10, cost_price: 5000, total_amount: 50000, stock_type: 'lunas', status: 'approved', dp_amount: null, due_date: null, expired_date: '2025-06-01', notes: null, image_url: '/uploads/img1.jpg', created_at: '2024-01-15T00:00:00Z' }] };
+
+    global.fetch = jest.fn((input: RequestInfo) => {
+      const url = typeof input === 'string' ? input : input.url;
+      if (url.includes('/api/inventory/batches/')) return okJson(faktursData);
+      if (url.includes('/api/products')) return okJson(productsPayload);
+      if (url.includes('/api/suppliers')) return okJson({ data: [] });
+      return okJson({});
+    }) as unknown as typeof fetch;
+
+    renderPage();
+    await waitLoaded();
+
+    fireEvent.click((await screen.findAllByTitle('Faktur'))[0]);
+    await waitFor(() => expect(screen.getByText(/Faktur - /)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('BATCH-IMGCLICK')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByTitle('Detail Faktur'));
+    await waitFor(() => expect(screen.getByText('Detail Faktur')).toBeInTheDocument());
+
+    // Click the image thumbnail to open preview
+    const images = screen.getAllByRole('img');
+    fireEvent.click(images[images.length - 1]); // last img in the modal
+    await waitFor(() => expect(screen.getByText('Bukti Faktur')).toBeInTheDocument());
+
+    // Close preview via X
+    const closeBtns = screen.getAllByTestId('x-icon');
+    fireEvent.click(closeBtns[closeBtns.length - 1].closest('button')!);
+    await waitFor(() => {
+      expect(screen.queryByText('Bukti Faktur')).not.toBeInTheDocument();
+    });
+  });
+
+  // ─── Detail Faktur Perbesar and Download buttons ───
+  test('clicks Perbesar button in detail faktur image gallery', async () => {
+    const faktursData = { data: [{ id: 95, product_id: 1, batch_number: 'BATCH-PERBESAR', invoice_number: 'BATCH-PERBESAR', supplier_id: 1, supplier_name: 'Supplier A', purchase_date: '2024-01-15', initial_quantity: 10, remaining_quantity: 8, quantity: 10, cost_price: 5000, total_amount: 50000, stock_type: 'lunas', status: 'approved', dp_amount: null, due_date: null, expired_date: '2025-06-01', notes: null, image_url: '/uploads/img1.jpg', created_at: '2024-01-15T00:00:00Z' }] };
+
+    global.fetch = jest.fn((input: RequestInfo) => {
+      const url = typeof input === 'string' ? input : input.url;
+      if (url.includes('/api/inventory/batches/')) return okJson(faktursData);
+      if (url.includes('/api/products')) return okJson(productsPayload);
+      if (url.includes('/api/suppliers')) return okJson({ data: [] });
+      return okJson({});
+    }) as unknown as typeof fetch;
+
+    renderPage();
+    await waitLoaded();
+
+    fireEvent.click((await screen.findAllByTitle('Faktur'))[0]);
+    await waitFor(() => expect(screen.getByText(/Faktur - /)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('BATCH-PERBESAR')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByTitle('Detail Faktur'));
+    await waitFor(() => expect(screen.getByText('Detail Faktur')).toBeInTheDocument());
+
+    // Click Perbesar button
+    fireEvent.click(screen.getByTitle('Perbesar'));
+    await waitFor(() => expect(screen.getByText('Bukti Faktur')).toBeInTheDocument());
+
+    const closeBtns = screen.getAllByTestId('x-icon');
+    fireEvent.click(closeBtns[closeBtns.length - 1].closest('button')!);
+    await waitFor(() => {
+      expect(screen.queryByText('Bukti Faktur')).not.toBeInTheDocument();
+    });
+  });
+
+  // ─── Multiple products tab shows Tambahkan Produk section ───
+  test('switches to multiple products mode showing Tambahkan Produk section', async () => {
+    mockDefaultFetch();
+    renderPage();
+    await waitLoaded();
+
+    fireEvent.click(screen.getByText('Add Products'));
+    await screen.findByTestId('offcanvas');
+
+    // Switch to Multiple Products tab
+    fireEvent.click(screen.getByText('Multiple Products'));
+    expect(await screen.findByText('Tambahkan Produk')).toBeInTheDocument();
+  });
+
+  // ─── Image preview navigation with multiple images ───
+  test('navigates image preview with prev/next arrows', async () => {
+    const faktursData = { data: [{ id: 96, product_id: 1, batch_number: 'BATCH-MULTIIMG', invoice_number: 'BATCH-MULTIIMG', supplier_id: 1, supplier_name: 'Supplier A', purchase_date: '2024-01-15', initial_quantity: 10, remaining_quantity: 8, quantity: 10, cost_price: 5000, total_amount: 50000, stock_type: 'lunas', status: 'approved', dp_amount: null, due_date: null, expired_date: '2025-06-01', notes: null, image_url: '/uploads/img1.jpg,/uploads/img2.jpg', created_at: '2024-01-15T00:00:00Z' }] };
+
+    global.fetch = jest.fn((input: RequestInfo) => {
+      const url = typeof input === 'string' ? input : input.url;
+      if (url.includes('/api/inventory/batches/')) return okJson(faktursData);
+      if (url.includes('/api/products')) return okJson(productsPayload);
+      if (url.includes('/api/suppliers')) return okJson({ data: [] });
+      return okJson({});
+    }) as unknown as typeof fetch;
+
+    renderPage();
+    await waitLoaded();
+
+    fireEvent.click((await screen.findAllByTitle('Faktur'))[0]);
+    await waitFor(() => expect(screen.getByText(/Faktur - /)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('BATCH-MULTIIMG')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByTitle('Detail Faktur'));
+    await waitFor(() => expect(screen.getByText('Detail Faktur')).toBeInTheDocument());
+
+    // Click Perbesar to open preview
+    fireEvent.click(screen.getByTitle('Perbesar'));
+    await waitFor(() => expect(screen.getByText('Bukti Faktur')).toBeInTheDocument());
+
+    // Click right arrow (next)
+    const arrowBtns = screen.getAllByRole('button').filter(b => b.innerHTML.includes('polyline'));
+    if (arrowBtns.length >= 2) {
+      fireEvent.click(arrowBtns[1]);
+    }
+
+    // Click left arrow (prev)
+    const leftArrows = screen.getAllByRole('button').filter(b => b.innerHTML.includes('polyline'));
+    if (leftArrows.length >= 2) {
+      fireEvent.click(leftArrows[0]);
+    }
+
+    // Close
+    const closeBtns = screen.getAllByTestId('x-icon');
+    fireEvent.click(closeBtns[closeBtns.length - 1].closest('button')!);
+    await waitFor(() => {
+      expect(screen.queryByText('Bukti Faktur')).not.toBeInTheDocument();
     });
   });
 });

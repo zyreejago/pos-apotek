@@ -445,7 +445,7 @@ export default function ProductsPage() {
       supplier_id: faktur.supplier_id?.toString() || '',
 
       purchase_date: formatDateForInput(faktur.purchase_date),
-      quantity: batchHasPU ? (faktur.quantity / multiplier).toString() : (faktur.initial_quantity || faktur.quantity).toString(),
+      quantity: batchHasPU ? ((faktur.quantity ?? 0) / multiplier).toString() : ((faktur.initial_quantity ?? faktur.quantity) || 0).toString(),
       cost_price: faktur.cost_price.toString(),
       selling_price: activeProduct?.selling_price.toString() || '',
       purchase_unit: activeProduct?.purchase_unit || 'Box',
@@ -2376,12 +2376,12 @@ export default function ProductsPage() {
 
           <div className="mb-4 flex justify-between items-center">
             <h3 className="font-semibold text-gray-700">Daftar Faktur</h3>
-            {/* <button
+            <button
               onClick={handleOpenAddFakturModal}
               className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium transition-colors"
             >
               <Plus size={16} /> Tambah Faktur
-            </button> */}
+            </button>
           </div>
 
           {fakturs.length === 0 ? (
@@ -2509,7 +2509,7 @@ export default function ProductsPage() {
                         <td className="px-4 py-3 font-medium">{formatCurrency(totalAmount)}</td>
                         <td className="px-4 py-3 text-right">
                           <div className="flex justify-end gap-2">
-                            {/* {faktur.image_url && getImageUrls(faktur.image_url).length > 0 && (
+                            {faktur.image_url && getImageUrls(faktur.image_url).length > 0 && (
                               <button
                                 onClick={() => {
                                   const urls = getImageUrls(faktur.image_url).map(u => `http://localhost:5000${u}`);
@@ -2520,7 +2520,7 @@ export default function ProductsPage() {
                               >
                                 <FileText size={14} />
                               </button>
-                            )} */}
+                            )}
                             <button
                               onClick={() => setDetailFaktur(faktur)}
                               className="p-1 text-gray-500 hover:bg-gray-100 rounded"

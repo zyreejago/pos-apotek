@@ -77,6 +77,7 @@ const initDB = async () => {
         expired_date DATE,
         category VARCHAR(100),
         product_category ENUM('OBAT', 'NON_OBAT') NOT NULL DEFAULT 'OBAT',
+        is_active TINYINT(1) DEFAULT 1,
         location_code VARCHAR(100) NULL,
         purchase_unit VARCHAR(50) DEFAULT 'Box',
         unit_multiplier INT DEFAULT 1,
@@ -129,6 +130,9 @@ const initDB = async () => {
     } catch (e) {}
     try {
       await connection.query(`ALTER TABLE products ADD COLUMN product_category ENUM('OBAT', 'NON_OBAT') NOT NULL DEFAULT 'OBAT'`);
+    } catch (e) {}
+    try {
+      await connection.query(`ALTER TABLE products ADD COLUMN is_active TINYINT(1) DEFAULT 1 AFTER product_category`);
     } catch (e) {}
     try {
       await connection.query(`ALTER TABLE batches MODIFY COLUMN stock_type VARCHAR(50) DEFAULT 'belum_bayar'`);
