@@ -829,7 +829,7 @@ export default function ProductsPage() {
   };
 
   const handleArchiveFaktur = async (faktur: Faktur) => {
-    const isExpired = faktur.notes === 'Expired';
+    const isExpired = faktur.notes === 'Expired' || (faktur.expired_date && new Date(faktur.expired_date) < new Date());
     if (!isExpired && faktur.stock_type !== 'lunas' && faktur.stock_type !== 'retur' && faktur.stock_type !== 'konsinyasi') {
       goeyToast.error('Hanya faktur dengan tipe stok "lunas", "retur", atau "konsinyasi" yang dapat diarsipkan!');
       return;
@@ -2450,6 +2450,7 @@ export default function ProductsPage() {
                       statusText = 'Belum Bayar';
                     } else if (faktur.stock_type === 'konsinyasi') {
                       statusText = 'Konsinyasi';
+                      canArchive = true;
                     } else if (faktur.stock_type === 'dp') {
                       // Only use DP calculation for stock_type 'dp'
                       if (totalDP >= totalAmount) {

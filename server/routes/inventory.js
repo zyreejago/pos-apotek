@@ -177,13 +177,15 @@ function registerInventoryRoutes(app, pool, authenticate, checkPermission, uploa
       const { is_archived } = req.body;
       
       // Get the batch first to check stock_type
-      const [batch] = await pool.query('SELECT stock_type, initial_quantity, notes FROM batches WHERE id = ?', [id]);
+      const [batch] = await pool.query('SELECT stock_type, initial_quantity, notes, expired_date FROM batches WHERE id = ?', [id]);
       if (batch.length === 0) {
         return res.status(404).json({ success: false, message: 'Batch tidak ditemukan' });
       }
       
+      const isExpired = batch[0].notes === 'Expired' || (batch[0].expired_date && new Date(batch[0].expired_date) < new Date());
+      
       // If trying to archive, check if stock_type is 'lunas', 'retur', 'konsinyasi', or already expired
-      if (is_archived && batch[0].notes !== 'Expired' && batch[0].stock_type !== 'lunas' && batch[0].stock_type !== 'retur' && batch[0].stock_type !== 'konsinyasi') {
+      if (is_archived && !isExpired && batch[0].stock_type !== 'lunas' && batch[0].stock_type !== 'retur' && batch[0].stock_type !== 'konsinyasi') {
         return res.status(400).json({ success: false, message: 'Hanya faktur dengan tipe stok \"lunas\", \"retur\", \"konsinyasi\", atau kadaluarsa yang dapat diarsipkan' });
       }
 
