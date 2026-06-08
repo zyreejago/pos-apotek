@@ -2528,18 +2528,6 @@ export default function ProductsPage() {
                         <td className="px-4 py-3 font-medium">{formatCurrency(totalAmount)}</td>
                         <td className="px-4 py-3 text-right">
                           <div className="flex justify-end gap-2">
-                            {faktur.image_url && getImageUrls(faktur.image_url).length > 0 && (
-                              <button
-                                onClick={() => {
-                                  const urls = getImageUrls(faktur.image_url).map(u => `http://localhost:5000${u}`);
-                                  openImagePreview(urls[0], urls);
-                                }}
-                                className="p-1 text-green-600 hover:bg-green-50 rounded"
-                                title="Lihat Bukti"
-                              >
-                                <FileText size={14} />
-                              </button>
-                            )}
                             <button
                               onClick={() => setDetailFaktur(faktur)}
                               className="p-1 text-gray-500 hover:bg-gray-100 rounded"
@@ -3241,18 +3229,6 @@ export default function ProductsPage() {
 
                           {/* Bukti & Edit Button */}
                           <div className={`flex flex-col gap-2 shrink-0 ${faktur.status === 'rejected' ? 'pr-8' : ''}`}>
-                            {faktur.image_url && getImageUrls(faktur.image_url).length > 0 && (
-                              <button 
-                                onClick={() => {
-                                  const urls = getImageUrls(faktur.image_url).map(u => `http://localhost:5000${u}`);
-                                  openImagePreview(urls[0], urls);
-                                }}
-                                className="flex items-center gap-2 px-4 py-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-all text-xs font-bold border border-blue-100"
-                              >
-                                <FileText size={18} />
-                                Lihat Bukti
-                              </button>
-                            )}
                             {faktur.status === 'revision' && (
                               <button 
                                 onClick={() => {
