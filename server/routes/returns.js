@@ -63,16 +63,16 @@ module.exports = function registerReturnRoutes(app, pool, authenticate, checkPer
       const { invoice_no } = req.query;
       if (!invoice_no) return res.status(400).json({ message: 'invoice_no required' });
 
-      // Search batches by batch_number
+      // Search batches by invoice_number (or batch_number for backward compat)
       const [batches] = await pool.query(`
         SELECT b.*, s.name as supplier_name, s.accepts_return, s.return_notes,
                p.name as product_name, p.product_category
         FROM batches b
         JOIN suppliers s ON b.supplier_id = s.id
         JOIN products p ON b.product_id = p.id
-        WHERE b.batch_number = ? AND b.is_archived = FALSE
+        WHERE (b.invoice_number = ? OR b.batch_number = ?) AND b.is_archived = FALSE
         ORDER BY b.id ASC
-      `, [invoice_no]);
+      `, [invoice_no, invoice_no]);
 
       if (batches.length === 0) return res.status(404).json({ message: 'Faktur tidak ditemukan' });
 

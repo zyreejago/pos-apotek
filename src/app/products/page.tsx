@@ -67,6 +67,7 @@ interface Faktur {
   created_at: string;
   dp_payments?: DpPayment[];
   qty_returned?: number;
+  qty_restored?: number;
   created_by_username?: string;
   created_by_role?: string;
 }
@@ -3464,6 +3465,12 @@ export default function ProductsPage() {
                   <div className="bg-gray-50 p-3 rounded-xl">
                     <p className="text-xs text-gray-500 font-medium uppercase tracking-wider">Qty Tersisa ({selectedProduct.purchase_unit})</p>
                     <p className="text-sm font-bold text-gray-900 mt-1">{Math.floor((detailFaktur.remaining_quantity ?? detailFaktur.quantity) / selectedProduct.unit_multiplier)} {selectedProduct.purchase_unit}</p>
+                  </div>
+                )}
+                {detailFaktur.qty_restored != null && detailFaktur.qty_restored > 0 && (
+                  <div className="bg-purple-50 p-3 rounded-xl">
+                    <p className="text-xs text-purple-600 font-medium uppercase tracking-wider">Qty Sales Retur</p>
+                    <p className="text-sm font-bold text-purple-800 mt-1">{detailFaktur.qty_restored} {selectedProduct?.unit || 'Tablet'}</p>
                   </div>
                 )}
                 <div className="bg-gray-50 p-3 rounded-xl">
