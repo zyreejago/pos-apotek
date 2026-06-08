@@ -3467,10 +3467,10 @@ export default function ProductsPage() {
                     <p className="text-sm font-bold text-gray-900 mt-1">{Math.floor((detailFaktur.remaining_quantity ?? detailFaktur.quantity) / selectedProduct.unit_multiplier)} {selectedProduct.purchase_unit}</p>
                   </div>
                 )}
-                {detailFaktur.qty_restored != null && detailFaktur.qty_restored > 0 && (
+                {detailFaktur.qty_restored != null && (
                   <div className="bg-purple-50 p-3 rounded-xl">
                     <p className="text-xs text-purple-600 font-medium uppercase tracking-wider">Qty Sales Retur</p>
-                    <p className="text-sm font-bold text-purple-800 mt-1">{detailFaktur.qty_restored} {selectedProduct?.unit || 'Tablet'}</p>
+                    <p className="text-sm font-bold text-purple-800 mt-1">{detailFaktur.qty_restored > 0 ? `${detailFaktur.qty_restored} ${selectedProduct?.unit || 'Tablet'}` : '0'}</p>
                   </div>
                 )}
                 <div className="bg-gray-50 p-3 rounded-xl">

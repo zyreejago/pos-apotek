@@ -510,15 +510,29 @@ module.exports = function registerReturnRoutes(app, pool, authenticate, checkPer
         // But the user's spec says sale_item_id is FK to sale_items.
         // In our system, we'll use the latest batch for the product.
 
-        // Find the batch that was most likely sold (FEFO - first expired first out)
-        const [batchRows] = await connection.query(
-          'SELECT id FROM batches WHERE product_id = ? ORDER BY expired_date ASC, created_at ASC LIMIT 1',
-          [si.product_id]
+        // Find batch by invoice_number recorded in transaction_items during sale
+        const [tiRows] = await connection.query(
+          'SELECT invoice_number FROM transaction_items WHERE id = ?',
+          [sale_item_id]
         );
-        if (batchRows.length === 0) {
-          throw new Error(`Tidak ditemukan batch untuk produk "${si.product_name}". Retur tidak dapat diproses.`);
+        const saleInvoice = tiRows.length > 0 ? tiRows[0].invoice_number : null;
+        let batchId = null;
+        if (saleInvoice) {
+          const [bRows] = await connection.query(
+            'SELECT id FROM batches WHERE invoice_number = ? AND product_id = ? LIMIT 1',
+            [saleInvoice, si.product_id]
+          );
+          if (bRows.length > 0) batchId = bRows[0].id;
         }
-        const batchId = batchRows[0].id;
+        if (!batchId) {
+          // Fallback: FEFO untuk transaksi lama yang belum punya invoice_number
+          const [fallback] = await connection.query(
+            'SELECT id FROM batches WHERE product_id = ? ORDER BY expired_date ASC, created_at ASC LIMIT 1',
+            [si.product_id]
+          );
+          if (fallback.length === 0) throw new Error(`Tidak ditemukan batch untuk produk "${si.product_name}".`);
+          batchId = fallback[0].id;
+        }
 
         returnItems.push({
           sale_item_id,

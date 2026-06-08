@@ -41,13 +41,23 @@ module.exports = function registerTransactionRoutes(app, pool, authenticate, che
       let nonObatCOGSTotal = 0;
 
       for (const item of items) {
+        // Get product cost price and product_category FIRST
+        const [productResult] = await connection.query('SELECT cost_price, product_category FROM products WHERE id = ?', [item.id]);
+
+        // Get invoice_number from FEFO batch for this product
+        let fefoInvoice = null;
+        if (productResult.length > 0 && ['cash', 'midtrans'].includes(payment_method)) {
+          const [batchRows] = await connection.query(
+            'SELECT invoice_number FROM batches WHERE product_id = ? AND remaining_quantity > 0 AND is_archived = FALSE ORDER BY expired_date ASC, created_at ASC LIMIT 1',
+            [item.id]
+          );
+          if (batchRows.length > 0) fefoInvoice = batchRows[0].invoice_number;
+        }
         await connection.query(
-          'INSERT INTO transaction_items (transaction_id, product_id, quantity, price) VALUES (?, ?, ?, ?)',
-          [transactionId, item.id, item.quantity, item.price]
+          'INSERT INTO transaction_items (transaction_id, product_id, invoice_number, quantity, price) VALUES (?, ?, ?, ?, ?)',
+          [transactionId, item.id, fefoInvoice, item.quantity, item.price]
         );
 
-        // Get product cost price and product_category
-        const [productResult] = await connection.query('SELECT cost_price, product_category FROM products WHERE id = ?', [item.id]);
         if (productResult.length > 0) {
           const cost = Number(productResult[0].cost_price || 0);
           const itemCOGS = cost * item.quantity;
