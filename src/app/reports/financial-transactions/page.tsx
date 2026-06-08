@@ -237,7 +237,7 @@ export default function FinancialTransactionsPage() {
       />
 
       {/* Tabs Menu */}
-      <div className="flex gap-4 mb-8 bg-white p-2 rounded-xl shadow-sm border border-gray-100 max-w-2xl mx-auto">
+      <div className="flex gap-4 mb-8 bg-white p-2 rounded-xl shadow-sm border border-gray-100 max-w-full sm:max-w-2xl mx-auto">
         <button
           onClick={() => setActiveTab('expense')}
           className={`flex-1 py-3 px-4 rounded-lg font-medium text-sm flex items-center justify-center gap-2 transition-all ${
@@ -274,14 +274,14 @@ export default function FinancialTransactionsPage() {
       </div>
 
       {/* Tab Panels */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8 max-w-2xl mx-auto">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8 max-w-full sm:max-w-2xl mx-auto">
         {activeTab === 'expense' && (
           <form onSubmit={handleExpenseSubmit} className="space-y-6">
             <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2 border-b border-gray-100 pb-3">
               <Wallet className="text-blue-600" /> Catat Biaya Operasional
             </h3>
             
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Tanggal Transaksi</label>
                 <input
@@ -309,7 +309,7 @@ export default function FinancialTransactionsPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Dibayar Menggunakan</label>
                 <select
@@ -367,7 +367,7 @@ export default function FinancialTransactionsPage() {
               <Landmark className="text-blue-600" /> Catat Modal & Prive
             </h3>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Jenis Transaksi</label>
                 <div className="flex gap-2 p-1 bg-gray-100 rounded-lg border border-gray-200">
@@ -404,7 +404,7 @@ export default function FinancialTransactionsPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Akun Kas / Bank Tujuan</label>
                 <select
@@ -464,7 +464,7 @@ export default function FinancialTransactionsPage() {
               <TrendingUp className="text-blue-600" /> Beli Aset Tetap
             </h3>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Tanggal Transaksi</label>
                 <input
@@ -492,7 +492,7 @@ export default function FinancialTransactionsPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Metode Pembayaran</label>
                 <div className="flex gap-2 p-1 bg-gray-100 rounded-lg border border-gray-200">

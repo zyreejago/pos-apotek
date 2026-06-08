@@ -325,7 +325,7 @@ export default function Page() {
           )
         }
       />
-      <div className="p-8 pt-0">
+      <div className="p-3 sm:p-4 md:p-8 pt-0">
         {!canManage ? (
           <div className="bg-amber-50 border border-amber-100 text-amber-800 rounded-xl px-4 py-3 mb-6 text-sm">
             Halaman ini hanya bisa dikelola oleh superadmin.

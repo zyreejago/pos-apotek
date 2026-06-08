@@ -128,10 +128,10 @@ export default function Page() {
         title="Peramalan Stok"
         breadcrumbs={[{ label: 'Peramalan Stok' }, { label: 'Peramalan' }]}
       />
-      <div className="p-8 pt-0">
+      <div className="p-3 sm:p-4 md:p-8 pt-0">
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-              <div className="w-full lg:max-w-md">
+              <div className="w-full lg:max-w-full sm:max-w-md">
                 <label className="block text-sm font-medium text-gray-700 mb-2">Cari Produk</label>
                 <input
                   type="text"
@@ -169,7 +169,7 @@ export default function Page() {
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div className="rounded-xl border border-gray-100 bg-gray-50 p-4">
                           <div className="text-xs text-gray-500 mb-1.5">Stok Saat Ini</div>
                           <div className="font-bold text-gray-900 text-lg">

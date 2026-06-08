@@ -49,7 +49,7 @@ export default function Page() {
         breadcrumbs={[{ label: 'Products' }, { label: 'Substitutions' }]}
       />
 
-      <div className="p-8 pt-0">
+      <div className="p-3 sm:p-4 md:p-8 pt-0">
       <div className="bg-white border border-gray-100 rounded-xl p-4 md:p-6">
         <div className="flex items-center justify-between mb-4">
           <div className="text-gray-600">Showing {Math.min(pageSize, total)} of {total} Products</div>

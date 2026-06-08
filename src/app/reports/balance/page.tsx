@@ -250,14 +250,14 @@ export default function BalanceSheetAccountingPage() {
         }
       />
       
-      <div className="p-8 pt-0">
+      <div className="p-3 sm:p-4 md:p-8 pt-0">
         {loading ? (
           <div className="flex flex-col items-center justify-center py-20">
             <Loader2 className="animate-spin text-blue-500 mb-2" size={32} />
             <p className="text-gray-500 text-sm">Memuat neraca keuangan...</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
             {/* Assets Column */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
               <div className="p-6 border-b border-gray-100 text-center bg-blue-50">
@@ -268,7 +268,7 @@ export default function BalanceSheetAccountingPage() {
                 <table className="w-full text-left text-sm">
                   <thead>
                     <tr className="bg-gray-50 text-gray-500 font-medium border-b border-gray-100">
-                      <th className="px-6 py-4">Keterangan</th>
+                      <th className="px-3 sm:px-6 py-4">Keterangan</th>
                       <th className="px-6 py-4 text-right">Debit</th>
                       <th className="px-6 py-4 text-right">Kredit</th>
                     </tr>
@@ -307,7 +307,7 @@ export default function BalanceSheetAccountingPage() {
                   <table className="w-full text-left text-sm">
                     <thead>
                       <tr className="bg-gray-50 text-gray-500 font-medium border-b border-gray-100">
-                        <th className="px-6 py-4">Keterangan</th>
+                        <th className="px-3 sm:px-6 py-4">Keterangan</th>
                         <th className="px-6 py-4 text-right">Debit</th>
                         <th className="px-6 py-4 text-right">Kredit</th>
                       </tr>
@@ -344,7 +344,7 @@ export default function BalanceSheetAccountingPage() {
                   <table className="w-full text-left text-sm">
                     <thead>
                       <tr className="bg-gray-50 text-gray-500 font-medium border-b border-gray-100">
-                        <th className="px-6 py-4">Keterangan</th>
+                        <th className="px-3 sm:px-6 py-4">Keterangan</th>
                         <th className="px-6 py-4 text-right">Debit</th>
                         <th className="px-6 py-4 text-right">Kredit</th>
                       </tr>

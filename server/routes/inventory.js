@@ -309,13 +309,15 @@ function registerInventoryRoutes(app, pool, authenticate, checkPermission, uploa
             WHERE id = ?
           `, [Number(initial_quantity), product_id]);
 
-          // Get product name for journal description
-          const [product] = await connection.query('SELECT name FROM products WHERE id = ?', [product_id]);
+          // Get product name & category for journal description
+          const [product] = await connection.query('SELECT name, product_category FROM products WHERE id = ?', [product_id]);
           const productName = product[0]?.name || `Produk #${product_id}`;
+          const isObat = product[0]?.product_category === 'OBAT';
+          const persediaanCode = isObat ? '103' : '104';
 
           // Create Journal Entry
           const journalItems = [
-            { accountCode: '110', debit: totalAmount } // Persediaan
+            { accountCode: persediaanCode, debit: totalAmount } // Persediaan (OBAT=103 / NON_OBAT=104)
           ];
 
           if (stock_type === 'lunas') {

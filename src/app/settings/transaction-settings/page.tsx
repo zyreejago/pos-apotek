@@ -120,7 +120,7 @@ export default function Page() {
         <PageHeader title="Transactions Settings" />
         
         <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50 p-6">
-          <div className="max-w-2xl mx-auto bg-white rounded-lg shadow p-6">
+          <div className="max-w-full sm:max-w-2xl mx-auto bg-white rounded-lg shadow p-6">
             <h2 className="text-lg font-semibold mb-6 text-gray-800">Transactions Settings</h2>
             
             <div className="space-y-6">

@@ -223,7 +223,7 @@ export default function ProfitLossAccountingPage() {
             <p className="text-gray-500 text-sm">Memuat laporan laba rugi...</p>
           </div>
         ) : (
-          <div className="bg-white w-full max-w-4xl rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="bg-white w-full max-w-full sm:max-w-4xl rounded-xl shadow-sm border border-gray-100 overflow-hidden">
             <div className="p-6 border-b border-gray-100 text-center">
               <h2 className="text-xl font-bold text-gray-900">Laporan Laba Rugi</h2>
               <p className="text-gray-500 text-sm mt-2">Periode: {getMonthName(month)} {year}</p>
@@ -233,8 +233,8 @@ export default function ProfitLossAccountingPage() {
               <table className="w-full text-left text-sm">
                 <thead>
                   <tr className="bg-gray-50 text-gray-500 font-medium border-b border-gray-100">
-                    <th className="px-6 py-4">No</th>
-                    <th className="px-6 py-4">Keterangan</th>
+                    <th className="px-3 sm:px-6 py-4">No</th>
+                    <th className="px-3 sm:px-6 py-4">Keterangan</th>
                     <th className="px-6 py-4 text-right">Debit</th>
                     <th className="px-6 py-4 text-right">Kredit</th>
                   </tr>

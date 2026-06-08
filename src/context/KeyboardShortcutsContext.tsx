@@ -11,6 +11,17 @@ interface KeyboardShortcutsContextType {
 
 const KeyboardShortcutsContext = createContext<KeyboardShortcutsContextType | undefined>(undefined);
 
+// Find search input on the current page by common placeholder patterns
+function findSearchInput(): HTMLInputElement | null {
+  const patterns = ['Cari', 'Search', 'cari', 'search', 'Ketik', 'ketik', 'nama', 'name', 'produk'];
+  const inputs = document.querySelectorAll<HTMLInputElement>('input[type="text"], input:not([type])');
+  for (const input of inputs) {
+    const ph = input.placeholder || '';
+    if (ph.length > 0 && patterns.some(p => ph.includes(p))) return input;
+  }
+  return null;
+}
+
 export function KeyboardShortcutsProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
   const { toggleSidebar } = useSidebar();
@@ -38,12 +49,23 @@ export function KeyboardShortcutsProvider({ children }: { children: ReactNode })
         return;
       }
 
-      // Search combo: Ctrl/Cmd + K (check before general modifier skip)
-      if (searchInputRef?.current && (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
-        e.preventDefault();
-        searchInputRef.current.focus();
-        searchInputRef.current.select();
-        return;
+      // Search: Ctrl/Cmd + F (standard find shortcut)
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') {
+        // Try to find any search input on the page
+        const searchInput = findSearchInput();
+        if (searchInput) {
+          e.preventDefault();
+          searchInput.focus();
+          searchInput.select();
+          return;
+        }
+        // Fallback to registered ref
+        if (searchInputRef?.current) {
+          e.preventDefault();
+          searchInputRef.current.focus();
+          searchInputRef.current.select();
+          return;
+        }
       }
 
       // Skip if modifier keys pressed (no navigation with modifiers)
@@ -60,40 +82,38 @@ export function KeyboardShortcutsProvider({ children }: { children: ReactNode })
           router.push('/products');
           return;
         case '3':
-          router.push('/stock-opname');
-          return;
-        case '4':
           router.push('/suppliers');
           return;
-        case '5':
+        case '4':
           router.push('/prescriptions');
           return;
-        case '6':
+        case '5':
           router.push('/transactions');
           return;
+        case '6':
+          router.push('/purchase-history');
+          return;
         case '7':
-          router.push('/users');
+          router.push('/approvals');
           return;
         case '8':
-          router.push('/recommendations');
+          router.push('/users');
           return;
       }
 
-      // Search shortcuts
-      if (searchInputRef?.current) {
-        const isSlash = e.key === '/';
-        const isAlpha = /^[a-zA-Z]$/.test(e.key); // Only letters, not numbers (numbers are for navigation)
-
-        if (isSlash) {
-          e.preventDefault();
-          searchInputRef.current.focus();
-          searchInputRef.current.select();
+      // Search: press / to focus any search input on the page
+      if (e.key === '/') {
+        e.preventDefault();
+        const searchInput = findSearchInput();
+        if (searchInput) {
+          searchInput.focus();
+          searchInput.select();
           return;
         }
-
-        if (isAlpha) {
-          // Just focus, don't prevent default - let the browser type the letter!
+        // Fallback to registered ref
+        if (searchInputRef?.current) {
           searchInputRef.current.focus();
+          searchInputRef.current.select();
           return;
         }
       }

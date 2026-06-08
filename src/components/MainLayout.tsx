@@ -48,7 +48,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
   }
 
   return (
-    <div className="flex h-screen bg-gray-50" style={{ overflow: 'hidden', maxWidth: '100vw' }}>
+    <div className="flex h-screen bg-gray-50 overflow-x-hidden">
       <Sidebar />
 
       {/* Area kanan: main + offcanvas, dibatasi sisa lebar setelah sidebar */}
@@ -79,6 +79,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
             right: 0,
             height: '100%',
             width: offCanvasWidth,
+            maxWidth: '100vw',
             transform: isAnyOffCanvasOpen ? 'translateX(0)' : 'translateX(100%)',
             transition: isDragging ? 'none' : 'transform 400ms cubic-bezier(0.4, 0, 0.2, 1)',
             zIndex: 50,

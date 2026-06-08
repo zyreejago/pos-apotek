@@ -50,7 +50,7 @@ export default function ConfirmModal({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[10000] animate-in fade-in duration-200">
-      <div className="bg-white rounded-xl shadow-lg w-full max-w-md mx-4 p-6 transform transition-all scale-100">
+      <div className="bg-white rounded-xl shadow-lg w-full max-w-full sm:max-w-md mx-4 p-6 transform transition-all scale-100">
         <div className="flex justify-between items-start mb-4">
           <div className={`w-12 h-12 ${styles.iconBg} rounded-full flex items-center justify-center ${styles.iconColor}`}>
             {variant === 'info' ? <Info size={24} /> : <AlertTriangle size={24} />}

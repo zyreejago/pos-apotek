@@ -1341,7 +1341,7 @@ export default function ProductsPage() {
       />
 
       {/* Main Content */}
-      <div className="p-8 pt-0">
+      <div className="p-3 sm:p-4 md:p-8 pt-0">
         <div className="bg-white rounded-xl shadow-sm overflow-hidden">
         {/* Toolbar */}
         <div className="p-4 flex flex-col md:flex-row justify-between items-center gap-4">
@@ -1416,7 +1416,7 @@ export default function ProductsPage() {
                     </td>
                     <td className="px-6 py-4 text-gray-600 font-medium">{product.location_code || '-'}</td>
                     <td className="px-6 py-4 text-gray-600">{product.supplier_name || '-'}</td>
-                    <td className="px-6 py-4">
+                    <td className="px-3 sm:px-6 py-4">
                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                         product.stock_type === 'lunas' 
                           ? 'bg-green-100 text-green-700 border border-green-200'
@@ -1439,7 +1439,7 @@ export default function ProductsPage() {
                     </td>
                     <td className="px-6 py-4 text-gray-600">{formatCurrency(product.cost_price)}</td>
                     <td className="px-6 py-4 text-gray-600">{formatCurrency(product.selling_price)}</td>
-                    <td className="px-6 py-4">
+                    <td className="px-3 sm:px-6 py-4">
                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getExpiredStatusColor(product.expired_date)}`}>
                         {formatDate(product.expired_date)}
                       </span>
@@ -1584,7 +1584,7 @@ export default function ProductsPage() {
             {/* Invoice Number and Bukti Faktur */}
             {productOffCanvasMode === 'add' && (
               <>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Supplier</label>
                     <select
@@ -1678,7 +1678,7 @@ export default function ProductsPage() {
                     </div>
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Stock Type</label>
                     <select
@@ -1706,7 +1706,7 @@ export default function ProductsPage() {
                 </div>
                 {/* DP Fields (only show if stock type is DP) */}
                 {formData.stock_type === 'dp' && (
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">DP Amount (IDR)</label>
                       <input
@@ -1763,7 +1763,7 @@ export default function ProductsPage() {
                   </select>
                 </div>
                 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Cost Price (IDR) <span className="text-red-500">*</span></label>
                     <input
@@ -1805,7 +1805,7 @@ export default function ProductsPage() {
                   <span className="text-sm font-medium text-gray-700">Memiliki satuan besar?</span>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Unit Dasar <span className="text-red-500">*</span></label>
                     <select
@@ -1846,7 +1846,7 @@ export default function ProductsPage() {
                 </div>
 
                 {hasPurchaseUnitForm && (
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Isi per Satuan Besar <span className="text-red-500">*</span></label>
                       <input
@@ -1876,7 +1876,7 @@ export default function ProductsPage() {
                   </div>
                 )}
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Stok (Dalam {formData.unit || 'Tablet'}) <span className="text-red-500">*</span> <span className="text-xs text-gray-400 font-normal">(Unit Dasar)</span>
@@ -2517,7 +2517,7 @@ export default function ProductsPage() {
               <h3 className="font-semibold text-gray-700 mb-4">
                 {fakturModalMode === 'add' ? 'Tambah Faktur Baru' : 'Edit Faktur'}
               </h3>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Nomor Batch (Opsional)</label>
                   <input
@@ -2697,7 +2697,7 @@ export default function ProductsPage() {
 
                 {/* DP BERTahap - ONLY IN EDIT MODE */}
                 {fakturModalMode === 'edit' && selectedFaktur && selectedFaktur.stock_type === 'dp' && (
-                  <div className="col-span-2 md:col-span-3 mt-4 bg-gray-50 rounded-xl p-4 border border-gray-200">
+                  <div className="col-span-1 sm:col-span-2 md:col-span-3 mt-4 bg-gray-50 rounded-xl p-4 border border-gray-200">
                     <h4 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
                       <Wallet size={18} /> Ringkasan Pembayaran
                     </h4>
@@ -2861,7 +2861,7 @@ export default function ProductsPage() {
                 )}
 
                 {fakturFormData.notes && (
-                  <div className="col-span-2 md:col-span-3 bg-orange-50 border border-orange-200 p-4 rounded-xl flex items-start gap-3">
+                  <div className="col-span-1 sm:col-span-2 md:col-span-3 bg-orange-50 border border-orange-200 p-4 rounded-xl flex items-start gap-3">
                     <AlertCircle className="text-orange-500 shrink-0 mt-0.5" size={18} />
                     <div>
                       <h4 className="text-xs font-extrabold text-orange-800 uppercase tracking-wider">Catatan Perbaikan dari Approver</h4>
@@ -2869,7 +2869,7 @@ export default function ProductsPage() {
                     </div>
                   </div>
                 )}
-                <div className="col-span-2 md:col-span-3 mt-2">
+                <div className="col-span-1 sm:col-span-2 md:col-span-3 mt-2">
                   <label className="block text-sm font-medium text-gray-700 mb-2">Bukti Faktur</label>
                   <div className="flex flex-col gap-4 items-start">
                     {/* Image Input UI */}
@@ -2986,11 +2986,11 @@ export default function ProductsPage() {
       {/* Approval Modal */}
       {isApprovalModalOpen && (
         <div 
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[9999] p-4" 
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[9999] p-2 sm:p-4" 
           onClick={() => setIsApprovalModalOpen(false)}
         >
           <div 
-            className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col overflow-hidden" 
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-full sm:max-w-5xl max-h-[85vh] sm:max-h-[90vh] flex flex-col overflow-hidden" 
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex justify-between items-center px-6 py-4 border-b border-gray-100 bg-gray-50/50 shrink-0">
@@ -3024,7 +3024,7 @@ export default function ProductsPage() {
                   <p className="text-gray-500 max-w-xs mx-auto">Tidak ada faktur yang menunggu persetujuan saat ini.</p>
                 </div>
               ) : (
-                <div className="flex flex-col gap-4 min-w-[800px]">
+                <div className="flex flex-col gap-4 min-w-0 overflow-x-auto">
                   {pendingFakturs.map((faktur) => (
                     <div key={faktur.id} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-all group relative">
                       {faktur.status === 'rejected' && (
@@ -3076,7 +3076,7 @@ export default function ProductsPage() {
                               </div>
                             )}
 
-                            <div className="grid grid-cols-3 gap-3 text-[13px]">
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-[13px]">
                               <div className="flex items-center gap-2 text-gray-600 bg-gray-50 px-2 py-1 rounded-lg">
                                 <Users size={14} className="text-gray-400" />
                                 <span className="truncate">{faktur.supplier_name || 'Tanpa Supplier'}</span>
@@ -3189,11 +3189,11 @@ export default function ProductsPage() {
       {/* Detail Produk Modal */}
       {detailProduct && (
         <div 
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[9999] p-4" 
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[9999] p-2 sm:p-4" 
           onClick={() => setDetailProduct(null)}
         >
           <div 
-            className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto" 
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-full sm:max-w-lg max-h-[85vh] sm:max-h-[90vh] overflow-y-auto" 
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex justify-between items-center px-6 py-4 border-b border-gray-100 bg-gray-50/50 sticky top-0 bg-white">
@@ -3288,11 +3288,11 @@ export default function ProductsPage() {
       {/* Detail Faktur Modal */}
       {detailFaktur && (
         <div 
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[9999] p-4" 
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[9999] p-2 sm:p-4" 
           onClick={() => setDetailFaktur(null)}
         >
           <div 
-            className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto" 
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-full sm:max-w-2xl max-h-[85vh] sm:max-h-[90vh] overflow-y-auto" 
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex justify-between items-center px-6 py-4 border-b border-gray-100 bg-gray-50/50 sticky top-0 bg-white">
@@ -3310,7 +3310,7 @@ export default function ProductsPage() {
 
             <div className="p-6 space-y-5">
               {/* Info Umum */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="bg-gray-50 p-3 rounded-xl">
                   <p className="text-xs text-gray-500 font-medium uppercase tracking-wider">Nomor Batch</p>
                   <p className="text-sm font-bold text-gray-900 mt-1">{detailFaktur.invoice_number || '-'}</p>
@@ -3476,11 +3476,11 @@ export default function ProductsPage() {
       {/* Image Preview Modal */}
       {previewImageUrl && (
         <div 
-          className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[9999] p-4 md:p-8" 
+          className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[9999] p-2 sm:p-4 md:p-8" 
           onClick={() => { setPreviewImageUrl(null); setPreviewImageList([]); }}
         >
           <div 
-            className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-full overflow-hidden flex flex-col" 
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-full sm:max-w-4xl max-h-full overflow-hidden flex flex-col" 
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex justify-between items-center px-6 py-4 border-b border-gray-100 shrink-0">

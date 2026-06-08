@@ -145,7 +145,7 @@ export default function AuditTrailsPage() {
       />
 
       {/* Main Content */}
-      <div className="p-8 pt-0">
+      <div className="p-3 sm:p-4 md:p-8 pt-0">
         <div className="bg-white rounded-xl shadow-sm overflow-hidden">
           {/* Toolbar */}
           <div className="p-4 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 border-b border-gray-100">
@@ -216,11 +216,11 @@ export default function AuditTrailsPage() {
             <table className="w-full text-sm text-left">
               <thead className="bg-gray-50 text-gray-500 font-medium">
                 <tr>
-                  <th className="px-6 py-4">Waktu</th>
-                  <th className="px-6 py-4">Pengguna</th>
-                  <th className="px-6 py-4">Modul</th>
-                  <th className="px-6 py-4">Aksi</th>
-                  <th className="px-6 py-4">Deskripsi</th>
+                  <th className="px-3 sm:px-6 py-4">Waktu</th>
+                  <th className="px-3 sm:px-6 py-4">Pengguna</th>
+                  <th className="px-3 sm:px-6 py-4">Modul</th>
+                  <th className="px-3 sm:px-6 py-4">Aksi</th>
+                  <th className="px-3 sm:px-6 py-4">Deskripsi</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -239,13 +239,13 @@ export default function AuditTrailsPage() {
                 ) : (
                   auditTrails.map((trail) => (
                     <tr key={trail.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-6 py-4">
+                      <td className="px-3 sm:px-6 py-4">
                         <div className="flex items-center gap-2 text-gray-600">
                           <Clock size={14} />
                           {formatDateTime(trail.created_at)}
                         </div>
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-3 sm:px-6 py-4">
                         <div className="flex items-center gap-2">
                           <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
                             <User size={16} className="text-blue-600" />
@@ -256,18 +256,18 @@ export default function AuditTrailsPage() {
                           </div>
                         </div>
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-3 sm:px-6 py-4">
                         <div className="flex items-center gap-2">
                           <Activity size={14} className="text-gray-400" />
                           <span className="font-medium text-gray-900">{trail.module}</span>
                         </div>
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-3 sm:px-6 py-4">
                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getActionBadgeColor(trail.action)}`}>
                           {trail.action}
                         </span>
                       </td>
-                      <td className="px-6 py-4 text-gray-600 max-w-md truncate">
+                      <td className="px-6 py-4 text-gray-600 max-w-full sm:max-w-md truncate">
                         {trail.description}
                       </td>
                      

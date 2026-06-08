@@ -180,7 +180,7 @@ export default function ApprovalsPage() {
         subtitle="Daftar faktur yang memerlukan persetujuan nominal > Rp 2.000.000"
       />
 
-      <div className="p-8 pt-0">
+      <div className="p-3 sm:p-4 md:p-8 pt-0">
         {loading ? (
           <div className="flex justify-center py-20">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
@@ -250,7 +250,7 @@ export default function ApprovalsPage() {
                         </div>
                       )}
 
-                      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+                      <div className="grid grid-cols-2 md:grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
                         <div className="flex items-center gap-2 text-gray-600">
                           <Users size={16} className="text-gray-400" />
                           <span>{faktur.supplier_name || 'Tanpa Supplier'}</span>
@@ -336,11 +336,11 @@ export default function ApprovalsPage() {
       {/* Image Preview Modal */}
       {previewImageUrl && (
         <div 
-          className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[9999] p-4 md:p-8" 
+          className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[9999] p-2 sm:p-4 md:p-8" 
           onClick={() => setPreviewImageUrl(null)}
         >
           <div 
-            className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-full overflow-hidden flex flex-col" 
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-full sm:max-w-4xl max-h-full overflow-hidden flex flex-col" 
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex justify-between items-center px-6 py-4 border-b border-gray-100 shrink-0">
@@ -365,8 +365,8 @@ export default function ApprovalsPage() {
 
       {/* Revision Note Modal */}
       {isRevisionModalOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[9999] p-2 sm:p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-full sm:max-w-md overflow-hidden">
             <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
               <h3 className="font-bold text-gray-800 flex items-center gap-2">
                 <AlertCircle size={20} className="text-orange-500" />

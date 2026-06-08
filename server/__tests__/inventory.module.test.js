@@ -482,7 +482,7 @@ describe('inventory module', () => {
         connection, null, '2026-06-01',
         expect.stringContaining('Pembelian stok'),
         expect.arrayContaining([
-          { accountCode: '110', debit: 50000 },
+          { accountCode: '103', debit: 50000 },
           { accountCode: '101', credit: 50000 },
         ])
       );
@@ -542,7 +542,7 @@ describe('inventory module', () => {
         connection, null, '2026-06-01',
         expect.any(String),
         expect.arrayContaining([
-          { accountCode: '110', debit: 50000 },
+          { accountCode: '103', debit: 50000 },
           { accountCode: '101', credit: 20000 },
           { accountCode: '201', credit: 30000 },
         ])
@@ -575,7 +575,7 @@ describe('inventory module', () => {
         connection, null, '2026-06-01',
         expect.any(String),
         expect.arrayContaining([
-          { accountCode: '110', debit: 50000 },
+          { accountCode: '103', debit: 50000 },
           { accountCode: '201', credit: 50000 },
         ])
       );

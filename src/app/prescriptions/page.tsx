@@ -755,7 +755,7 @@ export default function PrescriptionsPage() {
         }
       />
 
-      <div className="p-8 pt-0">
+      <div className="p-3 sm:p-4 md:p-8 pt-0">
         <div className="bg-white rounded-xl shadow-sm overflow-hidden">
           <div className="p-4 flex flex-col md:flex-row justify-between items-center gap-4">
             <div className="text-sm text-gray-600 font-medium">
@@ -779,13 +779,13 @@ export default function PrescriptionsPage() {
             <table className="w-full text-sm text-left">
               <thead className="bg-gray-50 text-gray-500 font-medium">
                 <tr>
-                  <th className="px-6 py-4">Kode Resep</th>
-                  <th className="px-6 py-4">Tanggal</th>
-                  <th className="px-6 py-4">Dokter</th>
-                  <th className="px-6 py-4">Instansi</th>
-                  <th className="px-6 py-4">Diupload Oleh</th>
-                  <th className="px-6 py-4">Gambar</th>
-                  <th className="px-6 py-4">Items</th>
+                  <th className="px-3 sm:px-6 py-4">Kode Resep</th>
+                  <th className="px-3 sm:px-6 py-4">Tanggal</th>
+                  <th className="px-3 sm:px-6 py-4">Dokter</th>
+                  <th className="px-3 sm:px-6 py-4">Instansi</th>
+                  <th className="px-3 sm:px-6 py-4">Diupload Oleh</th>
+                  <th className="px-3 sm:px-6 py-4">Gambar</th>
+                  <th className="px-3 sm:px-6 py-4">Items</th>
                   <th className="px-6 py-4 text-right">Aksi</th>
                 </tr>
               </thead>
@@ -820,7 +820,7 @@ export default function PrescriptionsPage() {
                       <td className="px-6 py-4 text-gray-600">
                         {prescription.entered_by_name || '-'}
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-3 sm:px-6 py-4">
                         {prescription.image_url ? (
                           <a 
                             href={`http://localhost:5000${prescription.image_url}`} 
@@ -835,7 +835,7 @@ export default function PrescriptionsPage() {
                           '-'
                         )}
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-3 sm:px-6 py-4">
                         {prescription.items && prescription.items.length > 0 ? (
                           <div className="space-y-1 max-w-xs">
                             {prescription.items.map((item, index) => (
@@ -960,7 +960,7 @@ export default function PrescriptionsPage() {
 
               {/* Preview */}
               {imagePreview && (
-                <div className="relative w-full max-w-sm h-48 shrink-0 rounded-xl overflow-hidden border-2 border-gray-200 group">
+                <div className="relative w-full max-w-full sm:max-w-sm h-48 shrink-0 rounded-xl overflow-hidden border-2 border-gray-200 group">
                   <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
                   <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                     <button
@@ -1177,7 +1177,7 @@ export default function PrescriptionsPage() {
 
                       <div className="flex flex-col gap-4">
                         <h4 className="text-sm font-semibold text-slate-700 mb-1 uppercase tracking-wider">Opsi Simpan</h4>
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                           <button
                             type="button"
                             onClick={(e) => {
@@ -1216,7 +1216,7 @@ export default function PrescriptionsPage() {
                       {saveOption === 'save_and_pay' && (
                         <div className="flex flex-col">
                           <h4 className="text-sm font-semibold text-slate-700 mb-3 uppercase tracking-wider">Metode Pembayaran</h4>
-                          <div className="grid grid-cols-2 gap-4">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <button
                               type="button"
                               onClick={(e) => {

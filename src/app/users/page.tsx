@@ -381,7 +381,7 @@ export default function UsersPage() {
         }
       />
 
-      <div className="p-8 pt-0">
+      <div className="p-3 sm:p-4 md:p-8 pt-0">
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
           <div className="p-4 flex flex-col md:flex-row justify-between items-center gap-4 border-b border-gray-100">
             <div className="text-sm font-medium text-gray-700">{showingText}</div>

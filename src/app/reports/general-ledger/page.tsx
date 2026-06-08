@@ -253,7 +253,7 @@ export default function GeneralLedgerPage() {
         }
       />
       
-      <div className="p-8 pt-0">
+      <div className="p-3 sm:p-4 md:p-8 pt-0">
         {loading ? (
           <div className="flex flex-col items-center justify-center py-20">
             <Loader2 className="animate-spin text-blue-500 mb-2" size={32} />
@@ -265,8 +265,8 @@ export default function GeneralLedgerPage() {
               <table className="w-full text-left text-sm">
                   <thead>
                     <tr className="bg-gray-50 text-gray-500 font-medium border-b border-gray-100">
-                      <th className="px-6 py-4">Tanggal</th>
-                      <th className="px-6 py-4">Keterangan</th>
+                      <th className="px-3 sm:px-6 py-4">Tanggal</th>
+                      <th className="px-3 sm:px-6 py-4">Keterangan</th>
                       <th className="px-6 py-4 text-right">Debit</th>
                       <th className="px-6 py-4 text-right">Kredit</th>
                       <th className="px-6 py-4 text-right">Saldo</th>

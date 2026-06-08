@@ -41,7 +41,9 @@ export default function OffCanvas({
     if (isOpen) {
       setIsAnyOffCanvasOpen(true);
       if (!initialWidthSet.current) {
-        setOffCanvasWidth(width);
+        const vw = typeof window !== 'undefined' ? window.innerWidth : 1200;
+        const maxW = vw < 640 ? Math.min(parseInt(width), vw - 60) : parseInt(width);
+        setOffCanvasWidth(`${maxW}px`);
         initialWidthSet.current = true;
       }
     } else if (prevIsOpen.current) {
@@ -87,8 +89,8 @@ export default function OffCanvas({
   return createPortal(
     <div className="flex flex-col h-full w-full bg-white">
       {/* Header */}
-      <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between shrink-0">
-        <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
+      <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-200 flex items-center justify-between shrink-0">
+        <h2 className="text-base sm:text-lg font-semibold text-gray-900 truncate max-w-[85%]">{title}</h2>
         <button 
           onClick={onClose}
           className="p-2 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-gray-700 transition-colors"
@@ -100,7 +102,7 @@ export default function OffCanvas({
       {/* Body */}
       <div 
         ref={scrollRef}
-        className="flex-1 overflow-y-auto p-6"
+        className="flex-1 overflow-y-auto p-3 sm:p-4 md:p-6"
       >
         {children}
       </div>

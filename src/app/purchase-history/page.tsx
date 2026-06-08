@@ -180,7 +180,7 @@ export default function PurchaseHistoryPage() {
         subtitle="Lihat semua riwayat pembelian, faktur, dan stok masuk."
       />
 
-      <div className="p-8 pt-0">
+      <div className="p-3 sm:p-4 md:p-8 pt-0">
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
           {/* Toolbar */}
           <div className="p-4 border-b border-gray-100 flex flex-col md:flex-row justify-between items-center gap-4 bg-gray-50/50">
@@ -225,9 +225,9 @@ export default function PurchaseHistoryPage() {
                   <SortableHeader field="created_at" label="Tanggal" />
                   <SortableHeader field="product_name" label="Produk" />
                   <SortableHeader field="supplier_name" label="Supplier" />
-                  <th className="px-6 py-4">Stok</th>
+                  <th className="px-3 sm:px-6 py-4">Stok</th>
                   <SortableHeader field="total_price" label="Total Harga" />
-                  <th className="px-6 py-4">DP & Hutang</th>
+                  <th className="px-3 sm:px-6 py-4">DP & Hutang</th>
                   <SortableHeader field="status" label="Status" />
                   <th className="px-6 py-4 text-center">Bukti</th>
                 </tr>
@@ -273,7 +273,7 @@ export default function PurchaseHistoryPage() {
                           ) : 'Aktif'}
                         </div>
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-3 sm:px-6 py-4">
                         <div className="font-medium text-gray-900">{faktur.product_name}</div>
                         <div className="text-xs text-gray-500 mt-1">Batch: {faktur.batch_number || '-'}</div>
                         {faktur.expired_date && (
@@ -282,7 +282,7 @@ export default function PurchaseHistoryPage() {
                           </div>
                         )}
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-3 sm:px-6 py-4">
                         <div className="text-gray-700">{faktur.supplier_name || '-'}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -302,7 +302,7 @@ export default function PurchaseHistoryPage() {
                           {faktur.initial_quantity} pcs @ {formatCurrency(faktur.cost_price)}
                         </div>
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-3 sm:px-6 py-4">
                         {dpList.length > 0 ? (
                           <div className="space-y-1">
                             {dpList.map((dp, idx) => (
@@ -367,11 +367,11 @@ export default function PurchaseHistoryPage() {
       {/* Image Preview Modal */}
       {previewImageUrl && (
         <div 
-          className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[9999] p-4 md:p-8" 
+          className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[9999] p-2 sm:p-4 md:p-8" 
           onClick={() => setPreviewImageUrl(null)}
         >
           <div 
-            className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-full overflow-hidden flex flex-col" 
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-full sm:max-w-4xl max-h-full overflow-hidden flex flex-col" 
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex justify-between items-center px-6 py-4 border-b border-gray-100 shrink-0">

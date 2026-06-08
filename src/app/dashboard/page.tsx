@@ -140,7 +140,7 @@ export default function Dashboard() {
       />
 
       {/* Main Grid Content */}
-      <div className="p-8 pt-0">
+      <div className="p-3 sm:p-4 md:p-8 pt-0">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         
         {/* Card 1: Rekomendasi Stock Harian */}

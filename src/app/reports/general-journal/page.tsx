@@ -264,8 +264,8 @@ export default function GeneralJournalPage() {
             <table className="w-full text-sm text-left border-collapse">
               <thead className="bg-gray-50 text-gray-500 font-medium uppercase text-xs border-b border-gray-100">
                 <tr>
-                  <th className="px-6 py-4">Tanggal & Deskripsi</th>
-                  <th className="px-6 py-4">Akun</th>
+                  <th className="px-3 sm:px-6 py-4">Tanggal & Deskripsi</th>
+                  <th className="px-3 sm:px-6 py-4">Akun</th>
                   <th className="px-6 py-4 text-right">Debit</th>
                   <th className="px-6 py-4 text-right">Kredit</th>
                 </tr>
@@ -288,8 +288,8 @@ export default function GeneralJournalPage() {
                     {/* Item lines */}
                     {entry.items.map((item, idx) => (
                       <tr key={item.id || idx} className="hover:bg-gray-50/30">
-                        <td className="px-6 py-3"></td>
-                        <td className="px-6 py-3">
+                        <td className="px-3 sm:px-6 py-3"></td>
+                        <td className="px-3 sm:px-6 py-3">
                           <div className={item.credit > 0 ? "pl-8 text-gray-600" : "font-medium text-gray-900"}>
                             <span className="text-xs text-gray-400 font-mono mr-2 bg-gray-100 px-1.5 py-0.5 rounded">{item.account_code}</span>
                             {item.account_name}
@@ -320,7 +320,7 @@ export default function GeneralJournalPage() {
           width="700px"
         >
           <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Tanggal</label>
                 <input

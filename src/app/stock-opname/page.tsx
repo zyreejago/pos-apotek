@@ -295,7 +295,7 @@ export default function StockOpnamePage() {
       />
 
       {/* Main Content */}
-      <div className="p-8 pt-0">
+      <div className="p-3 sm:p-4 md:p-8 pt-0">
         <div className="bg-white rounded-xl shadow-sm overflow-hidden">
         {/* Toolbar */}
         <div className="p-4 flex flex-col md:flex-row justify-between items-center gap-4">
@@ -361,12 +361,12 @@ export default function StockOpnamePage() {
 
                   return (
                     <tr key={product.id} className="hover:bg-gray-50 transition-colors">
-                        <td className="px-6 py-4">
+                        <td className="px-3 sm:px-6 py-4">
                         <div className="font-medium text-gray-900">{product.name}</div>
                         <div className="text-xs text-gray-500">{product.category}</div>
                         </td>
                         <td className="px-6 py-4 text-gray-600 font-medium">{product.stock}</td>
-                        <td className="px-6 py-4">
+                        <td className="px-3 sm:px-6 py-4">
                         {isOpnameActive ? (
                             <input 
                             type="number" 
@@ -380,7 +380,7 @@ export default function StockOpnamePage() {
                             <span className="text-gray-400">-</span>
                         )}
                         </td>
-                        <td className="px-6 py-4">
+                        <td className="px-3 sm:px-6 py-4">
                         {hasEntry ? (
                             <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getDifferenceColor(difference)}`}>
                             {difference > 0 ? '+' : ''}{difference}

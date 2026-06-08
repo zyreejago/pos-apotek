@@ -199,10 +199,10 @@ export default function Page() {
         title="Peramalan Stok (OpenRouter)"
         breadcrumbs={[{ label: 'Peramalan Stok' }, { label: 'Rekomendasi Stok (OpenRouter)' }]}
       />
-      <div className="p-8 pt-0">
+      <div className="p-3 sm:p-4 md:p-8 pt-0">
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-              <div className="w-full lg:max-w-md">
+              <div className="w-full lg:max-w-full sm:max-w-md">
                 <label className="block text-sm font-medium text-gray-700 mb-2">Cari Produk</label>
                 <input
                   type="text"
@@ -393,7 +393,7 @@ export default function Page() {
 
                   <div>
                     <h4 className="font-medium text-gray-800 mb-2">Hasil Peramalan</h4>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="p-4 bg-gray-50 rounded-lg">
                         <div className="text-xs text-gray-500 mb-1">Stok saat ini</div>
                         <div className="font-semibold text-gray-900">{selectedProduct.stock} {selectedProduct.unit}</div>

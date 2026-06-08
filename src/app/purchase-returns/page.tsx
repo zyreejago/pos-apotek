@@ -221,7 +221,7 @@ export default function PurchaseReturnsPage() {
     <div className="bg-gray-50 min-h-screen">
       <PageHeader title="Retur Pembelian" subtitle="Retur barang ke supplier" breadcrumbs={[{ label: 'Retur Pembelian' }]} />
 
-      <div className="p-8 pt-0 max-w-5xl mx-auto">
+      <div className="p-8 pt-0 max-w-full sm:max-w-5xl mx-auto">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
           <div className="bg-white rounded-xl shadow-sm p-4">
             <div className="flex items-center gap-3">
@@ -320,11 +320,11 @@ export default function PurchaseReturnsPage() {
                 <RotateCcw size={36} className="text-blue-400" />
               </div>
               <h3 className="text-xl font-semibold text-gray-800 mb-2">Retur Pembelian</h3>
-              <p className="text-gray-400 max-w-md mx-auto mb-6">
+              <p className="text-gray-400 max-w-full sm:max-w-md mx-auto mb-6">
                 Masukkan nomor faktur supplier di atas untuk mencari pembelian yang akan diretur. 
                 Sistem akan menampilkan daftar barang yang bisa diretur beserta stok yang tersedia.
               </p>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-xl mx-auto">
+              <div className="grid grid-cols-1 md:grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 max-w-xl mx-auto">
                 <div className="bg-blue-50 rounded-xl p-4 text-left">
                   <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center mb-2">
                     <Search size={16} className="text-blue-600" />
@@ -674,7 +674,7 @@ export default function PurchaseReturnsPage() {
 
       {showConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm mx-4 overflow-hidden">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-full sm:max-w-sm mx-4 overflow-hidden">
             <div className="p-6 text-center">
               <div className="w-14 h-14 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-4">
                 <AlertTriangle size={28} className="text-blue-600" />

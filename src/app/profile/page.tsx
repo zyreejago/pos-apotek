@@ -139,7 +139,7 @@ export default function ProfilePage() {
     <div className="flex flex-col h-full bg-gray-50">
       <PageHeader title="Profile Settings" subtitle="Manage your account details and password" />
       <div className="flex-1 p-4 md:p-8 overflow-y-auto">
-        <div className="max-w-4xl mx-auto space-y-6 pb-10">
+        <div className="max-w-full sm:max-w-4xl mx-auto space-y-6 pb-10">
           
           {/* Profile Details Section */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">

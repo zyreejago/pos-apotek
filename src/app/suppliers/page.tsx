@@ -275,7 +275,7 @@ export default function SuppliersPage() {
        
       />
 
-      <div className="p-8 pt-0">
+      <div className="p-3 sm:p-4 md:p-8 pt-0">
       {/* Main Content */}
       <div className="bg-white rounded-xl shadow-sm overflow-hidden">
         {/* Toolbar */}
@@ -333,7 +333,7 @@ export default function SuppliersPage() {
               ) : (
                 suppliers.map((supplier) => (
                   <tr key={supplier.id} className="hover:bg-gray-50 transition-colors group">
-                    <td className="px-6 py-4">
+                    <td className="px-3 sm:px-6 py-4">
                       <div className="font-medium text-gray-900">{supplier.name}</div>
                     </td>
                     <td className="px-6 py-4 text-gray-600">{supplier.phone || '-'}</td>

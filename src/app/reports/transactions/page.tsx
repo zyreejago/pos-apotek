@@ -352,10 +352,10 @@ export default function TransactionReportPage() {
                 <table className="w-full text-left text-sm">
                     <thead>
                         <tr className="bg-gray-50 text-gray-500 font-medium border-b border-gray-100">
-                            <th className="px-6 py-4">ID Transaksi</th>
-                            <th className="px-6 py-4">Waktu</th>
-                            <th className="px-6 py-4">Kasir</th>
-                            <th className="px-6 py-4">Detail Item</th>
+                            <th className="px-3 sm:px-6 py-4">ID Transaksi</th>
+                            <th className="px-3 sm:px-6 py-4">Waktu</th>
+                            <th className="px-3 sm:px-6 py-4">Kasir</th>
+                            <th className="px-3 sm:px-6 py-4">Detail Item</th>
                             <th className="px-6 py-4 text-right">Total</th>
                         </tr>
                     </thead>
