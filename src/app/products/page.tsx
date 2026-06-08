@@ -234,6 +234,9 @@ export default function ProductsPage() {
   const [previewImageIndex, setPreviewImageIndex] = useState(0);
   const [detailFaktur, setDetailFaktur] = useState<Faktur | null>(null);
   const [detailProduct, setDetailProduct] = useState<Product | null>(null);
+  const [fakturPage, setFakturPage] = useState(1);
+  const fakturPerPage = 5;
+  useEffect(() => { setFakturPage(1); }, [fakturs.length]);
   const [newDPAmount, setNewDPAmount] = useState('');
   const [newDPDate, setNewDPDate] = useState(new Date().toISOString().split('T')[0]);
   const [newDPPaymentMethod, setNewDPPaymentMethod] = useState('cash');
@@ -1256,7 +1259,7 @@ export default function ProductsPage() {
             productId = json.id;
           }
 
-          // Create batch/faktur if supplier info is present
+          // Create batch/faktur only if supplier is selected (purchase record)
           if (productId && item.supplier_id) {
             const batchFormData = new FormData();
             batchFormData.append('product_id', productId.toString());
@@ -2400,7 +2403,7 @@ export default function ProductsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {fakturs.map((faktur) => {
+                  {fakturs.slice((fakturPage - 1) * fakturPerPage, fakturPage * fakturPerPage).map((faktur) => {
                     const initialQty = faktur.initial_quantity || faktur.quantity;
                     const remainingQty = faktur.remaining_quantity ?? faktur.quantity;
                     const soldQty = initialQty - remainingQty;
@@ -2554,6 +2557,31 @@ export default function ProductsPage() {
             </div>
           )}
 
+          {/* Faktur Pagination */}
+          {fakturs.length > fakturPerPage && (
+            <div className="px-4 py-3 flex items-center justify-between text-sm text-gray-500 border-t border-gray-100">
+              <span>
+                {(fakturPage - 1) * fakturPerPage + 1}-{Math.min(fakturPage * fakturPerPage, fakturs.length)} of {fakturs.length}
+              </span>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setFakturPage(p => Math.max(1, p - 1))}
+                  disabled={fakturPage === 1}
+                  className="px-3 py-1 rounded border border-gray-200 disabled:opacity-40 hover:bg-gray-50"
+                >
+                  ← Prev
+                </button>
+                <button
+                  onClick={() => setFakturPage(p => Math.min(Math.ceil(fakturs.length / fakturPerPage), p + 1))}
+                  disabled={fakturPage === Math.ceil(fakturs.length / fakturPerPage)}
+                  className="px-3 py-1 rounded border border-gray-200 disabled:opacity-40 hover:bg-gray-50"
+                >
+                  Next →
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Faktur Form */}
           {showFakturForm && (
             <div className="mt-6 border-t border-gray-100 pt-6">
@@ -2626,7 +2654,11 @@ export default function ProductsPage() {
                   <div className="flex items-center gap-3 py-1 mb-2">
                     <button
                       type="button"
-                      onClick={() => setHasPurchaseUnitForm(!hasPurchaseUnitForm)}
+                      onClick={() => {
+                        const next = !hasPurchaseUnitForm;
+                        setHasPurchaseUnitForm(next);
+                        if (!next) setFakturFormData(prev => ({ ...prev, unit_multiplier: '1', purchase_unit: 'Box' }));
+                      }}
                       className={`relative w-11 h-6 rounded-full transition-colors ${hasPurchaseUnitForm ? 'bg-blue-600' : 'bg-gray-300'}`}
                     >
                       <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-transform ${hasPurchaseUnitForm ? 'translate-x-5' : ''}`} />
@@ -2697,11 +2729,7 @@ export default function ProductsPage() {
                     placeholder="0"
                     min="0"
                   />
-                  {Number(fakturFormData.unit_multiplier || 1) > 1 && fakturFormData.quantity && (
-                    <p className="text-xs text-blue-600 mt-1">
-                      = {Number(fakturFormData.quantity) * Number(fakturFormData.unit_multiplier || 1)} {fakturFormData.unit || 'Tablet'} (total satuan dasar)
-                    </p>
-                  )}
+
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Harga Beli</label>

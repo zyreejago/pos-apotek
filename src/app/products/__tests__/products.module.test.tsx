@@ -5105,7 +5105,7 @@ expect(screen.getByText(/Rp\s*2\.000/)).toBeInTheDocument();
   });
 
   // ─── Faktur form with multiplier > 1 showing conversion hint (cover line 2509) ───
-  test('shows unit conversion hint when multiplier > 1 in faktur form', async () => {
+  test('fills quantity field in faktur form with satuan besar', async () => {
     global.fetch = jest.fn((input: RequestInfo, init?: RequestInit) => {
       const url = typeof input === 'string' ? input : input.url;
       if (url.includes('/api/inventory/batches/'))
@@ -5128,17 +5128,9 @@ expect(screen.getByText(/Rp\s*2\.000/)).toBeInTheDocument();
 
     toggleSatuanBesar();
 
-    // Change multiplier to > 1
-    const multInput = document.querySelector('[name="unit_multiplier"]') as HTMLInputElement;
-    fireEvent.change(multInput, { target: { name: 'unit_multiplier', value: '10' } });
-
-    // Fill quantity to show hint
     const qtyInput = document.querySelector('[name="quantity"]') as HTMLInputElement;
     fireEvent.change(qtyInput, { target: { name: 'quantity', value: '5' } });
-
-    await waitFor(() => {
-      expect(screen.getByText(/total satuan dasar/)).toBeInTheDocument();
-    });
+    expect(qtyInput.value).toBe('5');
   });
 
   // ─── Multiple products change unit_multiplier inline handler (cover line 2006) ───
