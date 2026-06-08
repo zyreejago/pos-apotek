@@ -222,7 +222,10 @@ export default function ProductsPage() {
   const [fakturImageFiles, setFakturImageFiles] = useState<File[]>([]);
   const [fakturImagePreviews, setFakturImagePreviews] = useState<string[]>([]);
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
+  const [previewImageList, setPreviewImageList] = useState<string[]>([]);
+  const [previewImageIndex, setPreviewImageIndex] = useState(0);
   const [detailFaktur, setDetailFaktur] = useState<Faktur | null>(null);
+  const [detailProduct, setDetailProduct] = useState<Product | null>(null);
   const [newDPAmount, setNewDPAmount] = useState('');
   const [newDPDate, setNewDPDate] = useState(new Date().toISOString().split('T')[0]);
   const [newDPPaymentMethod, setNewDPPaymentMethod] = useState('cash');
@@ -879,7 +882,7 @@ export default function ProductsPage() {
     const date = new Date(dateString);
     return date.toLocaleDateString('id-ID', {
       day: 'numeric',
-      month: 'short',
+      month: 'long',
       year: 'numeric'
     });
   };
@@ -888,6 +891,13 @@ export default function ProductsPage() {
     if (!url) return [];
     try { const parsed = JSON.parse(url); return Array.isArray(parsed) ? parsed : [url]; }
     catch { return [url]; }
+  };
+
+  const openImagePreview = (url: string, allUrls: string[]) => {
+    const idx = allUrls.indexOf(url);
+    setPreviewImageList(allUrls);
+    setPreviewImageIndex(idx >= 0 ? idx : 0);
+    setPreviewImageUrl(url);
   };
 
   const getExpiredStatusColor = (dateString: string | null) => {
@@ -1439,6 +1449,13 @@ export default function ProductsPage() {
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button 
+                          onClick={() => setDetailProduct(product)}
+                          className="p-1 text-gray-500 hover:bg-gray-100 rounded"
+                          title="Detail Produk"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                        </button>
                         {checkPermission('edit') && (
                         <button 
                           onClick={() => handleOpenFakturOffCanvas(product)}
@@ -2401,7 +2418,7 @@ export default function ProductsPage() {
                             {statusText}
                           </span>
                         </td>
-                        <td className="px-4 py-3">{faktur.purchase_date ? new Date(faktur.purchase_date).toLocaleDateString('id-ID') : '-'}</td>
+                        <td className="px-4 py-3">{faktur.purchase_date ? new Date(faktur.purchase_date).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }) : '-'}</td>
                         <td className="px-4 py-3">
                           <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
                             faktur.status === 'approved' 
@@ -2434,7 +2451,7 @@ export default function ProductsPage() {
                           )}
                         </td>
                         <td className="px-4 py-3">
-                          {faktur.expired_date ? new Date(faktur.expired_date).toLocaleDateString('id-ID') : '-'}
+                          {faktur.expired_date ? new Date(faktur.expired_date).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }) : '-'}
                         </td>
                         <td className="px-4 py-3">{formatCurrency(faktur.cost_price)}</td>
                         <td className="px-4 py-3 font-medium">{formatCurrency(totalAmount)}</td>
@@ -2442,7 +2459,10 @@ export default function ProductsPage() {
                           <div className="flex justify-end gap-2">
                             {faktur.image_url && getImageUrls(faktur.image_url).length > 0 && (
                               <button
-                                onClick={() => setPreviewImageUrl(`http://localhost:5000${getImageUrls(faktur.image_url)[0]}`)}
+                                onClick={() => {
+                                  const urls = getImageUrls(faktur.image_url).map(u => `http://localhost:5000${u}`);
+                                  openImagePreview(urls[0], urls);
+                                }}
                                 className="p-1 text-green-600 hover:bg-green-50 rounded"
                                 title="Lihat Bukti"
                               >
@@ -2705,7 +2725,7 @@ export default function ProductsPage() {
                             <span className="text-gray-600">DP {index + 1}</span>
                             {dp.payment_date && (
                               <span className="text-xs text-gray-400 ml-2">
-                                {new Date(dp.payment_date).toLocaleDateString('id-ID')}
+                                {new Date(dp.payment_date).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
                               </span>
                             )}
                           </div>
@@ -3063,7 +3083,7 @@ export default function ProductsPage() {
                               </div>
                               <div className="flex items-center gap-2 text-gray-600 bg-gray-50 px-2 py-1 rounded-lg">
                                 <Calendar size={14} className="text-gray-400" />
-                                <span>{faktur.purchase_date ? new Date(faktur.purchase_date).toLocaleDateString('id-ID') : '-'}</span>
+                                <span>{faktur.purchase_date ? new Date(faktur.purchase_date).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }) : '-'}</span>
                               </div>
                               <div className="flex items-center gap-2 text-gray-600 bg-gray-50 px-2 py-1 rounded-lg">
                                 <Info size={14} className="text-gray-400" />
@@ -3094,7 +3114,10 @@ export default function ProductsPage() {
                           <div className={`flex flex-col gap-2 shrink-0 ${faktur.status === 'rejected' ? 'pr-8' : ''}`}>
                             {faktur.image_url && getImageUrls(faktur.image_url).length > 0 && (
                               <button 
-                                onClick={() => setPreviewImageUrl(`http://localhost:5000${getImageUrls(faktur.image_url)[0]}`)}
+                                onClick={() => {
+                                  const urls = getImageUrls(faktur.image_url).map(u => `http://localhost:5000${u}`);
+                                  openImagePreview(urls[0], urls);
+                                }}
                                 className="flex items-center gap-2 px-4 py-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-all text-xs font-bold border border-blue-100"
                               >
                                 <FileText size={18} />
@@ -3163,6 +3186,105 @@ export default function ProductsPage() {
         </div>
       )}
 
+      {/* Detail Produk Modal */}
+      {detailProduct && (
+        <div 
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[9999] p-4" 
+          onClick={() => setDetailProduct(null)}
+        >
+          <div 
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto" 
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-center px-6 py-4 border-b border-gray-100 bg-gray-50/50 sticky top-0 bg-white">
+              <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                Detail Produk
+              </h3>
+              <button 
+                onClick={() => setDetailProduct(null)}
+                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-all"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              {/* Nama & Kategori */}
+              <div className="bg-blue-50 p-4 rounded-xl">
+                <p className="text-xs text-blue-500 font-medium uppercase tracking-wider">Nama Produk</p>
+                <p className="text-lg font-bold text-gray-900 mt-1">{detailProduct.name}</p>
+                <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold mt-2 ${detailProduct.product_category === 'NON_OBAT' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}`}>
+                  {detailProduct.product_category === 'NON_OBAT' ? 'Non-Obat' : 'Obat'}
+                </span>
+              </div>
+
+              {/* Info Grid */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-gray-50 p-3 rounded-xl">
+                  <p className="text-xs text-gray-500 font-medium uppercase tracking-wider">Harga Beli</p>
+                  <p className="text-sm font-bold text-gray-900 mt-1">{formatCurrency(detailProduct.cost_price)}</p>
+                </div>
+                <div className="bg-gray-50 p-3 rounded-xl">
+                  <p className="text-xs text-gray-500 font-medium uppercase tracking-wider">Harga Jual</p>
+                  <p className="text-sm font-bold text-gray-900 mt-1">{formatCurrency(detailProduct.selling_price)}</p>
+                </div>
+                <div className="bg-gray-50 p-3 rounded-xl">
+                  <p className="text-xs text-gray-500 font-medium uppercase tracking-wider">Stok (Unit Dasar)</p>
+                  <p className="text-sm font-bold text-gray-900 mt-1">{detailProduct.stock} {detailProduct.unit || 'Tablet'}</p>
+                </div>
+                <div className="bg-gray-50 p-3 rounded-xl">
+                  <p className="text-xs text-gray-500 font-medium uppercase tracking-wider">Tipe Stok</p>
+                  <p className="text-sm font-bold text-gray-900 mt-1 capitalize">{detailProduct.stock_type?.replace(/_/g, ' ') || '-'}</p>
+                </div>
+                <div className="bg-gray-50 p-3 rounded-xl">
+                  <p className="text-xs text-gray-500 font-medium uppercase tracking-wider">Supplier</p>
+                  <p className="text-sm font-bold text-gray-900 mt-1">{detailProduct.supplier_name || '-'}</p>
+                </div>
+                <div className="bg-gray-50 p-3 rounded-xl">
+                  <p className="text-xs text-gray-500 font-medium uppercase tracking-wider">Kode Lokasi</p>
+                  <p className="text-sm font-bold text-gray-900 mt-1">{detailProduct.location_code || '-'}</p>
+                </div>
+                <div className="bg-gray-50 p-3 rounded-xl">
+                  <p className="text-xs text-gray-500 font-medium uppercase tracking-wider">Expired Date</p>
+                  <p className="text-sm font-bold text-gray-900 mt-1">{detailProduct.expired_date ? new Date(detailProduct.expired_date).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }) : '-'}</p>
+                </div>
+              </div>
+
+              {/* Satuan Besar Info */}
+              {(detailProduct.purchase_unit || detailProduct.unit_multiplier) && (
+                <div className="bg-purple-50 border border-purple-100 p-4 rounded-xl">
+                  <p className="text-xs text-purple-600 font-medium uppercase tracking-wider mb-2">Informasi Satuan Besar</p>
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-purple-700">Unit Pembelian</span>
+                      <span className="font-bold text-purple-900">{detailProduct.purchase_unit || '-'}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-purple-700">Isi per Unit</span>
+                      <span className="font-bold text-purple-900">{detailProduct.unit_multiplier || 1} {detailProduct.unit || 'Tablet'}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-purple-700">Stok (Dalam {detailProduct.purchase_unit || 'Box'})</span>
+                      <span className="font-bold text-purple-900">{detailProduct.stock ? Math.floor(detailProduct.stock / (detailProduct.unit_multiplier || 1)) : 0} {detailProduct.purchase_unit || 'Box'}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="px-6 py-4 border-t border-gray-100 flex justify-end">
+              <button
+                onClick={() => setDetailProduct(null)}
+                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors"
+              >
+                Tutup
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Detail Faktur Modal */}
       {detailFaktur && (
         <div 
@@ -3207,20 +3329,32 @@ export default function ProductsPage() {
                 </div>
                 <div className="bg-gray-50 p-3 rounded-xl">
                   <p className="text-xs text-gray-500 font-medium uppercase tracking-wider">Tgl Pembelian</p>
-                  <p className="text-sm font-bold text-gray-900 mt-1">{detailFaktur.purchase_date ? new Date(detailFaktur.purchase_date).toLocaleDateString('id-ID') : '-'}</p>
+                  <p className="text-sm font-bold text-gray-900 mt-1">{detailFaktur.purchase_date ? new Date(detailFaktur.purchase_date).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }) : '-'}</p>
                 </div>
                 <div className="bg-gray-50 p-3 rounded-xl">
                   <p className="text-xs text-gray-500 font-medium uppercase tracking-wider">Tgl Kadaluarsa</p>
-                  <p className="text-sm font-bold text-gray-900 mt-1">{detailFaktur.expired_date ? new Date(detailFaktur.expired_date).toLocaleDateString('id-ID') : '-'}</p>
+                  <p className="text-sm font-bold text-gray-900 mt-1">{detailFaktur.expired_date ? new Date(detailFaktur.expired_date).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }) : '-'}</p>
                 </div>
                 <div className="bg-gray-50 p-3 rounded-xl">
                   <p className="text-xs text-gray-500 font-medium uppercase tracking-wider">Qty Awal</p>
                   <p className="text-sm font-bold text-gray-900 mt-1">{detailFaktur.initial_quantity || detailFaktur.quantity} {selectedProduct?.unit || 'Tablet'}</p>
                 </div>
+                {selectedProduct?.purchase_unit && selectedProduct?.unit_multiplier && selectedProduct.unit_multiplier > 1 && (
+                  <div className="bg-gray-50 p-3 rounded-xl">
+                    <p className="text-xs text-gray-500 font-medium uppercase tracking-wider">Qty Awal ({selectedProduct.purchase_unit})</p>
+                    <p className="text-sm font-bold text-gray-900 mt-1">{Math.floor((detailFaktur.initial_quantity || detailFaktur.quantity) / selectedProduct.unit_multiplier)} {selectedProduct.purchase_unit}</p>
+                  </div>
+                )}
                 <div className="bg-gray-50 p-3 rounded-xl">
                   <p className="text-xs text-gray-500 font-medium uppercase tracking-wider">Qty Tersisa</p>
                   <p className="text-sm font-bold text-gray-900 mt-1">{detailFaktur.remaining_quantity ?? detailFaktur.quantity} {selectedProduct?.unit || 'Tablet'}</p>
                 </div>
+                {selectedProduct?.purchase_unit && selectedProduct?.unit_multiplier && selectedProduct.unit_multiplier > 1 && (
+                  <div className="bg-gray-50 p-3 rounded-xl">
+                    <p className="text-xs text-gray-500 font-medium uppercase tracking-wider">Qty Tersisa ({selectedProduct.purchase_unit})</p>
+                    <p className="text-sm font-bold text-gray-900 mt-1">{Math.floor((detailFaktur.remaining_quantity ?? detailFaktur.quantity) / selectedProduct.unit_multiplier)} {selectedProduct.purchase_unit}</p>
+                  </div>
+                )}
                 <div className="bg-gray-50 p-3 rounded-xl">
                   <p className="text-xs text-gray-500 font-medium uppercase tracking-wider">Harga Beli</p>
                   <p className="text-sm font-bold text-gray-900 mt-1">{formatCurrency(detailFaktur.cost_price)}</p>
@@ -3264,7 +3398,7 @@ export default function ProductsPage() {
                       <div key={dp.id} className="flex justify-between items-center bg-gray-50 p-3 rounded-xl">
                         <div>
                           <p className="text-sm font-medium text-gray-800">DP {i + 1}</p>
-                          <p className="text-xs text-gray-500">{dp.payment_date ? new Date(dp.payment_date).toLocaleDateString('id-ID') : '-'}</p>
+                          <p className="text-xs text-gray-500">{dp.payment_date ? new Date(dp.payment_date).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }) : '-'}</p>
                         </div>
                         <div className="flex items-center gap-2">
                           <span className={`text-xs font-medium px-1.5 py-0.5 rounded ${dp.payment_method === 'transfer' ? 'bg-purple-100 text-purple-700' : 'bg-green-100 text-green-700'}`}>
@@ -3286,17 +3420,19 @@ export default function ProductsPage() {
                 <div>
                   <h4 className="text-sm font-bold text-gray-700 mb-2">Bukti Faktur ({getImageUrls(detailFaktur.image_url).length})</h4>
                   <div className="flex flex-wrap gap-3">
-                    {getImageUrls(detailFaktur.image_url).map((url, idx) => (
+                    {(() => {
+                      const urls = getImageUrls(detailFaktur.image_url).map((u: string) => `http://localhost:5000${u}`);
+                      return urls.map((fullUrl: string, idx: number) => (
                       <div key={idx} className="relative inline-block group">
                         <img 
-                          src={`http://localhost:5000${url}`} 
+                          src={fullUrl} 
                           alt={`Bukti Faktur ${idx + 1}`} 
                           className="w-40 h-32 object-cover rounded-xl border border-gray-200 cursor-pointer"
-                          onClick={() => setPreviewImageUrl(`http://localhost:5000${url}`)}
+                          onClick={() => openImagePreview(fullUrl, urls)}
                         />
                         <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors rounded-xl flex items-center justify-center gap-2">
                           <button
-                            onClick={() => setPreviewImageUrl(`http://localhost:5000${url}`)}
+                            onClick={() => openImagePreview(fullUrl, urls)}
                             className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 bg-white/90 rounded-full shadow-md hover:bg-white"
                             title="Perbesar"
                           >
@@ -3305,7 +3441,7 @@ export default function ProductsPage() {
                           <button
                             onClick={() => {
                               const link = document.createElement('a');
-                              link.href = `http://localhost:5000${url}`;
+                              link.href = fullUrl;
                               link.download = `bukti_faktur_${idx + 1}.jpg`;
                               document.body.appendChild(link);
                               link.click();
@@ -3318,7 +3454,8 @@ export default function ProductsPage() {
                           </button>
                         </div>
                       </div>
-                    ))}
+                    ));
+                  })()}
                   </div>
                 </div>
               )}
@@ -3340,22 +3477,46 @@ export default function ProductsPage() {
       {previewImageUrl && (
         <div 
           className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[9999] p-4 md:p-8" 
-          onClick={() => setPreviewImageUrl(null)}
+          onClick={() => { setPreviewImageUrl(null); setPreviewImageList([]); }}
         >
           <div 
             className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-full overflow-hidden flex flex-col" 
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex justify-between items-center px-6 py-4 border-b border-gray-100 shrink-0">
-              <h3 className="text-lg font-semibold text-gray-800">Bukti Faktur</h3>
+              <h3 className="text-lg font-semibold text-gray-800">Bukti Faktur {previewImageList.length > 1 ? `(${previewImageIndex + 1}/${previewImageList.length})` : ''}</h3>
               <button 
-                 onClick={() => setPreviewImageUrl(null)} 
+                 onClick={() => { setPreviewImageUrl(null); setPreviewImageList([]); }} 
                  className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-all"
                >
                  <X size={20} />
                </button>
             </div>
-            <div className="p-4 flex-1 overflow-auto bg-gray-50 flex items-center justify-center min-h-0">
+            <div className="p-4 flex-1 overflow-auto bg-gray-50 flex items-center justify-center min-h-0 relative">
+              {previewImageList.length > 1 && (
+                <>
+                  <button
+                    onClick={() => {
+                      const newIdx = previewImageIndex > 0 ? previewImageIndex - 1 : previewImageList.length - 1;
+                      setPreviewImageIndex(newIdx);
+                      setPreviewImageUrl(previewImageList[newIdx]);
+                    }}
+                    className="absolute left-4 top-1/2 -translate-y-1/2 p-2 bg-white/80 hover:bg-white rounded-full shadow-md z-10 transition-all"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+                  </button>
+                  <button
+                    onClick={() => {
+                      const newIdx = previewImageIndex < previewImageList.length - 1 ? previewImageIndex + 1 : 0;
+                      setPreviewImageIndex(newIdx);
+                      setPreviewImageUrl(previewImageList[newIdx]);
+                    }}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 p-2 bg-white/80 hover:bg-white rounded-full shadow-md z-10 transition-all"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+                  </button>
+                </>
+              )}
               <img 
                 src={previewImageUrl} 
                 alt="Bukti Faktur" 

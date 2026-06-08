@@ -287,6 +287,12 @@ afterEach(() => {
 });
 
 describe('products module', () => {
+  function toggleSatuanBesar() {
+    const toggleText = screen.getByText('Memiliki satuan besar?');
+    const toggleBtn = toggleText.closest('div')?.querySelector('button');
+    if (toggleBtn) fireEvent.click(toggleBtn);
+  }
+
   test('renders products page and loads data', async () => {
     renderPage();
 
@@ -984,12 +990,6 @@ expect(screen.getByText(/Rp\s*2\.000/)).toBeInTheDocument();
   });
 
   // ─── Form input: unit_multiplier changes calculate stock ───
-  function toggleSatuanBesar() {
-    const toggleText = screen.getByText('Memiliki satuan besar?');
-    const toggleBtn = toggleText.closest('div')?.querySelector('button');
-    if (toggleBtn) fireEvent.click(toggleBtn);
-  }
-
   test('calculates stock when unit_multiplier changes', async () => {
     renderPage();
     await waitLoaded();
