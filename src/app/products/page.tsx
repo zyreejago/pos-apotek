@@ -1062,6 +1062,7 @@ export default function ProductsPage() {
     setSelectedProduct(product);
     const multiplier = product.unit_multiplier || 1;
     const calculatedPurchaseStock = (product.stock / multiplier).toString();
+    setHasPurchaseUnitForm(Number(product.unit_multiplier) > 1);
     setFormData({
       name: product.name,
       cost_price: product.cost_price.toString(),
@@ -1282,6 +1283,7 @@ export default function ProductsPage() {
             if (item.dp_awal) batchFormData.append('dp_awal', item.dp_awal);
             if (item.dp_amount) batchFormData.append('dp_amount', item.dp_amount);
             if (item.due_date) batchFormData.append('due_date', item.due_date);
+            batchFormData.append('has_purchase_unit', hasPurchaseUnitForm ? '1' : '0');
             imageFiles.forEach(f => batchFormData.append('images', f));
 
             const res = await fetch(`http://localhost:5000/api/inventory/batches`, {
