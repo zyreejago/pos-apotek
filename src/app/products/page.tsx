@@ -680,8 +680,9 @@ export default function ProductsPage() {
 
       // Convert from purchase unit (box) to base unit (tablet)
       // e.g. 20 Box × 2 tablet/box = 40 tablet
-      const multiplier = Number(fakturFormData.unit_multiplier) || 1;
-      const qtyInBaseUnit = (Number(fakturFormData.quantity) || 0) * multiplier;
+      const qtyInBaseUnit = hasPurchaseUnitForm
+        ? (Number(fakturFormData.quantity) || 0) * (Number(fakturFormData.unit_multiplier) || 1)
+        : (Number(fakturFormData.quantity) || 0);
 
       const formData = new FormData();
       formData.append('product_id', selectedProduct.id.toString());
