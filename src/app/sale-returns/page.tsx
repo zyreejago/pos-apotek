@@ -8,13 +8,14 @@ import { useRequirePermission } from '@/hooks/useRequirePermission';
 import PageHeader from '@/components/PageHeader';
 
 interface SaleItem {
-  sale_item_id: number;
+  sale_item_ids: number[];
   product_id: number;
   product_name: string;
   quantity: number;
   price: number;
   qty_already_returned: number;
   qty_returnable: number;
+  expired_date: string | null;
 }
 
 interface LookupResult {
@@ -86,18 +87,18 @@ export default function SaleReturnsPage() {
     }
   };
 
-  const handleQtyChange = (itemId: number, value: string) => {
+  const handleQtyChange = (productId: number, value: string) => {
     const num = parseInt(value) || 0;
-    setReturnQuantities(prev => ({ ...prev, [itemId]: num }));
+    setReturnQuantities(prev => ({ ...prev, [productId]: num }));
     if (num <= 0) {
-      setReturnConditions(prev => { const c = { ...prev }; delete c[itemId]; return c; });
-    } else if (!returnConditions[itemId]) {
-      setReturnConditions(prev => ({ ...prev, [itemId]: 'baik' }));
+      setReturnConditions(prev => { const c = { ...prev }; delete c[productId]; return c; });
+    } else if (!returnConditions[productId]) {
+      setReturnConditions(prev => ({ ...prev, [productId]: 'baik' }));
     }
   };
   
-  const handleConditionChange = (itemId: number, condition: string) => {
-    setReturnConditions(prev => ({ ...prev, [itemId]: condition }));
+  const handleConditionChange = (productId: number, condition: string) => {
+    setReturnConditions(prev => ({ ...prev, [productId]: condition }));
   };
 
   const handleSubmit = async () => {
@@ -119,7 +120,7 @@ export default function SaleReturnsPage() {
     }
 
     const invalidItems = lookupResult.items.filter(item => {
-      const qty = returnQuantities[item.sale_item_id] || 0;
+      const qty = returnQuantities[item.product_id] || 0;
       if (qty <= 0) return false;
       if (!Number.isInteger(qty) || qty < 1) return true;
       if (qty > item.qty_returnable) return true;
@@ -135,11 +136,11 @@ export default function SaleReturnsPage() {
     }
 
     const items = lookupResult.items
-      .filter(item => (returnQuantities[item.sale_item_id] || 0) > 0)
+      .filter(item => (returnQuantities[item.product_id] || 0) > 0)
       .map(item => ({
-        sale_item_id: item.sale_item_id,
-        qty_returned: returnQuantities[item.sale_item_id],
-        condition: returnConditions[item.sale_item_id] || 'baik',
+        product_id: item.product_id,
+        qty_returned: returnQuantities[item.product_id],
+        condition: returnConditions[item.product_id] || 'baik',
       }));
 
     if (items.length === 0) {
@@ -156,11 +157,11 @@ export default function SaleReturnsPage() {
     setSubmitting(true);
 
     const items = lookupResult.items
-      .filter(item => (returnQuantities[item.sale_item_id] || 0) > 0)
+      .filter(item => (returnQuantities[item.product_id] || 0) > 0)
       .map(item => ({
-        sale_item_id: item.sale_item_id,
-        qty_returned: returnQuantities[item.sale_item_id],
-        condition: returnConditions[item.sale_item_id] || 'baik',
+        product_id: item.product_id,
+        qty_returned: returnQuantities[item.product_id],
+        condition: returnConditions[item.product_id] || 'baik',
       }));
 
     try {
@@ -199,7 +200,7 @@ export default function SaleReturnsPage() {
   };
 
   const totalRefund = lookupResult?.items.reduce((sum, item) => {
-    const qty = returnQuantities[item.sale_item_id] || 0;
+    const qty = returnQuantities[item.product_id] || 0;
     return sum + qty * item.price;
   }, 0) || 0;
 
@@ -395,7 +396,7 @@ export default function SaleReturnsPage() {
                       {lookupResult.items.map(item => {
                         const disabled = item.qty_returnable <= 0;
                         return (
-                          <tr key={item.sale_item_id} className={`hover:bg-gray-50/50 transition-colors ${disabled ? 'opacity-40' : ''}`}>
+                          <tr key={item.product_id} className={`hover:bg-gray-50/50 transition-colors ${disabled ? 'opacity-40' : ''}`}>
                             <td className="px-4 py-3 font-medium">{item.product_name}</td>
                             <td className="px-4 py-3 text-center">{item.quantity}</td>
                             <td className="px-4 py-3 text-center">
@@ -409,6 +410,9 @@ export default function SaleReturnsPage() {
                               )}
                             </td>
                             <td className="px-4 py-3 text-center font-semibold">{item.qty_returnable}</td>
+                            <td className="px-4 py-3 text-center text-xs">
+                              {item.expired_date ? new Date(item.expired_date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) : '-'}
+                            </td>
                             <td className="px-4 py-3 text-center">
                               <input
                                 type="number"
@@ -416,8 +420,8 @@ export default function SaleReturnsPage() {
                                 max={item.qty_returnable}
                                 disabled={disabled}
                                 className="w-20 px-2 py-1.5 border border-gray-200 rounded-lg text-center focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 disabled:bg-gray-50 disabled:text-gray-400 transition-all"
-                                value={returnQuantities[item.sale_item_id] || ''}
-                                onChange={e => handleQtyChange(item.sale_item_id, e.target.value)}
+                                value={returnQuantities[item.product_id] || ''}
+                                onChange={e => handleQtyChange(item.product_id, e.target.value)}
                               />
                             </td>
                             <td className="px-4 py-3 text-center">
@@ -425,8 +429,8 @@ export default function SaleReturnsPage() {
                                 <span className="text-gray-300">-</span>
                               ) : (
                                 <select
-                                  value={returnConditions[item.sale_item_id] || 'baik'}
-                                  onChange={e => handleConditionChange(item.sale_item_id, e.target.value)}
+                                  value={returnConditions[item.product_id] || 'baik'}
+                                  onChange={e => handleConditionChange(item.product_id, e.target.value)}
                                   className="px-2 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
                                 >
                                   <option value="baik">Baik</option>
@@ -476,7 +480,7 @@ export default function SaleReturnsPage() {
                         <span className="font-medium">Total Refund</span>
                         <span className="text-xl font-bold text-emerald-700">{new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format(totalRefund)}</span>
                       </p>
-                      <p className="text-xs text-gray-400 mt-1">{lookupResult.items.filter(i => (returnQuantities[i.sale_item_id] || 0) > 0).length} item dipilih</p>
+                       <p className="text-xs text-gray-400 mt-1">{lookupResult.items.filter(i => (returnQuantities[i.product_id] || 0) > 0).length} item dipilih</p>
                     </div>
                   </div>
                 </div>

@@ -408,7 +408,8 @@ module.exports = function registerReturnRoutes(app, pool, authenticate, checkPer
         [sale.id]
       );
 
-      const enrichedItems = [];
+      // Group by product_id to avoid duplicates in UI
+      const productMap = new Map();
       for (const item of items) {
         const [returnedRows] = await pool.query(
           'SELECT COALESCE(SUM(qty_returned), 0) as qty FROM sale_return_items WHERE sale_item_id = ?',
@@ -416,11 +417,51 @@ module.exports = function registerReturnRoutes(app, pool, authenticate, checkPer
         );
         const qtyAlreadyReturned = Number(returnedRows[0].qty);
         const qtyReturnable = item.quantity - qtyAlreadyReturned;
-        enrichedItems.push({
-          ...item,
-          qty_already_returned: qtyAlreadyReturned,
-          qty_returnable: Math.max(0, qtyReturnable),
-        });
+
+        const key = item.product_id;
+        if (productMap.has(key)) {
+          const existing = productMap.get(key);
+          existing.sale_item_ids.push(item.sale_item_id);
+          existing.quantity += item.quantity;
+          existing.price = ((existing.price * existing.quantity) + (item.price * item.quantity)) / (existing.quantity + item.quantity); // weighted avg
+          existing.qty_already_returned += qtyAlreadyReturned;
+          existing.qty_returnable += Math.max(0, qtyReturnable);
+          existing.rawItems.push({ ...item, qty_already_returned: qtyAlreadyReturned, qty_returnable: Math.max(0, qtyReturnable) });
+        } else {
+          productMap.set(key, {
+            sale_item_ids: [item.sale_item_id],
+            product_id: item.product_id,
+            product_name: item.product_name,
+            quantity: item.quantity,
+            price: item.price,
+            qty_already_returned: qtyAlreadyReturned,
+            qty_returnable: Math.max(0, qtyReturnable),
+            rawItems: [{ ...item, qty_already_returned: qtyAlreadyReturned, qty_returnable: Math.max(0, qtyReturnable) }],
+          });
+        }
+      }
+
+      const enrichedItems = Array.from(productMap.values());
+
+      // Attach expired_date per product group
+      for (const group of enrichedItems) {
+        const [batchRows] = await pool.query(
+          `SELECT b.expired_date FROM transaction_items ti
+           LEFT JOIN batches b ON b.invoice_number = ti.invoice_number AND b.product_id = ti.product_id
+           WHERE ti.id IN (?)
+           ORDER BY b.expired_date ASC LIMIT 1`,
+          [group.sale_item_ids]
+        );
+        let expiredDate = null;
+        if (batchRows.length > 0) expiredDate = batchRows[0].expired_date;
+        if (!expiredDate) {
+          const [fallbackBatch] = await pool.query(
+            'SELECT expired_date FROM batches WHERE product_id = ? AND expired_date IS NOT NULL ORDER BY expired_date ASC LIMIT 1',
+            [group.product_id]
+          );
+          if (fallbackBatch.length > 0) expiredDate = fallbackBatch[0].expired_date;
+        }
+        group.expired_date = expiredDate;
       }
 
       res.json({
@@ -467,87 +508,122 @@ module.exports = function registerReturnRoutes(app, pool, authenticate, checkPer
       let obatHPP = 0;
       let nonObatHPP = 0;
 
+      // Get all transaction_items for this sale, grouped by product
+      const [allSaleItems] = await connection.query(
+        `SELECT ti.id as sale_item_id, ti.product_id, ti.quantity, ti.price, ti.invoice_number,
+                p.cost_price, p.product_category, p.name as product_name
+         FROM transaction_items ti
+         JOIN products p ON ti.product_id = p.id
+         WHERE ti.transaction_id = ?
+         ORDER BY ti.id ASC`,
+        [sale_id]
+      );
+
+      // Group sale items by product
+      const saleItemsByProduct = new Map();
+      for (const si of allSaleItems) {
+        const key = si.product_id;
+        if (!saleItemsByProduct.has(key)) saleItemsByProduct.set(key, []);
+        saleItemsByProduct.get(key).push(si);
+      }
+
       for (const item of items) {
-        const { sale_item_id, qty_returned, condition } = item;
-        if (!sale_item_id || !qty_returned) throw new Error('Setiap item wajib memiliki sale_item_id dan qty_returned');
+        const { product_id, qty_returned, condition } = item;
+        if (!product_id || !qty_returned) throw new Error('Setiap item wajib memiliki product_id dan qty_returned');
         if (qty_returned <= 0) throw new Error('qty_returned harus > 0');
 
-        const [siRows] = await connection.query(
-          'SELECT ti.*, p.cost_price, p.product_category, p.name as product_name FROM transaction_items ti JOIN products p ON ti.product_id = p.id WHERE ti.id = ?',
-          [sale_item_id]
-        );
-        if (siRows.length === 0) throw new Error(`Sale item #${sale_item_id} tidak ditemukan`);
-        const si = siRows[0];
-        if (si.transaction_id !== sale_id) throw new Error(`Item #${sale_item_id} bukan bagian dari transaksi ini`);
-
-        const [retRows] = await connection.query(
-          'SELECT COALESCE(SUM(qty_returned), 0) as qty FROM sale_return_items WHERE sale_item_id = ?',
-          [sale_item_id]
-        );
-        const qtyAlreadyReturned = Number(retRows[0].qty);
-        const qtyReturnable = si.quantity - qtyAlreadyReturned;
-        if (qty_returned > qtyReturnable) throw new Error(
-          `qty_returned (${qty_returned}) melebihi sisa retur (${qtyReturnable}) untuk item #${sale_item_id}`
-        );
-
-        const itemRefund = qty_returned * Number(si.price);
-        totalRefund += itemRefund;
-
-        const cost = Number(si.cost_price || 0);
-        const itemHPP = qty_returned * cost;
-        totalHPP += itemHPP;
-
-        const isObat = si.product_category === 'OBAT';
-        if (isObat) obatHPP += itemHPP;
-        else nonObatHPP += itemHPP;
-
-        // Get batch_id from transaction_items -> we need to find the batch that was sold
-        // The transaction_items don't directly store batch_id. We need to find the batch
-        // by reversing the FEFO logic or using the actual batch. Since we don't track
-        // which specific batch was sold in transaction_items, we need a different approach.
-        // Let's find any batch for this product that has stock and use it.
-        // Actually, looking at the schema: transaction_items doesn't have batch_id.
-        // But the user's spec says sale_item_id is FK to sale_items.
-        // In our system, we'll use the latest batch for the product.
-
-        // Find batch by invoice_number recorded in transaction_items during sale
-        const [tiRows] = await connection.query(
-          'SELECT invoice_number FROM transaction_items WHERE id = ?',
-          [sale_item_id]
-        );
-        const saleInvoice = tiRows.length > 0 ? tiRows[0].invoice_number : null;
-        let batchId = null;
-        if (saleInvoice) {
-          const [bRows] = await connection.query(
-            'SELECT id FROM batches WHERE invoice_number = ? AND product_id = ? LIMIT 1',
-            [saleInvoice, si.product_id]
-          );
-          if (bRows.length > 0) batchId = bRows[0].id;
-        }
-        if (!batchId) {
-          // Fallback: FEFO untuk transaksi lama yang belum punya invoice_number
-          const [fallback] = await connection.query(
-            'SELECT id FROM batches WHERE product_id = ? ORDER BY expired_date ASC, created_at ASC LIMIT 1',
-            [si.product_id]
-          );
-          if (fallback.length === 0) throw new Error(`Tidak ditemukan batch untuk produk "${si.product_name}".`);
-          batchId = fallback[0].id;
+        const productSaleItems = saleItemsByProduct.get(product_id);
+        if (!productSaleItems || productSaleItems.length === 0) {
+          throw new Error(`Produk #${product_id} tidak ditemukan dalam transaksi ini`);
         }
 
-        returnItems.push({
-          sale_item_id,
-          batch_id: batchId,
-          product_id: si.product_id,
-          qty_returned,
-          price: Number(si.price),
-          cost_price: cost,
-          product_name: si.product_name,
-          product_category: si.product_category,
-          isObat,
-          itemRefund,
-          itemHPP,
-          condition: item.condition || 'baik',
+        // Calculate total returnable qty for this product across all its sale items
+        let totalReturnable = 0;
+        const itemDetails = [];
+        for (const si of productSaleItems) {
+          const [retRows] = await connection.query(
+            'SELECT COALESCE(SUM(qty_returned), 0) as qty FROM sale_return_items WHERE sale_item_id = ?',
+            [si.sale_item_id]
+          );
+          const alreadyReturned = Number(retRows[0].qty);
+          const returnable = si.quantity - alreadyReturned;
+          totalReturnable += returnable;
+          itemDetails.push({ ...si, alreadyReturned, returnable });
+        }
+
+        if (qty_returned > totalReturnable) {
+          throw new Error(
+            `qty_returned (${qty_returned}) melebihi sisa retur (${totalReturnable}) untuk produk #${product_id}`
+          );
+        }
+
+        // Distribute qty_returned across sale items (FEFO by batch expired_date)
+        let remainingToReturn = qty_returned;
+
+        // Sort sale items by their batch's expired_date (FEFO)
+        const itemDetailsWithBatch = [];
+        for (const si of itemDetails) {
+          let batchId = null;
+          let batchExpired = null;
+          if (si.invoice_number) {
+            const [bRows] = await connection.query(
+              'SELECT id, expired_date FROM batches WHERE invoice_number = ? AND product_id = ? LIMIT 1',
+              [si.invoice_number, si.product_id]
+            );
+            if (bRows.length > 0) { batchId = bRows[0].id; batchExpired = bRows[0].expired_date; }
+          }
+          if (!batchId) {
+            const [fallback] = await connection.query(
+              'SELECT id, expired_date FROM batches WHERE product_id = ? ORDER BY expired_date ASC, created_at ASC LIMIT 1',
+              [si.product_id]
+            );
+            if (fallback.length > 0) { batchId = fallback[0].id; batchExpired = fallback[0].expired_date; }
+          }
+          itemDetailsWithBatch.push({ ...si, batchId, batchExpired });
+        }
+        // Sort: earliest expired first (FEFO)
+        itemDetailsWithBatch.sort((a, b) => {
+          if (!a.batchExpired && !b.batchExpired) return 0;
+          if (!a.batchExpired) return 1;
+          if (!b.batchExpired) return -1;
+          return new Date(a.batchExpired).getTime() - new Date(b.batchExpired).getTime();
         });
+
+        for (const si of itemDetailsWithBatch) {
+          if (remainingToReturn <= 0) break;
+          if (si.returnable <= 0) continue;
+
+          const take = Math.min(remainingToReturn, si.returnable);
+          remainingToReturn -= take;
+
+          const itemRefund = take * Number(si.price);
+          totalRefund += itemRefund;
+
+          const cost = Number(si.cost_price || 0);
+          const itemHPP = take * cost;
+          totalHPP += itemHPP;
+
+          const isObat = si.product_category === 'OBAT';
+          if (isObat) obatHPP += itemHPP;
+          else nonObatHPP += itemHPP;
+
+          if (!si.batchId) throw new Error(`Tidak ditemukan batch untuk produk "${si.product_name}".`);
+
+          returnItems.push({
+            sale_item_id: si.sale_item_id,
+            batch_id: si.batchId,
+            product_id: si.product_id,
+            qty_returned: take,
+            price: Number(si.price),
+            cost_price: cost,
+            product_name: si.product_name,
+            product_category: si.product_category,
+            isObat,
+            itemRefund,
+            itemHPP,
+            condition: item.condition || 'baik',
+          });
+        }
       }
 
       const year = new Date().getFullYear();
@@ -611,12 +687,12 @@ module.exports = function registerReturnRoutes(app, pool, authenticate, checkPer
       await createJournalEntry(connection, sale_id, today, `Retur penjualan: ${returnNo}`, journalItems);
 
       // Mark transaction as fully_returned if all items are fully returned
-      const [allSaleItems] = await connection.query(
+      const [allSaleItemsCheck] = await connection.query(
         'SELECT id, quantity FROM transaction_items WHERE transaction_id = ?',
         [sale_id]
       );
       let allFullyReturned = true;
-      for (const si of allSaleItems) {
+      for (const si of allSaleItemsCheck) {
         const [retSum] = await connection.query(
           'SELECT COALESCE(SUM(qty_returned), 0) as total FROM sale_return_items WHERE sale_item_id = ?',
           [si.id]
