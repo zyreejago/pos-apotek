@@ -9,7 +9,8 @@ interface Permission {
   show: boolean | number | string;
 }
 
-export function useRequirePermission(moduleName: string) {
+export function useRequirePermission(moduleName: string, options?: { redirectOnDeny?: boolean }) {
+  const { redirectOnDeny = true } = options ?? {};
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [hasPermission, setHasPermission] = useState(false);
@@ -55,16 +56,15 @@ export function useRequirePermission(moduleName: string) {
             const data: Permission[] = await res.json();
             setPermissions(data);
             const perm = data.find((p) => p.module === moduleName);
-            // Strict boolean check for 'show' permission
-            if (perm && (perm.show === true || perm.show === 1 || perm.show === '1')) {
+            if (perm && isPermitted(perm.show)) {
                 setHasPermission(true);
             } else {
                 setHasPermission(false);
-                router.push('/dashboard'); // Redirect to dashboard if access denied
+                if (redirectOnDeny) router.push('/dashboard');
             }
         } else {
              console.error("Failed to fetch permissions");
-             router.push('/dashboard');
+             if (redirectOnDeny) router.push('/dashboard');
         }
       } catch (e) {
         console.error("Error checking permissions", e);
@@ -76,6 +76,12 @@ export function useRequirePermission(moduleName: string) {
     check();
   }, [moduleName, router]);
 
+  const isPermitted = (val: boolean | number | string | undefined) => {
+    if (val === undefined || val === null) return false;
+    if (typeof val === 'boolean') return val;
+    return Number(val) === 1;
+  };
+
   const checkActionPermission = (action: 'create' | 'edit' | 'delete' | 'show') => {
     if (loading) return false;
     
@@ -83,7 +89,7 @@ export function useRequirePermission(moduleName: string) {
     if (currentUserRole === 'superadmin' && (moduleName === 'Role & Permission' || moduleName === 'Transaction Setting')) return true;
     
     const perm = permissions.find(p => p.module === moduleName);
-    const hasPerm = perm ? (perm[action] === true || perm[action] === 1 || perm[action] === '1') : false;
+    const hasPerm = perm ? isPermitted(perm[action]) : false;
 
     // Fallback: If no permissions found in DB for superadmin, give them access anyway (to prevent total lockout)
     // but if permissions exist, they must follow them.

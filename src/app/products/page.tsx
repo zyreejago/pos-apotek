@@ -164,7 +164,7 @@ export default function ProductsPage() {
   }, [setSearchInputRef]);
   // Permission Check
   const { checkActionPermission } = useRequirePermission('Management Product');
-  const { checkActionPermission: checkApprovalPermission } = useRequirePermission('Approval Faktur');
+  const { checkActionPermission: checkApprovalPermission } = useRequirePermission('Approval Faktur', { redirectOnDeny: false });
 
   // Local product state (to add new products without server)
   const [allProducts, setAllProducts] = useState<Product[]>([]);

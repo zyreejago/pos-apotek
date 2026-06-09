@@ -26,10 +26,10 @@ import { useOffCanvas } from '@/context/OffCanvasContext';
 
 interface Permission {
   module: string;
-  create: boolean;
-  edit: boolean;
-  delete: boolean;
-  show: boolean;
+  create: boolean | number | string;
+  edit: boolean | number | string;
+  delete: boolean | number | string;
+  show: boolean | number | string;
 }
 
 export default function Sidebar() {
@@ -161,6 +161,12 @@ export default function Sidebar() {
     setUserCollapsedState(newState);
   };
 
+  const isPermitted = (val: boolean | number | string | undefined) => {
+    if (val === undefined || val === null) return false;
+    if (typeof val === 'boolean') return val;
+    return Number(val) === 1;
+  };
+
   const canShow = (module: string) => {
     if (loading) return false;
     // Dashboard is usually visible to everyone once logged in
@@ -170,7 +176,7 @@ export default function Sidebar() {
     if (userRole === 'superadmin' && (module === 'Role & Permission' || module === 'System Setting')) return true;
     
     const perm = permissions.find(p => p.module === module);
-    const hasPerm = perm ? (perm.show || perm.create || perm.edit || perm.delete) : false;
+    const hasPerm = perm ? isPermitted(perm.show) : false;
 
     // Fallback: If superadmin has no permissions set in DB yet, show everything
     if (userRole === 'superadmin' && permissions.length === 0) return true;
