@@ -4,7 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const XLSX = require('xlsx');
 
-const GEMINI_MODELS = ['gemini-2.5-flash', 'gemini-2.5-flash-lite'];
+const GEMINI_MODELS = ['gemini-2.5-flash', 'gemini-2.5-flash-lite', "gemini-3.5-flash", "gemini-3-flash-preview", `gemini-2.5-flash-preview-09-2025`];
 
 async function processBatch(items, batchSize, processFn) {
   const results = [];
@@ -13,6 +13,9 @@ async function processBatch(items, batchSize, processFn) {
     console.log(`Memproses batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(items.length / batchSize)} (${batch.length} produk)`);
     const batchResults = await Promise.all(batch.map(processFn));
     results.push(...batchResults);
+    if (i + batchSize < items.length) {
+      await new Promise(r => setTimeout(r, 15000));
+    }
   }
   return results;
 }
@@ -226,7 +229,7 @@ async function callGeminiAPI(promptJson, instruction) {
         };
 
         const { data } = await axios.post(url, body, {
-          timeout: 25000,
+          timeout: 30000,
           headers: { 'Content-Type': 'application/json' },
         });
 
@@ -252,6 +255,7 @@ async function callGeminiAPI(promptJson, instruction) {
           console.error('Response status:', e.response.status);
           console.error('Response statusText:', e.response.statusText);
           console.error('Response data:', JSON.stringify(e.response.data, null, 2));
+          
         } else if (e.request) {
           console.error('No response received. Request was sent but no response.');
         } else {
@@ -597,7 +601,7 @@ async function generateStockRecommendation(options) {
   const windowSize = Number.isFinite(options.windowSize) ? options.windowSize : 7;
 
   const series = options.series || [];
-  const datasetWindowed = createSlidingWindow(series, windowSize);
+  const datasetWindowed = (createSlidingWindow(options.geminiSeries || series, windowSize, 1) );
 
   const stokSaatIni = Number(options.product.stok_saat_ini || 0);
   const perDayBaseline = fallbackExponentialSmoothing(series, 0.6);
@@ -634,7 +638,7 @@ async function generateStockRecommendation(options) {
       'Tugas:\n' +
       'Estimasi kebutuhan stok 7 hari ke depan berdasarkan pola historis pada dataset_windowed, lalu hitung tambahan stok yang perlu dipesan.\n\n' +
       'ATURAN FORECASTING:\n' +
-      '- Gunakan pola historis output untuk memperkirakan kebutuhan_7_hari.\n' +
+      '- Gunakan pola historis input untuk memperkirakan kebutuhan_7_hari.\n' +
       '- Prioritaskan kestabilan prediksi dibanding nilai ekstrem.\n' +
       '- Data terbaru lebih penting dibanding data lama.\n' +
       '- Jangan menghasilkan prediksi tidak wajar dibanding historis.\n\n' +
@@ -902,20 +906,28 @@ async function runWeeklyForecastJob(pool, options = {}) {
     const allRows = [...salesRows, ...transactionRows];
     // Calculate actual date range from data, minimum 365 days
     let dataDays = 365;
+    let actualDataDays = 0;
     if (allRows.length > 0) {
       const dates = allRows.map(r => new Date(r.day)).filter(d => !isNaN(d.getTime()));
       if (dates.length > 0) {
         const minDate = new Date(Math.min(...dates));
         const maxDate = new Date(Math.max(...dates));
         const range = Math.round((maxDate - minDate) / (1000 * 60 * 60 * 24)) + 1;
+        actualDataDays = range;
         dataDays = Math.max(range, 365);
       }
     }
     const { series, startDate, endDate } = prepareTimeSeries(allRows, { days: dataDays });
     const sourceEndDate = endDate ? endDate.toISOString().slice(0, 10) : null;
 
-    const rec = await generateStockRecommendation({
+    const geminiSeries = actualDataDays > 0 && actualDataDays < dataDays
+    ? prepareTimeSeries(allRows, { days: actualDataDays }).series
+    : series;
+
+  const rec = await generateStockRecommendation({
       series,
+      geminiSeries,
+      leadTime,
       leadTime,
       windowSize,
       product: {
@@ -932,7 +944,7 @@ async function runWeeklyForecastJob(pool, options = {}) {
     return { p, rec, sourceEndDate };
   };
 
-  const results = await processBatch(products || [], 10, processProduct);
+  const results = await processBatch(products || [], 1, processProduct);
 
   for (const { p, rec, sourceEndDate } of results) {
     await pool.query(

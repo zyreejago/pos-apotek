@@ -2394,12 +2394,12 @@ export default function ProductsPage() {
 
           <div className="mb-4 flex justify-between items-center">
             <h3 className="font-semibold text-gray-700">Daftar Faktur</h3>
-            <button
+           {/* <button
               onClick={handleOpenAddFakturModal}
               className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium transition-colors"
             >
               <Plus size={16} /> Tambah Faktur
-            </button>
+            </button> */}
           </div>
 
           {fakturs.length === 0 ? (
