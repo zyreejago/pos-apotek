@@ -97,6 +97,7 @@ export default function PrescriptionsPage() {
     instansi: ''
   });
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
@@ -847,15 +848,14 @@ export default function PrescriptionsPage() {
                       </td>
                       <td className="px-3 sm:px-6 py-4">
                         {prescription.image_url ? (
-                          <a 
-                            href={`http://localhost:5000${prescription.image_url}`} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="text-blue-600 hover:text-blue-700 flex items-center gap-1"
+                          <button
+                            type="button"
+                            onClick={() => setPreviewImageUrl(`http://localhost:5000${prescription.image_url}`)}
+                            className="text-blue-600 hover:text-blue-700 flex items-center gap-1 cursor-pointer"
                           >
                             <ImageIcon size={16} />
                             Lihat Gambar
-                          </a>
+                          </button>
                         ) : (
                           '-'
                         )}
@@ -1338,6 +1338,35 @@ export default function PrescriptionsPage() {
           </div>
         </form>
       </OffCanvas>
+
+      {previewImageUrl && (
+        <div
+          className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[9999] p-4"
+          onClick={() => setPreviewImageUrl(null)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-full overflow-hidden flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-center px-6 py-4 border-b border-gray-100 shrink-0">
+              <h3 className="text-lg font-semibold text-gray-800">Gambar Resep</h3>
+              <button
+                onClick={() => setPreviewImageUrl(null)}
+                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-all"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <div className="p-4 flex-1 overflow-auto bg-gray-50 flex items-center justify-center min-h-0">
+              <img
+                src={previewImageUrl}
+                alt="Gambar Resep"
+                className="max-w-full max-h-full object-contain rounded-lg shadow-sm"
+              />
+            </div>
+          </div>
+        </div>
+      )}
 
       <ConfirmModal
         isOpen={confirmModal.isOpen}
