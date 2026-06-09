@@ -56,6 +56,7 @@ export default function POSTransactionsPage() {
   const [settings, setSettings] = useState({ ppn_rate: 0, discount_rate: 0 });
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'midtrans'>('cash');
   const [highlightedProductId, setHighlightedProductId] = useState<number | null>(null);
+  const [editingQty, setEditingQty] = useState<{id: number; value: string} | null>(null);
 
   // Fetch Data
   useEffect(() => {
@@ -138,6 +139,7 @@ export default function POSTransactionsPage() {
   };
 
   const updateQuantity = (productId: number, delta: number) => {
+    setEditingQty(null);
     setCart(prev => {
       return prev.map(item => {
         if (item.id === productId) {
@@ -147,6 +149,17 @@ export default function POSTransactionsPage() {
         return item;
       });
     });
+  };
+
+  const setQuantityDirect = (productId: number, val: number) => {
+    const product = products.find(p => p.id === productId);
+    const maxStock = product?.stock ?? Infinity;
+    setCart(prev => prev.map(item => {
+      if (item.id === productId) {
+        return { ...item, quantity: Math.max(1, Math.min(val, maxStock)) };
+      }
+      return item;
+    }));
   };
 
   const formatCurrency = (val: number) => 
@@ -628,7 +641,32 @@ export default function POSTransactionsPage() {
                     className="w-6 h-6 flex items-center justify-center hover:bg-white rounded-md text-gray-700 shadow-sm transition-all">
                     <Minus size={12} />
                   </button>
-                  <span className="text-xs font-semibold px-2 text-center min-w-[2rem]">{item.quantity}</span>
+                  {editingQty?.id === item.id ? (
+                    <input
+                      type="number"
+                      value={editingQty.value}
+                      onChange={(e) => setEditingQty({ id: item.id, value: e.target.value })}
+                      onBlur={() => {
+                        const val = parseInt(editingQty!.value);
+                        if (!isNaN(val) && val > 0) setQuantityDirect(item.id, val);
+                        setEditingQty(null);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+                        else if (e.key === 'Escape') setEditingQty(null);
+                      }}
+                      autoFocus
+                      className="w-10 text-center text-xs font-semibold border border-blue-300 rounded px-1 outline-none"
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                  ) : (
+                    <span
+                      onClick={(e) => { e.stopPropagation(); setEditingQty({ id: item.id, value: String(item.quantity) }); }}
+                      className="text-xs font-semibold px-2 text-center min-w-[2rem] cursor-pointer hover:bg-white rounded"
+                    >
+                      {item.quantity}
+                    </span>
+                  )}
                   <button onClick={(e) => { e.stopPropagation(); updateQuantity(item.id, 1); }}
                     className="w-6 h-6 flex items-center justify-center hover:bg-white rounded-md text-gray-700 shadow-sm transition-all">
                     <Plus size={12} />

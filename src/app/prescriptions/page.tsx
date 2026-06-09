@@ -108,6 +108,7 @@ export default function PrescriptionsPage() {
   const [processing, setProcessing] = useState(false);
   const [productSearchQuery, setProductSearchQuery] = useState('');
   const [settings, setSettings] = useState({ ppn_rate: 0, discount_rate: 0 });
+  const [editingQty, setEditingQty] = useState<{id: number; value: string} | null>(null);
 
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
   const userStr = typeof window !== 'undefined' ? localStorage.getItem('user') : null;
@@ -220,6 +221,7 @@ export default function PrescriptionsPage() {
   };
 
   const updateQuantity = (productId: number, delta: number) => {
+    setEditingQty(null);
     setCart(prev => {
       return prev.map(item => {
         if (item.id === productId) {
@@ -229,6 +231,17 @@ export default function PrescriptionsPage() {
         return item;
       });
     });
+  };
+
+  const setQuantityDirect = (productId: number, val: number) => {
+    const product = products.find(p => p.id === productId);
+    const maxStock = product?.stock ?? Infinity;
+    setCart(prev => prev.map(item => {
+      if (item.id === productId) {
+        return { ...item, quantity: Math.max(1, Math.min(val, maxStock)) };
+      }
+      return item;
+    }));
   };
 
   // Calculations
@@ -1126,7 +1139,32 @@ export default function PrescriptionsPage() {
                                   >
                                     <Minus size={14} />
                                   </button>
-                                  <span className="text-sm font-semibold w-8 text-center text-slate-700">{item.quantity}</span>
+                                  {editingQty?.id === item.id ? (
+                                    <input
+                                      type="number"
+                                      value={editingQty.value}
+                                      onChange={(e) => setEditingQty({ id: item.id, value: e.target.value })}
+                                      onBlur={() => {
+                                        const val = parseInt(editingQty!.value);
+                                        if (!isNaN(val) && val > 0) setQuantityDirect(item.id, val);
+                                        setEditingQty(null);
+                                      }}
+                                      onKeyDown={(e) => {
+                                        if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+                                        else if (e.key === 'Escape') setEditingQty(null);
+                                      }}
+                                      autoFocus
+                                      className="w-12 text-center text-sm font-semibold border border-blue-300 rounded px-1 outline-none"
+                                      onClick={(e) => e.stopPropagation()}
+                                    />
+                                  ) : (
+                                    <span
+                                      onClick={(e) => { e.stopPropagation(); setEditingQty({ id: item.id, value: String(item.quantity) }); }}
+                                      className="text-sm font-semibold w-8 text-center text-slate-700 cursor-pointer hover:bg-white rounded"
+                                    >
+                                      {item.quantity}
+                                    </span>
+                                  )}
                                   <button 
                                     type="button"
                                     onClick={(e) => { e.stopPropagation(); updateQuantity(item.id, 1); }}
