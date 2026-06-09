@@ -410,9 +410,9 @@ export default function SaleReturnsPage() {
                               )}
                             </td>
                             <td className="px-4 py-3 text-center font-semibold">{item.qty_returnable}</td>
-                            <td className="px-4 py-3 text-center text-xs">
+                            {/* <td className="px-4 py-3 text-center text-xs">
                               {item.expired_date ? new Date(item.expired_date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) : '-'}
-                            </td>
+                            </td> */}
                             <td className="px-4 py-3 text-center">
                               <input
                                 type="number"
