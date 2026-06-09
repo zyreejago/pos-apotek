@@ -600,7 +600,7 @@ async function generateStockRecommendation(options) {
   const datasetWindowed = createSlidingWindow(series, windowSize);
 
   const stokSaatIni = Number(options.product.stok_saat_ini || 0);
-  const perDayBaseline = fallbackExponentialSmoothing(series, 0.2);
+  const perDayBaseline = fallbackExponentialSmoothing(series, 0.6);
   const recentDays = series.slice(Math.max(0, series.length - 30));
   const recentSold = recentDays.reduce((acc, v) => acc + (Number.isFinite(v) ? v : 0), 0);
   const totalSold = series.reduce((acc, v) => acc + (Number.isFinite(v) ? v : 0), 0);
@@ -664,6 +664,7 @@ async function generateStockRecommendation(options) {
       'FORMAT OUTPUT WAJIB:\n' +
       '{\n' +
       '  "tambahan_stok": <integer>\n' +
+      '  "kebutuhan_7_hari": <integer>\n' +
       '}\n\n' +
       'Tidak boleh ada teks lain selain JSON.'
 
