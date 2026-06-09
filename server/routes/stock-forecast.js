@@ -890,7 +890,28 @@ async function runWeeklyForecastJob(pool, options = {}) {
       `SELECT sale_date AS day, quantity AS qty FROM sales_history WHERE product_id = ? ORDER BY sale_date ASC`,
       [p.id]
     );
-    const { series, startDate, endDate } = prepareTimeSeries(salesRows, { days: 365 });
+    const [transactionRows] = await pool.query(
+      `SELECT DATE(t.transaction_date) AS day, SUM(ti.quantity) AS qty
+       FROM transaction_items ti
+       JOIN transactions t ON ti.transaction_id = t.id
+       WHERE ti.product_id = ? AND t.payment_status = 'completed'
+       GROUP BY DATE(t.transaction_date)
+       ORDER BY day ASC`,
+      [p.id]
+    );
+    const allRows = [...salesRows, ...transactionRows];
+    // Calculate actual date range from data, minimum 365 days
+    let dataDays = 365;
+    if (allRows.length > 0) {
+      const dates = allRows.map(r => new Date(r.day)).filter(d => !isNaN(d.getTime()));
+      if (dates.length > 0) {
+        const minDate = new Date(Math.min(...dates));
+        const maxDate = new Date(Math.max(...dates));
+        const range = Math.round((maxDate - minDate) / (1000 * 60 * 60 * 24)) + 1;
+        dataDays = Math.max(range, 365);
+      }
+    }
+    const { series, startDate, endDate } = prepareTimeSeries(allRows, { days: dataDays });
     const sourceEndDate = endDate ? endDate.toISOString().slice(0, 10) : null;
 
     const rec = await generateStockRecommendation({
@@ -920,7 +941,7 @@ async function runWeeklyForecastJob(pool, options = {}) {
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         p.id,
-        'sales_history',
+        'sales_history+transactions',
         sourceEndDate,
         leadTime,
         windowSize,
@@ -941,7 +962,7 @@ async function runWeeklyForecastJob(pool, options = {}) {
     [jobKey, now, 'success', null]
   );
 
-  return { ok: true, source: 'sales_history', sourceEndDate: null, productsCount: (products || []).length };
+  return { ok: true, source: 'sales_history+transactions', sourceEndDate: null, productsCount: (products || []).length };
 }
 
 function startWeeklyForecastScheduler(pool, options = {}) {
