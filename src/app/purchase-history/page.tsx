@@ -42,7 +42,15 @@ export default function PurchaseHistoryPage() {
   const [fakturs, setFakturs] = useState<HistoryFaktur[]>([]);
   const [loading, setLoading] = useState(true);
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
-  
+  const [previewImageList, setPreviewImageList] = useState<string[]>([]);
+  const [previewImageIndex, setPreviewImageIndex] = useState(0);
+
+  const getImageUrls = (url: string | null): string[] => {
+    if (!url) return [];
+    try { const parsed = JSON.parse(url); return Array.isArray(parsed) ? parsed : [url]; }
+    catch { return [url]; }
+  };
+
   // Sorting and Filtering
   const [sortField, setSortField] = useState<keyof HistoryFaktur | 'total_price'>('created_at');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
@@ -344,7 +352,13 @@ export default function PurchaseHistoryPage() {
                       <td className="px-6 py-4 text-center">
                         {faktur.image_url ? (
                           <button 
-                            onClick={() => setPreviewImageUrl(`http://localhost:5000${faktur.image_url}`)}
+                            onClick={() => {
+                              const urls = getImageUrls(faktur.image_url)
+                                .map((u: string) => u.startsWith('http') ? u : `http://localhost:5000${u}`);
+                              setPreviewImageList(urls);
+                              setPreviewImageIndex(0);
+                              setPreviewImageUrl(urls[0]);
+                            }}
                             className="inline-flex items-center gap-1.5 px-3 py-1.5 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-md transition-colors text-xs font-medium"
                           >
                             <FileText size={14} />
@@ -368,26 +382,56 @@ export default function PurchaseHistoryPage() {
       {previewImageUrl && (
         <div 
           className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[9999] p-2 sm:p-4 md:p-8" 
-          onClick={() => setPreviewImageUrl(null)}
+          onClick={() => { setPreviewImageUrl(null); setPreviewImageList([]); }}
         >
           <div 
             className="bg-white rounded-2xl shadow-2xl w-full max-w-full sm:max-w-4xl max-h-full overflow-hidden flex flex-col" 
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex justify-between items-center px-6 py-4 border-b border-gray-100 shrink-0">
-              <h3 className="text-lg font-semibold text-gray-800">Bukti Faktur</h3>
+              <h3 className="text-lg font-semibold text-gray-800">
+                Bukti Faktur
+                {previewImageList.length > 1 && ` (${previewImageIndex + 1}/${previewImageList.length})`}
+              </h3>
               <button 
-                onClick={() => setPreviewImageUrl(null)} 
+                onClick={() => { setPreviewImageUrl(null); setPreviewImageList([]); }} 
                 className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-all"
               >
                 <div className="text-xl leading-none">&times;</div>
               </button>
             </div>
-            <div className="p-4 flex-1 overflow-auto bg-gray-50 flex items-center justify-center min-h-0">
+            <div className="p-4 flex-1 overflow-auto bg-gray-50 flex items-center justify-center min-h-0 relative">
+              {previewImageList.length > 1 && (
+                <>
+                  <button
+                    onClick={() => {
+                      const newIdx = previewImageIndex > 0 ? previewImageIndex - 1 : previewImageList.length - 1;
+                      setPreviewImageIndex(newIdx);
+                      setPreviewImageUrl(previewImageList[newIdx]);
+                    }}
+                    className="absolute left-4 top-1/2 -translate-y-1/2 p-2 bg-white/80 hover:bg-white rounded-full shadow-md z-10 transition-all"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+                  </button>
+                  <button
+                    onClick={() => {
+                      const newIdx = previewImageIndex < previewImageList.length - 1 ? previewImageIndex + 1 : 0;
+                      setPreviewImageIndex(newIdx);
+                      setPreviewImageUrl(previewImageList[newIdx]);
+                    }}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 p-2 bg-white/80 hover:bg-white rounded-full shadow-md z-10 transition-all"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+                  </button>
+                </>
+              )}
               <img 
                 src={previewImageUrl} 
                 alt="Bukti Faktur" 
                 className="max-w-full max-h-full object-contain rounded-lg shadow-sm" 
+                onError={(e) => {
+                  (e.target as HTMLImageElement).style.display = 'none';
+                }}
               />
             </div>
           </div>
