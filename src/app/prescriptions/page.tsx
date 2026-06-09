@@ -248,6 +248,18 @@ export default function PrescriptionsPage() {
     return subtotal + ppn - discount;
   }, [subtotal, ppn, discount]);
 
+  // Filtered Prescriptions
+  const filteredPrescriptions = useMemo(() => {
+    if (!searchQuery) return prescriptions;
+    const q = searchQuery.toLowerCase();
+    return prescriptions.filter(p => 
+      (p.prescription_code && p.prescription_code.toLowerCase().includes(q)) ||
+      (p.doctor_name && p.doctor_name.toLowerCase().includes(q)) ||
+      (p.instansi && p.instansi.toLowerCase().includes(q)) ||
+      (p.entered_by_name && p.entered_by_name.toLowerCase().includes(q))
+    );
+  }, [prescriptions, searchQuery]);
+
   // Filtered Products
   const filteredProducts = useMemo(() => {
     if (!productSearchQuery) return products;
@@ -759,7 +771,7 @@ export default function PrescriptionsPage() {
         <div className="bg-white rounded-xl shadow-sm overflow-hidden">
           <div className="p-4 flex flex-col md:flex-row justify-between items-center gap-4">
             <div className="text-sm text-gray-600 font-medium">
-              Menampilkan {prescriptions.length} Resep
+              Menampilkan {filteredPrescriptions.length} Resep
             </div>
             <div className="flex items-center gap-3 w-full md:w-auto">
               <div className="relative flex-1 md:w-64">
@@ -796,14 +808,14 @@ export default function PrescriptionsPage() {
                       Memuat resep...
                     </td>
                   </tr>
-                ) : prescriptions.length === 0 ? (
+                ) : filteredPrescriptions.length === 0 ? (
                   <tr>
                     <td colSpan={8} className="px-6 py-8 text-center text-gray-500">
                       Belum ada resep yang ditambahkan
                     </td>
                   </tr>
                 ) : (
-                  prescriptions.map((prescription) => (
+                  filteredPrescriptions.map((prescription) => (
                     <tr key={prescription.id} className="hover:bg-gray-50 transition-colors group">
                       <td className="px-6 py-4 font-medium text-gray-900">
                         {prescription.prescription_code || '-'}
