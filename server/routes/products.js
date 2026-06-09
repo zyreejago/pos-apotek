@@ -245,6 +245,45 @@ module.exports = function registerProductRoutes(app, pool, authenticate, checkPe
     }
   );
 
+  app.delete(
+    '/api/products/:id/permanent',
+    authenticate,
+    checkPermission('Management Product', 'delete'),
+    async (req, res) => {
+    const id = parseInt(req.params.id);
+
+    try {
+      const [rows] = await pool.query('SELECT id, name FROM products WHERE id = ?', [id]);
+      if (rows.length === 0) {
+        return res.status(404).json({ message: 'Produk tidak ditemukan' });
+      }
+
+      const productName = rows[0].name;
+
+      await pool.query('DELETE FROM products WHERE id = ?', [id]);
+
+      await createAuditTrail({
+        user_id: req.user.id,
+        username: req.user.username,
+        role: req.user.role,
+        module: 'Management Product',
+        action: 'delete_permanent',
+        description: `Menghapus permanen produk: ${productName}`,
+      });
+
+      res.json({ message: `Produk "${productName}" berhasil dihapus permanen` });
+    } catch (error) {
+      if (error && error.code === 'ER_ROW_IS_REFERENCED_2') {
+        return res.status(400).json({
+          message: 'Produk tidak dapat dihapus permanen karena masih memiliki riwayat transaksi. Nonaktifkan saja produk ini.'
+        });
+      }
+      console.error('Error permanently deleting product:', error);
+      res.status(500).json({ message: 'Server error' });
+    }
+    }
+  );
+
   app.post(
     '/api/inventory/adjust',
     authenticate,

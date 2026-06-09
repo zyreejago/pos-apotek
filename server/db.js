@@ -135,6 +135,9 @@ const initDB = async () => {
       await connection.query(`ALTER TABLE products ADD COLUMN is_active TINYINT(1) DEFAULT 1 AFTER product_category`);
     } catch (e) {}
     try {
+      await connection.query(`ALTER TABLE products ADD COLUMN deleted_at TIMESTAMP NULL DEFAULT NULL AFTER is_active`);
+    } catch (e) {}
+    try {
       await connection.query(`ALTER TABLE batches MODIFY COLUMN stock_type VARCHAR(50) DEFAULT 'belum_bayar'`);
     } catch (e) {}
     try {
