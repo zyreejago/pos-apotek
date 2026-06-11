@@ -33,6 +33,7 @@ interface CartItem extends Product {
 }
 
 interface PrescriptionData {
+  id?: number;
   label: string;
   prescription_code: string;
   doctor_name: string;
@@ -230,16 +231,50 @@ export default function POSTransactionsPage() {
     setShowPrescriptionForm(true);
   };
 
-  const savePrescription = () => {
+  const savePrescriptionToApi = async (data: PrescriptionData): Promise<number | undefined> => {
+    try {
+      const token = localStorage.getItem('token');
+      const userStr = localStorage.getItem('user');
+      const currentUser = userStr ? JSON.parse(userStr) : null;
+      const itemsPayload = data.items.map(i => ({ product_id: i.product.id, quantity: i.quantity, selling_price: i.product.selling_price }));
+
+      if (data.id) {
+        const res = await fetch(`http://localhost:5000/api/inventory/prescriptions/${data.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+          body: JSON.stringify({ ...prescriptionForm, entered_by: currentUser?.id, items: JSON.stringify(itemsPayload) }),
+        });
+        if (res.ok) return data.id;
+      } else {
+        const res = await fetch('http://localhost:5000/api/inventory/prescriptions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+          body: JSON.stringify({ ...prescriptionForm, entered_by: currentUser?.id, items: JSON.stringify(itemsPayload) }),
+        });
+        if (res.ok) {
+          const result = await res.json();
+          return result.data?.id;
+        }
+      }
+    } catch (error) {
+      console.error('Error saving prescription:', error);
+    }
+  };
+
+  const savePrescription = async () => {
     const label = editingPrescriptionIdx !== null
       ? prescriptions[editingPrescriptionIdx].label
       : `Resep ${prescriptions.length + 1}`;
 
     const data: PrescriptionData = {
+      id: editingPrescriptionIdx !== null ? prescriptions[editingPrescriptionIdx].id : undefined,
       label,
       ...prescriptionForm,
       items: prescriptionItems.map(i => ({ product: i.product, quantity: i.quantity })),
     };
+
+    const savedId = await savePrescriptionToApi(data);
+    if (savedId) data.id = savedId;
 
     if (editingPrescriptionIdx !== null) {
       setCart(prev => prev.filter(item => item.prescriptionLabel !== label));
@@ -273,9 +308,20 @@ export default function POSTransactionsPage() {
     setShowPrescriptionForm(false);
   };
 
-  const deletePrescription = (idx: number) => {
-    const label = prescriptions[idx].label;
-    setCart(prev => prev.filter(item => item.prescriptionLabel !== label));
+  const deletePrescription = async (idx: number) => {
+    const p = prescriptions[idx];
+    if (p.id) {
+      try {
+        const token = localStorage.getItem('token');
+        await fetch(`http://localhost:5000/api/inventory/prescriptions/${p.id}`, {
+          method: 'DELETE',
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+      } catch (error) {
+        console.error('Error deleting prescription:', error);
+      }
+    }
+    setCart(prev => prev.filter(item => item.prescriptionLabel !== p.label));
     setPrescriptions(prev => prev.filter((_, i) => i !== idx));
   };
 
