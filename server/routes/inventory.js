@@ -2,6 +2,21 @@
 const { createJournalEntry } = require('../utils/journal');
 
 function registerInventoryRoutes(app, pool, authenticate, checkPermission, upload, createAuditTrail) {
+  // Check if invoice number already exists
+  app.get('/api/inventory/batches/check-invoice/:invoiceNumber', authenticate, async (req, res) => {
+    try {
+      const { invoiceNumber } = req.params;
+      const [rows] = await pool.query(
+        'SELECT COUNT(*) as count FROM batches WHERE invoice_number = ?',
+        [invoiceNumber]
+      );
+      res.json({ success: true, exists: rows[0].count > 0 });
+    } catch (err) {
+      console.error('Error checking invoice:', err);
+      res.status(500).json({ success: false, message: 'Server error' });
+    }
+  });
+
   // Get all batches for a product with DP payments
   app.get('/api/inventory/batches/:productId', authenticate, async (req, res) => {
     try {

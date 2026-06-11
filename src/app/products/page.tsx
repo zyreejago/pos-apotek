@@ -232,6 +232,7 @@ export default function ProductsPage() {
   });
   const [fakturImageFiles, setFakturImageFiles] = useState<File[]>([]);
   const [fakturImagePreviews, setFakturImagePreviews] = useState<string[]>([]);
+  const [invoiceNumberError, setInvoiceNumberError] = useState<string>('');
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
   const [previewImageList, setPreviewImageList] = useState<string[]>([]);
   const [previewImageIndex, setPreviewImageIndex] = useState(0);
@@ -1114,11 +1115,33 @@ export default function ProductsPage() {
     setMultipleProducts([]);
   };
 
+  const checkInvoiceNumber = async (value: string) => {
+    if (!value.trim()) { setInvoiceNumberError(''); return; }
+    const trimmed = value.trim();
+
+    const existsInLocal = pendingFakturs.some(f => f.invoice_number === trimmed);
+    if (existsInLocal) { setInvoiceNumberError('No. Faktur sudah digunakan'); return; }
+
+    try {
+      const res = await fetch(`http://localhost:5000/api/inventory/batches/check-invoice/${encodeURIComponent(trimmed)}`, {
+        headers: authHeaders
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setInvoiceNumberError(data.exists ? 'No. Faktur sudah digunakan' : '');
+      }
+    } catch { setInvoiceNumberError(''); }
+  };
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData(prev => {
       let updated = { ...prev, [name]: value };
       
+      if (name === 'invoice_number') {
+        checkInvoiceNumber(value);
+      }
+
       // Auto-fill fields if name matches existing product
       if (name === 'name') {
         const matchedProduct = allProducts.find(
@@ -1166,6 +1189,13 @@ export default function ProductsPage() {
             description: "Anda tidak memiliki izin untuk mengubah data produk."
         });
         return;
+    }
+
+    if (productOffCanvasMode === 'add' && formData.invoice_number && invoiceNumberError) {
+      goeyToast.error('No. Faktur sudah digunakan', {
+        description: 'Silakan gunakan nomor faktur yang berbeda.'
+      });
+      return;
     }
 
     if (productOffCanvasMode === 'edit' && selectedProduct) {
@@ -1301,6 +1331,9 @@ export default function ProductsPage() {
                   description: `Faktur untuk ${item.name} memerlukan persetujuan karena nominal > Rp 2.000.000.`
                 });
               }
+            } else {
+              const errData = await res.json().catch(() => ({}));
+              throw new Error(errData.message || `Gagal menyimpan faktur (${res.status})`);
             }
           }
         };
@@ -1321,9 +1354,9 @@ export default function ProductsPage() {
         handleCloseProductOffCanvas();
         fetchProducts();
         goeyToast.success('Produk berhasil disimpan');
-      } catch (error) {
+      } catch (error: any) {
         console.error('Error adding product:', error);
-        goeyToast.error('Gagal menambahkan produk');
+        goeyToast.error(error.message || 'Gagal menambahkan produk');
       }
     }
   };
@@ -1658,9 +1691,16 @@ export default function ProductsPage() {
                       required
                       value={formData.invoice_number ?? ''}
                       onChange={handleInputChange}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                      className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 transition-colors ${
+                        invoiceNumberError
+                          ? 'border-red-400 focus:ring-red-500/20 focus:border-red-500'
+                          : 'border-gray-300 focus:ring-blue-500/20 focus:border-blue-500'
+                      }`}
                       placeholder="Masukkan nomor faktur"
                     />
+                    {invoiceNumberError && (
+                      <p className="text-red-500 text-xs mt-1">{invoiceNumberError}</p>
+                    )}
                   </div>
                   {!isMultipleProducts && (
                     <div>
