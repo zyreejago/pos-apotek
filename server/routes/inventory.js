@@ -158,7 +158,8 @@ function registerInventoryRoutes(app, pool, authenticate, checkPermission, uploa
   app.get('/api/inventory/history', authenticate, checkPermission('Riwayat Pembelian', 'show'), async (req, res) => {
     try {
       const [rows] = await pool.query(`
-        SELECT b.*, s.name as supplier_name, p.name as product_name
+        SELECT b.*, s.name as supplier_name, p.name as product_name,
+          COALESCE((SELECT SUM(qty_returned) FROM purchase_return_items WHERE batch_id = b.id), 0) as return_qty
         FROM batches b 
         LEFT JOIN suppliers s ON b.supplier_id = s.id 
         LEFT JOIN products p ON b.product_id = p.id

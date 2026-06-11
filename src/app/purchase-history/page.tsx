@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Search, FileText, Info, Package, Users, Calendar, ArrowUpDown, Filter } from 'lucide-react';
+import { Search, FileText, Package, Filter } from 'lucide-react';
 import { goeyToast } from "@/components/ui/goey-toaster";
 import PageHeader from '@/components/PageHeader';
 import { useRequirePermission } from '@/hooks/useRequirePermission';
@@ -10,6 +10,7 @@ interface DpPayment {
   id: number;
   amount: number;
   payment_date: string;
+  payment_method?: string | null;
   notes?: string | null;
   created_at: string;
 }
@@ -34,16 +35,19 @@ interface HistoryFaktur {
   is_archived: number;
   notes: string | null;
   created_at: string;
+  return_qty?: number;
   dp_payments?: DpPayment[];
 }
 
 export default function PurchaseHistoryPage() {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { checkActionPermission } = useRequirePermission('Riwayat Pembelian');
   const [fakturs, setFakturs] = useState<HistoryFaktur[]>([]);
   const [loading, setLoading] = useState(true);
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
   const [previewImageList, setPreviewImageList] = useState<string[]>([]);
   const [previewImageIndex, setPreviewImageIndex] = useState(0);
+  const [expandedFaktur, setExpandedFaktur] = useState<string | null>(null);
 
   const getImageUrls = (url: string | null): string[] => {
     if (!url) return [];
@@ -52,8 +56,8 @@ export default function PurchaseHistoryPage() {
   };
 
   // Sorting and Filtering
-  const [sortField, setSortField] = useState<keyof HistoryFaktur | 'total_price'>('created_at');
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+  const [sortField] = useState<keyof HistoryFaktur | 'total_price'>('created_at');
+  const [sortDirection] = useState<'asc' | 'desc'>('desc');
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
 
@@ -85,23 +89,6 @@ export default function PurchaseHistoryPage() {
   useEffect(() => {
     fetchHistory();
   }, [fetchHistory]);
-
-  const handleSort = (field: keyof HistoryFaktur | 'total_price') => {
-    if (sortField === field) {
-      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortField(field);
-      const defaultDirection: Record<string, 'asc' | 'desc'> = {
-        created_at: 'desc',
-        purchase_date: 'desc',
-        due_date: 'desc',
-        total_price: 'asc',
-        cost_price: 'asc',
-        initial_quantity: 'asc'
-      };
-      setSortDirection(defaultDirection[field] || 'asc');
-    }
-  };
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('id-ID', {
@@ -137,9 +124,10 @@ export default function PurchaseHistoryPage() {
     }
 
     // Sort
-    result.sort((a, b) => {
-      let valA: any;
-      let valB: any;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    result.sort((a: any, b: any) => {
+      let valA;
+      let valB;
 
       if (sortField === 'total_price') {
         valA = a.cost_price * a.initial_quantity;
@@ -168,18 +156,6 @@ export default function PurchaseHistoryPage() {
 
     return result;
   }, [fakturs, searchQuery, sortField, sortDirection, statusFilter]);
-
-  const SortableHeader = ({ field, label }: { field: keyof HistoryFaktur | 'total_price', label: string }) => (
-    <th 
-      className="px-6 py-4 text-left cursor-pointer hover:bg-gray-100 transition-colors select-none"
-      onClick={() => handleSort(field)}
-    >
-      <div className="flex items-center gap-2">
-        <span>{label}</span>
-        <ArrowUpDown size={14} className={`text-gray-400 ${sortField === field ? 'text-blue-500' : ''}`} />
-      </div>
-    </th>
-  );
 
   return (
     <div className="bg-gray-50 min-h-screen">
@@ -225,215 +201,207 @@ export default function PurchaseHistoryPage() {
             </div>
           </div>
 
-          {/* Table */}
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm text-left">
-              <thead className="text-xs text-gray-500 uppercase bg-gray-50 border-b border-gray-100">
-                <tr>
-                  <SortableHeader field="created_at" label="Tanggal" />
-                  <SortableHeader field="product_name" label="Produk" />
-                  <SortableHeader field="supplier_name" label="Supplier" />
-                  <th className="px-3 sm:px-6 py-4">Stok</th>
-                  <SortableHeader field="total_price" label="Total Harga" />
-                  <th className="px-3 sm:px-6 py-4">DP & Hutang</th>
-                  <SortableHeader field="status" label="Status" />
-                  <th className="px-6 py-4 text-center">Bukti</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {loading ? (
-                  <tr>
-                    <td colSpan={8} className="px-6 py-8 text-center text-gray-500">
-                      Loading riwayat pembelian...
-                    </td>
-                  </tr>
-                ) : filteredAndSortedFakturs.length === 0 ? (
-                  <tr>
-                    <td colSpan={8} className="px-6 py-12 text-center text-gray-500">
-                      <div className="flex flex-col items-center justify-center">
-                        <Package size={32} className="text-gray-300 mb-3" />
-                        <p>Tidak ada riwayat pembelian yang ditemukan.</p>
-                      </div>
-                    </td>
-                  </tr>
-                ) : (
-                  filteredAndSortedFakturs.map((faktur) => {
-                    const soldQty = faktur.initial_quantity - faktur.remaining_quantity;
-                    let dpList: DpPayment[] = [];
-                    if (faktur.dp_payments && faktur.dp_payments.length > 0) {
-                      dpList = faktur.dp_payments;
-                    } else if (faktur.dp_amount) {
-                      dpList = [{ id: -1, amount: faktur.dp_amount, payment_date: faktur.purchase_date || '', created_at: faktur.created_at }];
-                    }
-                    const totalAmount = faktur.cost_price * faktur.initial_quantity;
-                    const totalDp = dpList.reduce((sum, dp) => sum + Number(dp.amount), 0);
-                    const remainingDebt = totalAmount - totalDp;
+          {/* Faktur List */}
+          <div className="p-4">
+            {loading ? (
+              <div className="text-center py-12 text-gray-500">Loading riwayat pembelian...</div>
+            ) : filteredAndSortedFakturs.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 text-gray-500">
+                <Package size={32} className="text-gray-300 mb-3" />
+                <p>Tidak ada riwayat pembelian yang ditemukan.</p>
+              </div>
+            ) : (() => {
+              const grouped: Record<string, HistoryFaktur[]> = {};
+              for (const f of filteredAndSortedFakturs) {
+                const key = f.batch_number || '__NO_INVOICE__';
+                if (!grouped[key]) grouped[key] = [];
+                grouped[key].push(f);
+              }
 
-                    return (
-                    <tr key={faktur.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="font-medium text-gray-900">
-                          {new Date(faktur.created_at).toLocaleDateString('id-ID')}
-                        </div>
-                        <div className="text-xs text-gray-500 mt-1">
-                          {faktur.is_archived ? (
-                            <span className="text-red-500 font-medium border border-red-200 bg-red-50 px-1.5 py-0.5 rounded">Diarsipkan</span>
-                          ) : 'Aktif'}
-                        </div>
-                      </td>
-                      <td className="px-3 sm:px-6 py-4">
-                        <div className="font-medium text-gray-900">{faktur.product_name}</div>
-                        <div className="text-xs text-gray-500 mt-1">Batch: {faktur.batch_number || '-'}</div>
-                        {faktur.expired_date && (
-                          <div className="text-xs text-orange-600 mt-1">
-                            Exp: {new Date(faktur.expired_date).toLocaleDateString('id-ID')}
+              const renderBatchRow = (batch: HistoryFaktur) => {
+                const soldQty = batch.initial_quantity - batch.remaining_quantity - (batch.return_qty || 0);
+                let dpList: DpPayment[] = [];
+                if (batch.dp_payments && batch.dp_payments.length > 0) {
+                  dpList = batch.dp_payments;
+                } else if (batch.dp_amount) {
+                  dpList = [{ id: -1, amount: batch.dp_amount, payment_date: batch.purchase_date || '', payment_method: 'cash', created_at: batch.created_at }];
+                }
+                const totalAmount = batch.cost_price * batch.initial_quantity;
+                const totalDp = dpList.reduce((sum, dp) => sum + Number(dp.amount), 0);
+                const remainingDebt = totalAmount - totalDp;
+
+                return (
+                  <div key={batch.id} className="border border-gray-200 bg-white p-3 rounded-lg text-xs">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="font-semibold text-gray-900 truncate">{batch.product_name}</span>
+                        <span className="text-gray-400 shrink-0">#{batch.batch_number || '-'}</span>
+                      </div>
+                      <span className={`shrink-0 px-2 py-0.5 text-[10px] font-medium rounded-full ${
+                        batch.status === 'approved' ? 'bg-green-100 text-green-700' : 
+                        batch.status === 'pending' ? 'bg-yellow-100 text-yellow-700' : 
+                        batch.status === 'rejected' ? 'bg-red-100 text-red-700' : 
+                        'bg-orange-100 text-orange-700'
+                      }`}>
+                        {batch.status === 'approved' ? 'Disetujui' : 
+                         batch.status === 'pending' ? 'Menunggu' : 
+                         batch.status === 'rejected' ? 'Ditolak' : 'Revisi'}
+                      </span>
+                    </div>
+
+                    <div className="flex flex-wrap gap-x-4 gap-y-1 text-gray-600 mb-1.5">
+                      {batch.purchase_date && <span>Pembelian: <strong>{new Date(batch.purchase_date).toLocaleDateString('id-ID')}</strong></span>}
+                      {batch.expired_date && <span>Exp: <strong>{new Date(batch.expired_date).toLocaleDateString('id-ID')}</strong></span>}
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-3 text-gray-600">
+                      <span>Stok Awal: <strong>{batch.initial_quantity}</strong></span>
+                      <span className="text-gray-300">|</span>
+                      <span>Sisa: <strong>{batch.remaining_quantity}</strong></span>
+                      <span className="text-gray-300">|</span>
+                      <span className={soldQty > 0 ? 'text-blue-600' : ''}>Terjual: <strong>{soldQty}</strong></span>
+                      {(batch.return_qty || 0) > 0 && <>
+                        <span className="text-gray-300">|</span>
+                        <span className="text-red-600">Retur: <strong>{batch.return_qty}</strong></span>
+                      </>}
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-3 mt-1 text-gray-600">
+                      <span>Harga: <strong className="text-blue-600">{formatCurrency(totalAmount)}</strong></span>
+                      <span className="text-gray-300">|</span>
+                      <span>@ {formatCurrency(batch.cost_price)} / pcs</span>
+                    </div>
+
+                    {dpList.length > 0 && (
+                      <div className="border-t border-gray-100 pt-1.5 mt-2 space-y-0.5">
+                        {dpList.map((dp, idx) => (
+                          <div key={dp.id} className="flex items-center gap-1.5 text-gray-600">
+                            <span className="font-medium text-yellow-600">DP {idx + 1}:</span>
+                            <span className={`text-[10px] px-1 py-0.5 rounded font-medium ${dp.payment_method === 'transfer' ? 'bg-purple-100 text-purple-700' : 'bg-green-100 text-green-700'}`}>
+                              {dp.payment_method === 'transfer' ? 'TF' : 'Cash'}
+                            </span>
+                            <span className="text-blue-600 font-semibold">{formatCurrency(dp.amount)}</span>
+                            {dp.payment_date && <span className="text-gray-400">({new Date(dp.payment_date).toLocaleDateString('id-ID')})</span>}
                           </div>
-                        )}
-                      </td>
-                      <td className="px-3 sm:px-6 py-4">
-                        <div className="text-gray-700">{faktur.supplier_name || '-'}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-800">
-                          {faktur.remaining_quantity} / {faktur.initial_quantity}
-                        </div>
-                        <div className="text-xs text-gray-500 mt-1">
-                          Sisa / Awal
-                          {soldQty > 0 && <span className="text-blue-600 ml-2">({soldQty} terjual)</span>}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="font-bold text-blue-600">
-                          {formatCurrency(totalAmount)}
-                        </div>
-                        <div className="text-xs text-gray-500 mt-1">
-                          {faktur.initial_quantity} pcs @ {formatCurrency(faktur.cost_price)}
-                        </div>
-                      </td>
-                      <td className="px-3 sm:px-6 py-4">
-                        {dpList.length > 0 ? (
-                          <div className="space-y-1">
-                            {dpList.map((dp, idx) => (
-                              <div key={dp.id} className="text-xs">
-                                <span className="font-medium text-gray-700">DP {idx + 1}:</span>
-                                <span className="text-blue-600 font-semibold ml-1">{formatCurrency(dp.amount)}</span>
-                                {dp.payment_date && (
-                                  <span className="text-gray-400 ml-2">({new Date(dp.payment_date).toLocaleDateString('id-ID')})</span>
-                                )}
-                              </div>
-                            ))}
-                            {remainingDebt > 0 ? (
-                              <div className="text-xs text-orange-600 font-medium mt-1">
-                                Sisa hutang: {formatCurrency(remainingDebt)}
-                              </div>
-                            ) : remainingDebt <= 0 && totalDp > 0 ? (
-                              <div className="text-xs text-green-600 font-medium mt-1">
-                                Lunas
-                              </div>
-                            ) : null}
-                          </div>
-                        ) : (
-                          <span className="text-xs text-gray-400 italic">{faktur.stock_type === 'lunas' ? 'Lunas' : faktur.stock_type === 'retur' ? 'Retur' : '-'}</span>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-2.5 py-1 text-xs font-medium rounded-full ${
-                          faktur.status === 'approved' ? 'bg-green-100 text-green-700' : 
-                          faktur.status === 'pending' ? 'bg-yellow-100 text-yellow-700' : 
-                          faktur.status === 'rejected' ? 'bg-red-100 text-red-700' : 
-                          'bg-orange-100 text-orange-700'
-                        }`}>
-                          {faktur.status === 'approved' ? 'Disetujui' : 
-                           faktur.status === 'pending' ? 'Menunggu' : 
-                           faktur.status === 'rejected' ? 'Ditolak' : 
-                           'Revisi'}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-center">
-                        {faktur.image_url ? (
-                          <button 
-                            onClick={() => {
-                              const urls = getImageUrls(faktur.image_url)
-                                .map((u: string) => u.startsWith('http') ? u : `http://localhost:5000${u}`);
-                              setPreviewImageList(urls);
-                              setPreviewImageIndex(0);
-                              setPreviewImageUrl(urls[0]);
-                            }}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-md transition-colors text-xs font-medium"
-                          >
-                            <FileText size={14} />
-                            Lihat
-                          </button>
-                        ) : (
-                          <span className="text-xs text-gray-400 italic">Tidak ada</span>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                  })
-                )}
-              </tbody>
-            </table>
+                        ))}
+                        {remainingDebt > 0 ? (
+                          <div className="text-orange-600 font-medium">Sisa hutang: {formatCurrency(remainingDebt)}</div>
+                        ) : remainingDebt <= 0 && totalDp > 0 ? (
+                          <div className="text-green-600 font-medium">Lunas ✓</div>
+                        ) : null}
+                      </div>
+                    )}
+
+                    <div className="flex items-center gap-3 mt-2">
+                      {batch.is_archived ? (
+                        <span className="text-red-500 font-medium border border-red-200 bg-red-50 px-1.5 py-0.5 rounded">Diarsipkan</span>
+                      ) : (
+                        <span className="text-green-600 font-medium">Aktif</span>
+                      )}
+                    </div>
+
+                    {batch.image_url && (
+                      <div className="mt-2">
+                        <img src={(() => { const urls = getImageUrls(batch.image_url); return urls[0]?.startsWith('http') ? urls[0] : `http://localhost:5000${urls[0]}`; })()}
+                          alt="Bukti" className="h-16 w-auto object-cover rounded border cursor-pointer hover:opacity-80 transition-opacity"
+                          onClick={() => {
+                            const urls = getImageUrls(batch.image_url).map((u: string) => u.startsWith('http') ? u : `http://localhost:5000${u}`);
+                            setPreviewImageList(urls);
+                            setPreviewImageIndex(0);
+                            setPreviewImageUrl(urls[0]);
+                          }} />
+                      </div>
+                    )}
+                  </div>
+                );
+              };
+
+              const renderFakturCard = (invoiceNumber: string, items: HistoryFaktur[]) => {
+                const totalQty = items.reduce((s, b) => s + Number(b.initial_quantity), 0);
+                const totalCost = items.reduce((s, b) => s + Number(b.cost_price) * Number(b.initial_quantity), 0);
+                const statusCounts: Record<string, number> = {};
+                items.forEach(b => { statusCounts[b.status] = (statusCounts[b.status] || 0) + 1; });
+                const isExpanded = expandedFaktur === invoiceNumber;
+                const displayLabel = invoiceNumber === '__NO_INVOICE__' ? 'Tanpa No. Batch' : invoiceNumber;
+                const supplierName = items[0]?.supplier_name || '-';
+                const firstDate = items.reduce((latest, b) => b.created_at > latest ? b.created_at : latest, items[0]?.created_at || '');
+
+                return (
+                  <div key={invoiceNumber} className="border border-purple-200 rounded-xl overflow-hidden">
+                    <button onClick={() => setExpandedFaktur(isExpanded ? null : invoiceNumber)}
+                      className="w-full flex items-center gap-3 p-4 bg-purple-50 hover:bg-purple-100 transition-colors text-left">
+                      <FileText size={18} className="text-purple-600 shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-sm text-gray-800">{displayLabel}</p>
+                        <p className="text-xs text-gray-500">{supplierName} · {items.length} produk · {totalQty} pcs · {formatCurrency(totalCost)}</p>
+                      </div>
+                      <div className="text-[10px] text-gray-400 shrink-0">{new Date(firstDate).toLocaleDateString('id-ID')}</div>
+                      <div className="flex gap-1 shrink-0">
+                        {Object.entries(statusCounts).map(([s, c]) => (
+                          <span key={s} className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
+                            s === 'approved' ? 'bg-green-100 text-green-700' :
+                            s === 'pending' ? 'bg-yellow-100 text-yellow-700' :
+                            s === 'rejected' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-700'
+                          }`}>{c} {s === 'approved' ? '✓' : s === 'pending' ? '⏳' : s === 'rejected' ? '✗' : '?'}</span>
+                        ))}
+                      </div>
+                      <svg className={`w-4 h-4 text-purple-600 transition-transform ${isExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                    </button>
+                    {isExpanded && (
+                      <div className="p-3 space-y-2 bg-white border-t border-purple-100">
+                        {items.map(renderBatchRow)}
+                      </div>
+                    )}
+                  </div>
+                );
+              };
+
+              const fakturKeys = Object.keys(grouped);
+              const hasInvoiceSection = fakturKeys.some(k => k !== '__NO_INVOICE__');
+              const noInvoiceItems = grouped['__NO_INVOICE__'] || [];
+
+              return (
+                <div className="space-y-3">
+                  {fakturKeys.filter(k => k !== '__NO_INVOICE__').sort().map(k => renderFakturCard(k, grouped[k]))}
+                  {hasInvoiceSection && noInvoiceItems.length > 0 && <hr className="my-2" />}
+                  {noInvoiceItems.length > 0 && renderFakturCard('__NO_INVOICE__', noInvoiceItems)}
+                </div>
+              );
+            })()}
           </div>
         </div>
       </div>
 
       {/* Image Preview Modal */}
-      {previewImageUrl && (
-        <div 
-          className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[9999] p-2 sm:p-4 md:p-8" 
-          onClick={() => { setPreviewImageUrl(null); setPreviewImageList([]); }}
-        >
-          <div 
-            className="bg-white rounded-2xl shadow-2xl w-full max-w-full sm:max-w-4xl max-h-full overflow-hidden flex flex-col" 
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex justify-between items-center px-6 py-4 border-b border-gray-100 shrink-0">
-              <h3 className="text-lg font-semibold text-gray-800">
-                Bukti Faktur
-                {previewImageList.length > 1 && ` (${previewImageIndex + 1}/${previewImageList.length})`}
-              </h3>
-              <button 
-                onClick={() => { setPreviewImageUrl(null); setPreviewImageList([]); }} 
-                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-all"
-              >
-                <div className="text-xl leading-none">&times;</div>
-              </button>
-            </div>
-            <div className="p-4 flex-1 overflow-auto bg-gray-50 flex items-center justify-center min-h-0 relative">
-              {previewImageList.length > 1 && (
-                <>
-                  <button
-                    onClick={() => {
-                      const newIdx = previewImageIndex > 0 ? previewImageIndex - 1 : previewImageList.length - 1;
-                      setPreviewImageIndex(newIdx);
-                      setPreviewImageUrl(previewImageList[newIdx]);
-                    }}
-                    className="absolute left-4 top-1/2 -translate-y-1/2 p-2 bg-white/80 hover:bg-white rounded-full shadow-md z-10 transition-all"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
-                  </button>
-                  <button
-                    onClick={() => {
-                      const newIdx = previewImageIndex < previewImageList.length - 1 ? previewImageIndex + 1 : 0;
-                      setPreviewImageIndex(newIdx);
-                      setPreviewImageUrl(previewImageList[newIdx]);
-                    }}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 p-2 bg-white/80 hover:bg-white rounded-full shadow-md z-10 transition-all"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-                  </button>
-                </>
-              )}
-              <img 
-                src={previewImageUrl} 
-                alt="Bukti Faktur" 
-                className="max-w-full max-h-full object-contain rounded-lg shadow-sm" 
-                onError={(e) => {
-                  (e.target as HTMLImageElement).style.display = 'none';
-                }}
-              />
-            </div>
+      {previewImageList.length > 0 && previewImageUrl && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => { setPreviewImageUrl(null); setPreviewImageList([]); }}>
+          <div className="relative max-w-2xl w-full max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
+            <button onClick={() => { setPreviewImageUrl(null); setPreviewImageList([]); }}
+              className="absolute -top-3 -right-3 w-8 h-8 bg-white rounded-full shadow-lg flex items-center justify-center hover:bg-gray-100 z-10">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
+            {previewImageList.length > 1 && (
+              <>
+                <button onClick={() => {
+                  const newIdx = previewImageIndex > 0 ? previewImageIndex - 1 : previewImageList.length - 1;
+                  setPreviewImageIndex(newIdx);
+                  setPreviewImageUrl(previewImageList[newIdx]);
+                }} className="absolute left-2 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/80 hover:bg-white rounded-full shadow-lg flex items-center justify-center z-10">
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+                </button>
+                <button onClick={() => {
+                  const newIdx = previewImageIndex < previewImageList.length - 1 ? previewImageIndex + 1 : 0;
+                  setPreviewImageIndex(newIdx);
+                  setPreviewImageUrl(previewImageList[newIdx]);
+                }} className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/80 hover:bg-white rounded-full shadow-lg flex items-center justify-center z-10">
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                </button>
+                <div className="absolute bottom-3 left-1/2 -translate-x-1/2 bg-black/50 text-white text-xs px-2 py-1 rounded-full">
+                  {previewImageIndex + 1} / {previewImageList.length}
+                </div>
+              </>
+            )}
+            <img src={previewImageUrl} alt="Bukti Faktur" className="w-full h-auto max-h-[85vh] object-contain rounded-xl shadow-2xl" />
           </div>
         </div>
       )}
