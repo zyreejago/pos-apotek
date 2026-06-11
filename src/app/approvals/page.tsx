@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Check, X, AlertCircle, FileText, Info, Package, Users, Calendar, Trash2 } from 'lucide-react';
+import { Check, X, AlertCircle, FileText, Trash2 } from 'lucide-react';
 import { goeyToast } from "@/components/ui/goey-toaster";
 import PageHeader from '@/components/PageHeader';
 import { useRequirePermission } from '@/hooks/useRequirePermission';
@@ -15,6 +15,7 @@ interface PendingFaktur {
   product_purchase_unit: string;
   product_unit_multiplier: number;
   batch_number: string | null;
+  invoice_number?: string | null;
   supplier_id: number | null;
   supplier_name: string | null;
   purchase_date: string | null;
@@ -34,10 +35,11 @@ export default function ApprovalsPage() {
   const [pendingFakturs, setPendingFakturs] = useState<PendingFaktur[]>([]);
   const [loading, setLoading] = useState(true);
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
-  
+  const [expandedInvoice, setExpandedInvoice] = useState<string | null>(null);
+
   // Revision Modal States
   const [isRevisionModalOpen, setIsRevisionModalOpen] = useState(false);
-  const [revisionFakturId, setRevisionFakturId] = useState<number | null>(null);
+  const [revisionInvoice, setRevisionInvoice] = useState<string | null>(null);
   const [revisionNotes, setRevisionNotes] = useState('');
   const [isSubmittingRevision, setIsSubmittingRevision] = useState(false);
 
@@ -68,94 +70,79 @@ export default function ApprovalsPage() {
     fetchPendingFakturs();
   }, [fetchPendingFakturs]);
 
-  const handleApprove = async (id: number) => {
+  const handleApprove = async (items: PendingFaktur[]) => {
     try {
-      const res = await fetch(`http://localhost:5000/api/inventory/batches/${id}/approve`, {
-        method: 'PUT',
-        headers: authHeaders
-      });
-      if (res.ok) {
-        goeyToast.success('Faktur disetujui');
-        fetchPendingFakturs();
-      } else {
-        goeyToast.error('Gagal menyetujui faktur');
+      for (const item of items) {
+        await fetch(`http://localhost:5000/api/inventory/batches/${item.id}/approve`, {
+          method: 'PUT', headers: authHeaders
+        });
       }
+      goeyToast.success(`${items.length} faktur disetujui`);
+      fetchPendingFakturs();
     } catch (error) {
       console.error(error);
       goeyToast.error('Terjadi kesalahan');
     }
   };
 
-  const handleReject = async (id: number) => {
+  const handleReject = async (items: PendingFaktur[]) => {
     try {
-      const res = await fetch(`http://localhost:5000/api/inventory/batches/${id}/reject`, {
-        method: 'PUT',
-        headers: authHeaders
-      });
-      if (res.ok) {
-        goeyToast.success('Faktur ditolak');
-        fetchPendingFakturs();
-      } else {
-        goeyToast.error('Gagal menolak faktur');
+      for (const item of items) {
+        await fetch(`http://localhost:5000/api/inventory/batches/${item.id}/reject`, {
+          method: 'PUT', headers: authHeaders
+        });
       }
+      goeyToast.success(`${items.length} faktur ditolak`);
+      fetchPendingFakturs();
     } catch (error) {
       console.error(error);
       goeyToast.error('Terjadi kesalahan');
     }
   };
 
-  const handleDelete = async (id: number) => {
-    if (!window.confirm('Apakah Anda yakin ingin menghapus faktur ini? Tindakan ini tidak dapat dibatalkan.')) {
-      return;
-    }
+  const handleDelete = async (items: PendingFaktur[]) => {
+    const label = items[0]?.invoice_number || items[0]?.batch_number || 'ini';
+    if (!window.confirm(`Hapus semua batch pada faktur ${label}?`)) return;
     try {
-      const res = await fetch(`http://localhost:5000/api/inventory/batches/${id}`, {
-        method: 'DELETE',
-        headers: authHeaders
-      });
-      if (res.ok) {
-        goeyToast.success('Faktur berhasil dihapus');
-        fetchPendingFakturs();
-      } else {
-        const data = await res.json();
-        goeyToast.error(data.message || 'Gagal menghapus faktur');
+      for (const item of items) {
+        await fetch(`http://localhost:5000/api/inventory/batches/${item.id}`, {
+          method: 'DELETE', headers: authHeaders
+        });
       }
+      goeyToast.success('Faktur berhasil dihapus');
+      fetchPendingFakturs();
     } catch (error) {
       console.error(error);
-      goeyToast.error('Terjadi kesalahan saat menghapus faktur');
+      goeyToast.error('Terjadi kesalahan');
     }
   };
 
-  const handleRevision = (id: number) => {
-    setRevisionFakturId(id);
+  const handleRevision = (invoiceKey: string) => {
+    setRevisionInvoice(invoiceKey);
     setRevisionNotes('');
     setIsRevisionModalOpen(true);
   };
 
   const submitRevision = async () => {
-    if (!revisionFakturId) return;
+    if (!revisionInvoice) return;
     if (!revisionNotes.trim()) {
       goeyToast.error('Catatan perbaikan harus diisi');
       return;
     }
 
+    const items = pendingFakturs.filter(f => (f.invoice_number || '__NO_INVOICE__') === revisionInvoice);
     setIsSubmittingRevision(true);
     try {
-      const res = await fetch(`http://localhost:5000/api/inventory/batches/${revisionFakturId}/revision`, {
-        method: 'PUT',
-        headers: {
-          ...authHeaders,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ notes: revisionNotes })
-      });
-      if (res.ok) {
-        goeyToast.success('Permintaan perbaikan dikirim');
-        setIsRevisionModalOpen(false);
-        fetchPendingFakturs();
-      } else {
-        goeyToast.error('Gagal mengirim permintaan perbaikan');
+      for (const item of items) {
+        await fetch(`http://localhost:5000/api/inventory/batches/${item.id}/revision`, {
+          method: 'PUT',
+          headers: { ...authHeaders, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ notes: revisionNotes })
+        });
       }
+      goeyToast.success('Permintaan perbaikan dikirim');
+      setIsRevisionModalOpen(false);
+      fetchPendingFakturs();
     } catch (error) {
       console.error(error);
       goeyToast.error('Terjadi kesalahan');
@@ -194,141 +181,126 @@ export default function ApprovalsPage() {
             <p className="text-gray-500">Tidak ada faktur yang menunggu persetujuan saat ini.</p>
           </div>
         ) : (
-          <div className="grid gap-6">
-            {pendingFakturs.map((faktur) => (
-              <div key={faktur.id} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow relative">
-                {faktur.status === 'rejected' && (
-                  <button 
-                    onClick={() => handleDelete(faktur.id)}
-                    className="absolute top-4 right-4 p-2 text-red-500 hover:text-white bg-red-50 hover:bg-red-600 rounded-lg border border-red-200 hover:border-red-600 transition-all shadow-sm hover:scale-105 duration-200 z-10"
-                    title="Hapus Faktur Ditolak"
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                )}
-                <div className="p-6">
-                  <div className="flex flex-col lg:flex-row justify-between gap-6">
-                    {/* Left: Product & Supplier Info */}
-                    <div className="flex-1 space-y-4">
-                      <div className="flex items-start gap-4">
-                        <div className="bg-blue-50 p-3 rounded-xl text-blue-600 shrink-0">
-                          <Package size={24} />
-                        </div>
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2">
-                            <h3 className="text-lg font-bold text-gray-900">{faktur.product_name}</h3>
-                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider border ${
-                              faktur.status === 'pending' 
-                                ? 'bg-yellow-100 text-yellow-700 border-yellow-200 animate-pulse' 
-                                : faktur.status === 'rejected'
-                                ? 'bg-red-100 text-red-700 border-red-200'
-                                : 'bg-orange-100 text-orange-700 border-orange-200'
-                            }`}>
-                              {faktur.status === 'pending' 
-                                ? 'Pending Approval' 
-                                : faktur.status === 'rejected'
-                                ? 'Ditolak'
-                                : 'Menunggu Perbaikan'}
-                            </span>
-                            {faktur.product_status === 'pending' && (
-                              <span className="bg-purple-100 text-purple-700 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase">
-                                Produk Baru
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm text-left">
+                <thead className="text-xs text-gray-500 uppercase bg-gray-50 border-b border-gray-100">
+                  <tr>
+                    <th className="px-4 py-3">No. Faktur</th>
+                    <th className="px-4 py-3">Supplier</th>
+                    <th className="px-4 py-3">Tanggal</th>
+                    <th className="px-4 py-3">Qty</th>
+                    <th className="px-4 py-3">Total</th>
+                    <th className="px-4 py-3">Status</th>
+                    <th className="px-4 py-3">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {(() => {
+                    const grouped: Record<string, PendingFaktur[]> = {};
+                    for (const f of pendingFakturs) {
+                      const key = f.invoice_number || `__BATCH_${f.batch_number || f.id}`;
+                      if (!grouped[key]) grouped[key] = [];
+                      grouped[key].push(f);
+                    }
+
+                    const formatIDR = (v: number) => formatCurrency(v);
+                    const formatDate = (d: string) => new Date(d).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
+
+                    return Object.entries(grouped).map(([invoiceKey, items]) => {
+                      const first = items[0];
+                      const totalQty = items.reduce((s, i) => s + i.initial_quantity / (i.product_unit_multiplier || 1), 0);
+                      const totalCost = items.reduce((s, i) => s + i.cost_price * i.initial_quantity, 0);
+                      const allStatuses = [...new Set(items.map(i => i.status))];
+                      const displayStatus = allStatuses.includes('pending') ? 'pending' : allStatuses.includes('revision') ? 'revision' : 'rejected';
+                      const isExpanded = expandedInvoice === invoiceKey;
+                      const invoiceLabel = first.invoice_number || `Batch: ${first.batch_number || '#' + first.id}`
+
+                      return (
+                        <React.Fragment key={invoiceKey}>
+                          <tr className="hover:bg-purple-50 transition-colors cursor-pointer" onClick={() => setExpandedInvoice(isExpanded ? null : invoiceKey)}>
+                            <td className="px-4 py-3">
+                              <div className="flex items-center gap-2">
+                                <svg className={`w-3 h-3 text-gray-400 transition-transform ${isExpanded ? 'rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                                <span className="font-semibold text-gray-900">{invoiceLabel}</span>
+                              </div>
+                              <div className="text-xs text-gray-400 mt-0.5 ml-5">{items.length} produk</div>
+                            </td>
+                            <td className="px-4 py-3 text-gray-600">{first.supplier_name || '-'}</td>
+                            <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{first.purchase_date ? formatDate(first.purchase_date) : '-'}</td>
+                            <td className="px-4 py-3 whitespace-nowrap">
+                              <span className="font-medium">{totalQty}</span>
+                              <span className="text-gray-400 ml-1">{first.product_purchase_unit}</span>
+                            </td>
+                            <td className="px-4 py-3">
+                              <span className="font-bold text-blue-600">{formatIDR(totalCost)}</span>
+                            </td>
+                            <td className="px-4 py-3">
+                              <span className={`inline-block px-2 py-0.5 text-[10px] font-bold rounded-full border ${
+                                displayStatus === 'pending' 
+                                  ? 'bg-yellow-100 text-yellow-700 border-yellow-200' 
+                                  : displayStatus === 'rejected'
+                                  ? 'bg-red-100 text-red-700 border-red-200'
+                                  : 'bg-orange-100 text-orange-700 border-orange-200'
+                              }`}>
+                                {displayStatus === 'pending' ? 'Pending' : displayStatus === 'rejected' ? 'Ditolak' : 'Revisi'}
                               </span>
-                            )}
-                          </div>
-                          <p className="text-sm text-gray-500">Produk ID: #{faktur.product_id} | Batch: {faktur.batch_number || '-'}</p>
-                        </div>
-                      </div>
-
-                      {faktur.notes && (
-                        <div className="bg-orange-50 border border-orange-100 p-3 rounded-xl flex items-start gap-3">
-                          <AlertCircle size={16} className="text-orange-500 shrink-0 mt-0.5" />
-                          <div>
-                            <p className="text-[11px] font-bold text-orange-800 uppercase tracking-wider">Catatan Perbaikan:</p>
-                            <p className="text-sm text-orange-700 mt-0.5 leading-relaxed">{faktur.notes}</p>
-                          </div>
-                        </div>
-                      )}
-
-                      <div className="grid grid-cols-2 md:grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
-                        <div className="flex items-center gap-2 text-gray-600">
-                          <Users size={16} className="text-gray-400" />
-                          <span>{faktur.supplier_name || 'Tanpa Supplier'}</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-gray-600">
-                          <Calendar size={16} className="text-gray-400" />
-                          <span>{faktur.purchase_date ? new Date(faktur.purchase_date).toLocaleDateString('id-ID') : '-'}</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-gray-600">
-                          <Info size={16} className="text-gray-400" />
-                          <span className="capitalize">{faktur.stock_type.replace('_', ' ')}</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Middle: Financial Details */}
-                    <div className="lg:w-64 bg-gray-50 p-4 rounded-xl space-y-2">
-                      <div className="flex justify-between text-sm">
-                        <span className="text-gray-500">Jumlah:</span>
-                        <span className="font-medium text-gray-900">
-                          {faktur.initial_quantity / (faktur.product_unit_multiplier || 1)} {faktur.product_purchase_unit}
-                        </span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span className="text-gray-500">Harga Beli:</span>
-                        <span className="font-medium text-gray-900">{formatCurrency(faktur.cost_price)}</span>
-                      </div>
-                      <div className="pt-2 border-t border-gray-200 flex justify-between items-center">
-                        <span className="text-xs font-bold text-gray-400 uppercase">Total:</span>
-                        <span className="text-lg font-extrabold text-blue-600">{formatCurrency(faktur.cost_price * faktur.initial_quantity)}</span>
-                      </div>
-                    </div>
-
-                    {/* Right: Actions */}
-                    <div className="flex lg:flex-col items-center justify-center gap-3 shrink-0">
-                      {faktur.image_url && (
-                        <button 
-                          onClick={() => setPreviewImageUrl(`http://localhost:5000${faktur.image_url}`)}
-                          className="flex items-center gap-2 px-4 py-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors text-sm font-medium w-full justify-center"
-                        >
-                          <FileText size={18} />
-                          Lihat Bukti
-                        </button>
-                      )}
-                      {faktur.status === 'pending' ? (
-                        <div className="flex gap-2 w-full">
-                          <button 
-                            onClick={() => handleApprove(faktur.id)}
-                            className="flex-1 bg-green-600 hover:bg-green-700 text-white p-2 rounded-lg transition-colors flex items-center justify-center gap-1 text-sm font-bold"
-                            title="Setujui"
-                          >
-                            <Check size={18} /> Setujui
-                          </button>
-                          <button 
-                            onClick={() => handleRevision(faktur.id)}
-                            className="flex-1 bg-orange-500 hover:bg-orange-600 text-white p-2 rounded-lg transition-colors flex items-center justify-center gap-1 text-sm font-bold"
-                            title="Perlu Perbaikan"
-                          >
-                            <AlertCircle size={18} /> Perbaiki
-                          </button>
-                          <button 
-                            onClick={() => handleReject(faktur.id)}
-                            className="flex-1 bg-red-600 hover:bg-red-700 text-white p-2 rounded-lg transition-colors flex items-center justify-center gap-1 text-sm font-bold"
-                            title="Tolak"
-                          >
-                            <X size={18} /> Tolak
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="text-center py-2 px-4 bg-gray-100 rounded-lg text-xs font-bold text-gray-500 w-full border border-gray-200">
-                          {faktur.status === 'rejected' ? 'Telah Ditolak' : 'Menunggu Perbaikan Kasir'}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
+                            </td>
+                            <td className="px-4 py-3">
+                              <div className="flex items-center gap-1.5">
+                                {items.some(i => i.image_url) && (
+                                  <button onClick={(e) => { e.stopPropagation(); setPreviewImageUrl(`http://localhost:5000${items.find(i => i.image_url)!.image_url}`); }}
+                                    className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg" title="Lihat Bukti">
+                                    <FileText size={14} />
+                                  </button>
+                                )}
+                                {displayStatus === 'pending' ? (
+                                  <>
+                                    <button onClick={(e) => { e.stopPropagation(); handleApprove(items); }}
+                                      className="px-2.5 py-1 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs font-bold transition-colors">
+                                      <Check size={14} className="inline mr-0.5" />Setujui
+                                    </button>
+                                    <button onClick={(e) => { e.stopPropagation(); handleRevision(invoiceKey); }}
+                                      className="px-2.5 py-1 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-xs font-bold transition-colors">
+                                      <AlertCircle size={14} className="inline mr-0.5" />Perbaiki
+                                    </button>
+                                    <button onClick={(e) => { e.stopPropagation(); handleReject(items); }}
+                                      className="px-2.5 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-bold transition-colors">
+                                      <X size={14} className="inline mr-0.5" />Tolak
+                                    </button>
+                                  </>
+                                ) : (
+                                  <span className="text-xs text-gray-400 italic">{displayStatus === 'rejected' ? 'Ditolak' : 'Menunggu kasir'}</span>
+                                )}
+                                {displayStatus === 'rejected' && (
+                                  <button onClick={(e) => { e.stopPropagation(); handleDelete(items); }}
+                                    className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg" title="Hapus">
+                                    <Trash2 size={14} />
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                          {isExpanded && items.map(item => (
+                            <tr key={item.id} className="bg-gray-50 text-xs text-gray-600">
+                              <td colSpan={7} className="px-4 py-2">
+                                <div className="ml-5 flex items-center gap-4">
+                                  <span className="font-medium text-gray-800 min-w-[150px]">{item.product_name}</span>
+                                  <span>{item.initial_quantity / (item.product_unit_multiplier || 1)} {item.product_purchase_unit}</span>
+                                  <span className="text-blue-600">@ {formatCurrency(item.cost_price)}</span>
+                                  <span className="font-semibold">= {formatCurrency(item.cost_price * item.initial_quantity)}</span>
+                                  {item.notes && <span className="text-orange-600 ml-2">✱ {item.notes}</span>}
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </React.Fragment>
+                      );
+                    });
+                  })()}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
       </div>
