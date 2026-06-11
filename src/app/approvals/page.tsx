@@ -164,7 +164,7 @@ export default function ApprovalsPage() {
     <div className="bg-gray-50 min-h-screen">
       <PageHeader 
         title="Approval Faktur" 
-        subtitle="Daftar faktur yang memerlukan persetujuan nominal > Rp 2.000.000"
+        subtitle="Daftar faktur yang memerlukan persetujuan"
       />
 
       <div className="p-3 sm:p-4 md:p-8 pt-0">

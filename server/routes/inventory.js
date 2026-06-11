@@ -277,10 +277,9 @@ function registerInventoryRoutes(app, pool, authenticate, checkPermission, uploa
       const formattedExpiredDate = formatDate(expired_date);
       const formattedDueDate = formatDate(due_date);
 
-      // Approval Logic: Check if total amount > 2,000,000
+      // Approval Logic: All batches require approval
       const totalAmount = Number(initial_quantity) * Number(cost_price);
-      const needsApproval = totalAmount > 2000000;
-      const status = needsApproval ? 'pending' : 'approved';
+      const status = 'pending';
 
       const [result] = await pool.query(`
         INSERT INTO batches (product_id, supplier_id, batch_number, invoice_number, stock_type, purchase_date, initial_quantity, remaining_quantity, cost_price, expired_date, dp_amount, due_date, image_url, status, notes, created_by, has_purchase_unit)
@@ -418,23 +417,15 @@ function registerInventoryRoutes(app, pool, authenticate, checkPermission, uploa
       const formattedExpiredDate = formatDate(expired_date);
       const formattedDueDate = formatDate(due_date);
 
-      // Re-evaluate approval
+      // Re-evaluate approval: all batches need approval
       const totalAmount = Number(initial_quantity) * Number(cost_price);
       let status = oldStatus;
       
-      if (totalAmount > 2000000) {
-        // If it's over 2M, it must be pending (unless already approved, but usually we don't re-approve)
-        // or if it was rejected/revision, it goes back to pending
-        if (oldStatus !== 'approved') {
-          status = 'pending';
-        }
-      } else {
-        // If it's under 2M, it can be approved automatically
-        status = 'approved';
+      if (oldStatus !== 'approved') {
+        status = 'pending';
       }
 
-      // If status becomes pending or approved, the cashier has updated/corrected the invoice, 
-      // so we should clear the old revision notes.
+      // If status becomes pending or approved, clear old revision notes
       const finalNotes = (status === 'pending' || status === 'approved') ? null : (notes || null);
 
       await pool.query(`

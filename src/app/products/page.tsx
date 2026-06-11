@@ -722,7 +722,7 @@ export default function ProductsPage() {
         const json = await res.json();
         if (json.status === 'pending') {
           goeyToast.info('Persetujuan Diperlukan', {
-            description: 'Faktur memerlukan persetujuan karena nominal > Rp 2.000.000. Stok belum akan bertambah sampai disetujui.'
+            description: 'Faktur memerlukan persetujuan. Stok belum akan bertambah sampai disetujui.'
           });
         } else {
           goeyToast.success(`Faktur ${fakturModalMode === 'add' ? 'ditambahkan' : 'diperbarui'}!`);
@@ -1273,7 +1273,7 @@ export default function ProductsPage() {
             const multiplier = Number(item.unit_multiplier) || 1;
             const calculatedStock = Number(item.stock);
             const totalAmount = (Number(item.cost_price) || 0) * calculatedStock;
-            const needsApproval = totalAmount > 2000000;
+            const needsApproval = true;
 
             const payload = {
               name: item.name,
@@ -1328,7 +1328,7 @@ export default function ProductsPage() {
               const batchJson = await res.json();
               if (batchJson.data.status === 'pending') {
                 goeyToast.info('Persetujuan Diperlukan', {
-                  description: `Faktur untuk ${item.name} memerlukan persetujuan karena nominal > Rp 2.000.000.`
+                  description: `Faktur untuk ${item.name} memerlukan persetujuan.`
                 });
               }
             } else {
@@ -3156,7 +3156,7 @@ export default function ProductsPage() {
                   <CheckCircle className="text-yellow-600" size={24} />
                   Approval Faktur Pembelian
                 </h3>
-                <p className="text-sm text-gray-500 mt-1">Daftar faktur yang memerlukan persetujuan nominal {'>'} Rp 2.000.000</p>
+                <p className="text-sm text-gray-500 mt-1">Daftar faktur yang memerlukan persetujuan</p>
               </div>
               <button 
                 onClick={() => setIsApprovalModalOpen(false)} 
