@@ -21,7 +21,9 @@ module.exports = function registerProductRoutes(app, pool, authenticate, checkPe
                b.supplier_id, 
                s.name AS supplier_name, 
                b.stock_type,
-               (SELECT MIN(b2.expired_date) FROM batches b2 WHERE b2.product_id = p.id AND b2.is_archived = FALSE AND b2.status = 'approved') AS nearest_expired
+               (SELECT MIN(b2.expired_date) FROM batches b2 WHERE b2.product_id = p.id AND b2.is_archived = FALSE AND b2.status = 'approved') AS nearest_expired,
+               (SELECT MAX(ih.created_at) FROM inventory_history ih WHERE ih.product_id = p.id AND ih.type = 'opname') AS last_opname_at,
+               (SELECT u.username FROM inventory_history ih LEFT JOIN users u ON ih.user_id = u.id WHERE ih.product_id = p.id AND ih.type = 'opname' ORDER BY ih.created_at DESC LIMIT 1) AS last_opname_by
         FROM products p
         LEFT JOIN (
           SELECT b1.product_id, b1.supplier_id, b1.stock_type
@@ -332,7 +334,7 @@ module.exports = function registerProductRoutes(app, pool, authenticate, checkPe
         ]);
 
         await connection.query(
-          'INSERT INTO inventory_history (product_id, type, quantity_change, previous_stock, new_stock, note) VALUES (?, ?, ?, ?, ?, ?)',
+          'INSERT INTO inventory_history (product_id, type, quantity_change, previous_stock, new_stock, note, user_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
           [
             productId,
             'adjustment',
@@ -340,6 +342,7 @@ module.exports = function registerProductRoutes(app, pool, authenticate, checkPe
             currentStock,
             newStock,
             note || 'Manual Adjustment',
+            req.user.id,
           ]
         );
 
@@ -413,7 +416,7 @@ module.exports = function registerProductRoutes(app, pool, authenticate, checkPe
           );
 
           await connection.query(
-            'INSERT INTO inventory_history (product_id, type, quantity_change, previous_stock, new_stock, note) VALUES (?, ?, ?, ?, ?, ?)',
+            'INSERT INTO inventory_history (product_id, type, quantity_change, previous_stock, new_stock, note, user_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
             [
               id,
               'opname',
@@ -421,6 +424,7 @@ module.exports = function registerProductRoutes(app, pool, authenticate, checkPe
               system_stock,
               actual_stock,
               note || 'Stock Opname Adjustment',
+              req.user.id,
             ]
           );
         }

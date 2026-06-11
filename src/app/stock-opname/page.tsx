@@ -14,6 +14,8 @@ interface Product {
   stock: number;
   unit: string;
   category: string;
+  last_opname_at?: string | null;
+  last_opname_by?: string | null;
 }
 
 interface Pagination {
@@ -336,18 +338,20 @@ export default function StockOpnamePage() {
                 <th className="px-6 py-4 text-left">Stock Faktual</th>
                 <th className="px-6 py-4 text-left">Selisih</th>
                 <th className="px-6 py-4 text-right">Unit</th>
+                <th className="px-6 py-4 text-left">Opname Terakhir</th>
+                <th className="px-6 py-4 text-left">Oleh</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {loading ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
+                  <td colSpan={8} className="px-6 py-8 text-center text-gray-500">
                     Loading products...
                   </td>
                 </tr>
               ) : products.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
+                  <td colSpan={8} className="px-6 py-8 text-center text-gray-500">
                     No products found
                   </td>
                 </tr>
@@ -391,6 +395,12 @@ export default function StockOpnamePage() {
                         </td>
                         <td className="px-6 py-4 text-right text-gray-500 text-sm">
                             {product.unit}
+                        </td>
+                        <td className="px-6 py-4 text-gray-500 text-xs whitespace-nowrap">
+                            {product.last_opname_at ? new Date(product.last_opname_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) : '-'}
+                        </td>
+                        <td className="px-6 py-4 text-gray-500 text-xs">
+                            {product.last_opname_by || '-'}
                         </td>
                     </tr>
                   );

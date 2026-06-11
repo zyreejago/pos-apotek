@@ -361,6 +361,12 @@ const initDB = async () => {
     try {
       await connection.query(`ALTER TABLE purchases ADD COLUMN invoice_no VARCHAR(100) NULL`);
     } catch (e) {}
+    try {
+      await connection.query(`ALTER TABLE inventory_history ADD COLUMN user_id INT NULL`);
+    } catch (e) {}
+    try {
+      await connection.query(`ALTER TABLE inventory_history ADD FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL`);
+    } catch (e) {}
 
     // Prescriptions table
     await connection.query(`
