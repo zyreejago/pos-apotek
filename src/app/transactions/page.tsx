@@ -138,6 +138,21 @@ export default function POSTransactionsPage() {
     setCart(prev => prev.filter(item => item.id !== productId));
   };
 
+  const decrementProduct = (productId: number) => {
+    setCart(prev => {
+      const existing = prev.find(item => item.id === productId);
+      if (!existing) return prev;
+      if (existing.quantity <= 1) {
+        return prev.filter(item => item.id !== productId);
+      }
+      return prev.map(item =>
+        item.id === productId
+          ? { ...item, quantity: item.quantity - 1 }
+          : item
+      );
+    });
+  };
+
   const updateQuantity = (productId: number, delta: number) => {
     setEditingQty(null);
     setCart(prev => {
@@ -572,13 +587,22 @@ export default function POSTransactionsPage() {
                                 <span className="text-gray-400 text-sm font-normal"> / {product.unit.toLowerCase()}</span>
                             </p>
                         </div>
-                        <button className={`w-8 h-8 flex items-center justify-center rounded-lg transition-all ${
-                            isActive 
-                              ? 'bg-blue-600 text-white shadow-md' 
-                              : 'bg-blue-50 text-blue-600 opacity-0 group-hover:opacity-100'
-                        }`}>
+                        <div className="flex items-center gap-1">
+                          {isActive && (
+                            <button onClick={(e) => { e.stopPropagation(); decrementProduct(product.id); }}
+                              className="w-8 h-8 flex items-center justify-center rounded-lg transition-all bg-blue-600 text-white shadow-md">
+                              <Minus size={16} />
+                            </button>
+                          )}
+                          <button onClick={(e) => { e.stopPropagation(); addToCart(product); }}
+                            className={`w-8 h-8 flex items-center justify-center rounded-lg transition-all ${
+                              isActive 
+                                ? 'bg-blue-600 text-white shadow-md' 
+                                : 'bg-blue-50 text-blue-600 opacity-0 group-hover:opacity-100'
+                            }`}>
                             <Plus size={16} />
-                        </button>
+                          </button>
+                        </div>
                     </div>
                     </div>
                     );
