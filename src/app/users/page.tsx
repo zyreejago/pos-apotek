@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Search, Filter, Plus, Edit, Trash2 } from 'lucide-react';
+import { Search, Plus, Edit, Trash2 } from 'lucide-react';
 import { goeyToast } from "@/components/ui/goey-toaster";
 import ConfirmModal from '@/components/ConfirmModal';
 import OffCanvas from '@/components/OffCanvas';
@@ -399,68 +399,69 @@ export default function UsersPage() {
             </div>
           </div>
 
-          <div className="p-4 space-y-3">
-            {loading ? (
-              <div className="text-center py-8 text-gray-500">Loading users...</div>
-            ) : users.length === 0 ? (
-              <div className="text-center py-8 text-gray-500">No users found.</div>
-            ) : (
-              users.map((user) => {
-                const isActive = user.status !== 'inactive';
-
-                return (
-                  <div key={user.id} className="group bg-white p-4 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md hover:border-blue-100 transition-all duration-200 flex items-center justify-between">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="relative shrink-0">
-                        <div className={`w-10 h-10 rounded-full flex items-center justify-center text-base font-bold text-white shadow-sm ${getAvatarColor(user.username)}`}>
-                          {getInitials(user.username)}
-                        </div>
-                        <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white ${isActive ? 'bg-emerald-500' : 'bg-rose-500'}`}></div>
-                      </div>
-                      <div className="min-w-0">
-                        <h3 className="text-sm font-bold text-gray-900 leading-tight group-hover:text-blue-600 transition-colors truncate">{user.username}</h3>
-                        <p className="text-xs font-medium text-gray-500 mt-0.5 truncate">{user.email}</p>
-                      </div>
-                    </div>
-                    
-                    <div className="flex items-center gap-3">
-                      <div className="hidden sm:flex flex-col items-center justify-center border border-dashed border-gray-300 bg-gray-50/50 rounded-xl px-3 py-1 min-w-[88px]">
-                        <span className="text-xs font-bold text-gray-900 capitalize">{user.role}</span>
-                        <span className="text-[9px] font-semibold text-gray-400 uppercase tracking-wider mt-0.5">Role</span>
-                      </div>
-                      
-                      <div className={`hidden sm:flex flex-col items-center justify-center border border-dashed rounded-xl px-3 py-1 min-w-[88px] ${isActive ? 'border-emerald-200 bg-emerald-50/30' : 'border-rose-200 bg-rose-50/30'}`}>
-                        <span className={`text-xs font-bold ${isActive ? 'text-emerald-600' : 'text-rose-600'}`}>
-                          {isActive ? 'Active' : 'Inactive'}
-                        </span>
-                        <span className={`text-[9px] font-semibold uppercase tracking-wider mt-0.5 ${isActive ? 'text-emerald-400' : 'text-rose-400'}`}>Status</span>
-                      </div>
-                      
-                      <div className="flex items-center gap-1 pl-2 border-l border-gray-100">
-                        {checkActionPermission('edit') && (
-                          <button 
-                            onClick={() => handleOpenEditOffCanvas(user)}
-                            className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all duration-200"
-                            title="Edit User"
-                          >
-                            <Edit size={16} strokeWidth={2} />
-                          </button>
-                        )}
-                        {checkActionPermission('delete') && (!currentUser || currentUser.id !== user.id) && (
-                          <button 
-                            onClick={() => handleDelete(user)}
-                            className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all duration-200"
-                            title="Delete User"
-                          >
-                            <Trash2 size={16} strokeWidth={2} />
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })
-            )}
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm text-left">
+              <thead className="text-xs text-gray-500 uppercase bg-gray-50 border-b border-gray-100">
+                <tr>
+                  <th className="px-4 py-3">Pengguna</th>
+                  <th className="px-4 py-3">Email</th>
+                  <th className="px-4 py-3">Role</th>
+                  <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3">Aksi</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {loading ? (
+                  <tr><td colSpan={5} className="px-4 py-8 text-center text-gray-500">Loading users...</td></tr>
+                ) : users.length === 0 ? (
+                  <tr><td colSpan={5} className="px-4 py-8 text-center text-gray-500">No users found.</td></tr>
+                ) : (
+                  users.map((user) => {
+                    const isActive = user.status !== 'inactive';
+                    return (
+                      <tr key={user.id} className="hover:bg-gray-50 transition-colors">
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-3">
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0 ${getAvatarColor(user.username)}`}>
+                              {getInitials(user.username)}
+                            </div>
+                            <span className="font-medium text-gray-900">{user.username}</span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-gray-600">{user.email}</td>
+                        <td className="px-4 py-3">
+                          <span className="capitalize text-gray-700 font-medium">{user.role}</span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold rounded-full ${
+                            isActive ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                          }`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${isActive ? 'bg-green-500' : 'bg-red-500'}`} />
+                            {isActive ? 'Active' : 'Inactive'}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-1">
+                            {checkActionPermission('edit') && (
+                              <button onClick={() => handleOpenEditOffCanvas(user)}
+                                className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Edit">
+                                <Edit size={14} />
+                              </button>
+                            )}
+                            {checkActionPermission('delete') && (!currentUser || currentUser.id !== user.id) && (
+                              <button onClick={() => handleDelete(user)}
+                                className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Hapus">
+                                <Trash2 size={14} />
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
           </div>
 
           <div className="p-4 flex flex-col sm:flex-row justify-between items-center gap-4 text-sm text-gray-500 border-t border-gray-100">
