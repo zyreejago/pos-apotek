@@ -52,7 +52,11 @@ export default function SuppliersPage() {
   const [isOffCanvasOpen, setIsOffCanvasOpen] = useState(false);
   const [offCanvasMode, setOffCanvasMode] = useState<'add' | 'edit' | 'view'>('add');
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [supplierDetails, setSupplierDetails] = useState<any>(null);
+  const [expandedFaktur, setExpandedFaktur] = useState<string | null>(null);
+  const [previewImages, setPreviewImages] = useState<string[]>([]);
+  const [previewImageIdx, setPreviewImageIdx] = useState(0);
 
   // Confirm Modal State
   const [confirmModal, setConfirmModal] = useState({
@@ -476,145 +480,153 @@ export default function SuppliersPage() {
                   )}
                 </div> */}
 
-                {/* Batches (Bukti Faktur Pembelian) */}
+                {/* Faktur (grouped by invoice_number) */}
                 <div>
                   <h3 className="font-semibold text-lg mb-3 flex items-center gap-2">
                     <FileText size={20} className="text-purple-600" />
                     Bukti Faktur Pembelian 
                   </h3>
+                  {/* eslint-disable @typescript-eslint/no-explicit-any */}
                   {(() => {
-                    console.log('supplierDetails.batches:', supplierDetails.batches);
-                    return supplierDetails.batches && supplierDetails.batches.length > 0;
-                  })() ? (
-                    <div className="space-y-3">
-                      {supplierDetails.batches.map((batch: any) => (
-                        <div key={batch.id} className="border border-gray-200 p-4 rounded-lg">
-                          <div className="flex justify-between items-center mb-2">
-                            <p className="font-medium">{batch.product_name}</p>
-                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                              batch.status === 'approved' ? 'bg-green-100 text-green-700' : 
-                              batch.status === 'pending' ? 'bg-yellow-100 text-yellow-700' : 
-                              batch.status === 'rejected' ? 'bg-red-100 text-red-700' : 
-                              'bg-gray-100 text-gray-700'
-                            }`}>
-                              {batch.status === 'approved' ? 'Disetujui' : 
-                               batch.status === 'pending' ? 'Menunggu' : 
-                               batch.status === 'rejected' ? 'Ditolak' : 
-                               'Revisi'}
-                            </span>
-                          </div>
-                          <p className="text-sm text-gray-500 mb-1">
-                            Tanggal Pembelian: {new Date(batch.purchase_date || batch.created_at).toLocaleDateString('id-ID')}
-                          </p>
-                          {batch.expired_date && (
-                            <p className="text-sm text-orange-600 mb-1">
-                              Tanggal Kadaluarsa: {new Date(batch.expired_date).toLocaleDateString('id-ID')}
-                            </p>
-                          )}
-                          {batch.due_date && (
-                            <p className="text-sm text-red-600 mb-1">
-                              Jatuh Tempo Pembayaran: {new Date(batch.due_date).toLocaleDateString('id-ID')}
-                            </p>
-                          )}
-                          <div className="grid grid-cols-2 gap-2 mb-2 text-sm mt-2">
-                            <div>
-                              <span className="text-gray-500">Jumlah Stok Masuk:</span>
-                              <span className="ml-1 font-medium">{batch.initial_quantity}</span>
-                            </div>
-                            <div>
-                              <span className="text-gray-500">Sisa Stok:</span>
-                              <span className="ml-1 font-medium">{batch.remaining_quantity}</span>
-                            </div>
-                            <div>
-                              <span className="text-gray-500">Harga Satuan:</span>
-                              <span className="ml-1 font-medium">{new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format(batch.cost_price)}</span>
-                            </div>
-                            <div>
-                              <span className="text-gray-500">Total Harga:</span>
-                              <span className="ml-1 font-medium">{new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format(batch.cost_price * batch.initial_quantity)}</span>
-                            </div>
-                            <div className="col-span-2">
-                              <span className="text-gray-500">Tipe Pembayaran:</span>
-                              <span className={`ml-1 font-medium ${
-                                batch.stock_type === 'lunas' ? 'text-green-600' : 
-                                (batch.stock_type === 'dp' || batch.stock_type === 'DP') ? 'text-yellow-600' : 
-                                (batch.stock_type === 'consignment' || batch.stock_type === 'konsinyasi') ? 'text-blue-600' :
-                                batch.stock_type === 'retur' ? 'text-red-600' :
-                                'text-gray-600'
-                              }`}>
-                                {batch.stock_type === 'lunas' ? 'Lunas' : 
-                                  (batch.stock_type === 'dp' || batch.stock_type === 'DP') ? 'DP' : 
-                                  (batch.stock_type === 'consignment' || batch.stock_type === 'konsinyasi') ? 'Konsinyasi' : 
-                                  batch.stock_type === 'retur' ? 'Retur' :
-                                  'Belum Lunas'}
-                              </span>
-                            </div>
-                          </div>
+                    const batches = supplierDetails.batches || [];
+                    if (batches.length === 0) return <p className="text-gray-500 italic">Belum ada bukti faktur pembelian dari supplier ini.</p>;
 
-                          {(() => {
-                            let dpList = [];
-                            if (batch.dp_payments && batch.dp_payments.length > 0) {
-                              dpList = batch.dp_payments;
-                            } else if (batch.dp_amount) {
-                              dpList = [{ id: -1, amount: batch.dp_amount, payment_date: batch.purchase_date || '', created_at: batch.created_at }];
-                            }
-                            if (dpList.length > 0) {
-                              const totalDp = dpList.reduce((sum: number, dp: any) => sum + Number(dp.amount), 0);
-                              const totalAmount = batch.cost_price * batch.initial_quantity;
-                              const remainingDebt = totalAmount - totalDp;
-                              return (
-                                <div className="border-t border-gray-100 pt-2 mt-2">
-                                  <div className="space-y-0.5">
-                                    {dpList.map((dp: any, idx: number) => (
-                                      <div key={dp.id} className="text-sm">
-                                        <span className="font-medium text-yellow-600">DP {idx + 1}:</span>
-                                        <span className={`ml-1.5 text-xs font-medium px-1.5 py-0.5 rounded ${
-                                          dp.payment_method === 'transfer' ? 'bg-purple-100 text-purple-700' : 'bg-green-100 text-green-700'
-                                        }`}>
-                                          {dp.payment_method === 'transfer' ? 'TF' : 'Cash'}
-                                        </span>
-                                        <span className="text-blue-600 font-semibold ml-1">{new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format(dp.amount)}</span>
-                                        {dp.payment_date && (
-                                          <span className="text-gray-400 ml-2">({new Date(dp.payment_date).toLocaleDateString('id-ID')})</span>
-                                        )}
-                                      </div>
-                                    ))}
-                                    {remainingDebt > 0 ? (
-                                      <div className="text-sm text-orange-600 font-medium">
-                                        Sisa hutang: {new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format(remainingDebt)}
-                                      </div>
-                                    ) : remainingDebt <= 0 && totalDp > 0 ? (
-                                      <div className="text-sm text-green-600 font-medium">Lunas</div>
-                                    ) : null}
+                    const grouped: Record<string, any[]> = {};
+                    for (const b of batches) {
+                      const key = b.invoice_number || '__NO_INVOICE__';
+                      if (!grouped[key]) grouped[key] = [];
+                      grouped[key].push(b);
+                    }
+
+                    const formatIDR = (val: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format(val);
+                    const formatDate = (d: string) => d ? new Date(d).toLocaleDateString('id-ID') : '-';
+
+                    const renderBatchDetail = (batch: any, fakturImages: string[]) => (
+                      <div key={batch.id} className="border border-gray-100 bg-gray-50 p-3 rounded-lg">
+                        <div className="flex justify-between items-center mb-1">
+                          <p className="font-medium text-sm">{batch.product_name}</p>
+                          <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-medium ${
+                            batch.status === 'approved' ? 'bg-green-100 text-green-700' : 
+                            batch.status === 'pending' ? 'bg-yellow-100 text-yellow-700' : 
+                            batch.status === 'rejected' ? 'bg-red-100 text-red-700' : 
+                            'bg-gray-100 text-gray-700'
+                          }`}>
+                            {batch.status === 'approved' ? 'Disetujui' : 
+                             batch.status === 'pending' ? 'Menunggu' : 
+                             batch.status === 'rejected' ? 'Ditolak' : 'Revisi'}
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-xs text-gray-600 mt-1">
+                          <span>Pembelian: {formatDate(batch.purchase_date)}</span>
+                          {batch.expired_date && <span>Exp: {formatDate(batch.expired_date)}</span>}
+                          <span>Stok masuk: <strong>{batch.initial_quantity}</strong></span>
+                          <span>Sisa: <strong>{batch.remaining_quantity}</strong></span>
+                          <span>Harga: {formatIDR(batch.cost_price)}</span>
+                          <span>Total: {formatIDR(batch.cost_price * batch.initial_quantity)}</span>
+                          <span className="col-span-2">
+                            Bayar: <span className={`font-medium ${
+                              batch.stock_type === 'lunas' ? 'text-green-600' : 
+                              batch.stock_type === 'dp' || batch.stock_type === 'DP' ? 'text-yellow-600' :
+                              batch.stock_type === 'consignment' || batch.stock_type === 'konsinyasi' ? 'text-blue-600' :
+                              batch.stock_type === 'retur' ? 'text-red-600' : 'text-gray-600'
+                            }`}>
+                              {batch.stock_type === 'lunas' ? 'Lunas' : 
+                               batch.stock_type === 'dp' || batch.stock_type === 'DP' ? 'DP' : 
+                               batch.stock_type === 'consignment' || batch.stock_type === 'konsinyasi' ? 'Konsinyasi' : 
+                               batch.stock_type === 'retur' ? 'Retur' : 'Belum Lunas'}
+                            </span>
+                          </span>
+                        </div>
+                        {(() => {
+                          let dpList: any[] = [];
+                          if (batch.dp_payments?.length > 0) dpList = batch.dp_payments;
+                          else if (batch.dp_amount) dpList = [{ id: -1, amount: batch.dp_amount, payment_date: batch.purchase_date }];
+                          if (dpList.length > 0) {
+                            const totalDp = dpList.reduce((s: number, d: any) => s + Number(d.amount), 0);
+                            const remaining = (batch.cost_price * batch.initial_quantity) - totalDp;
+                            return (
+                              <div className="border-t border-gray-200 pt-1.5 mt-1.5 space-y-0.5">
+                                {dpList.map((dp: any, idx: number) => (
+                                  <div key={dp.id} className="text-xs">
+                                    <span className="text-yellow-600 font-medium">DP {idx + 1}:</span>
+                                    <span className={`ml-1 text-[10px] px-1 py-0.5 rounded ${dp.payment_method === 'transfer' ? 'bg-purple-100 text-purple-700' : 'bg-green-100 text-green-700'}`}>
+                                      {dp.payment_method === 'transfer' ? 'TF' : 'Cash'}
+                                    </span>
+                                    <span className="text-blue-600 font-semibold ml-1">{formatIDR(dp.amount)}</span>
+                                    {dp.payment_date && <span className="text-gray-400 ml-1">({formatDate(dp.payment_date)})</span>}
                                   </div>
-                                </div>
-                              );
-                            }
-                            return null;
-                          })()}
-                          {batch.notes && (
-                            <p className="text-sm text-gray-500 italic">
-                              Catatan: {batch.notes}
-                            </p>
-                          )}
-                          {batch.image_url && (
-                            <div className="mt-3">
-                              <p className="text-sm font-medium mb-2 text-gray-700">Lampiran Bukti:</p>
-                              <a href={`http://localhost:5000${batch.image_url}`} target="_blank" rel="noopener noreferrer">
-                                <img 
-                                  src={`http://localhost:5000${batch.image_url}`} 
-                                  alt="Bukti Faktur" 
-                                  className="h-32 w-auto object-cover rounded border border-gray-200 hover:opacity-90 transition-opacity" 
-                                />
-                              </a>
+                                ))}
+                                {remaining > 0 ? <div className="text-xs text-orange-600 font-medium">Sisa hutang: {formatIDR(remaining)}</div> : totalDp > 0 ? <div className="text-xs text-green-600 font-medium">Lunas</div> : null}
+                              </div>
+                            );
+                          }
+                          return null;
+                        })()}
+                        {batch.notes && <p className="text-xs text-gray-400 italic mt-1">{batch.notes}</p>}
+                        {batch.image_url && (
+                          <div className="mt-2">
+                            <img src={`http://localhost:5000${batch.image_url}`} alt="Bukti"
+                              className="h-20 w-auto object-cover rounded border cursor-pointer hover:opacity-80 transition-opacity"
+                              onClick={() => {
+                                const idx = fakturImages.indexOf(`http://localhost:5000${batch.image_url}`);
+                                setPreviewImageIdx(idx >= 0 ? idx : 0);
+                                setPreviewImages(fakturImages);
+                              }} />
+                          </div>
+                        )}
+                      </div>
+                    );
+
+                    const renderFakturCard = (invoiceNumber: string, items: any[]) => {
+                      const totalQty = items.reduce((s, b) => s + Number(b.initial_quantity), 0);
+                      const totalCost = items.reduce((s, b) => s + Number(b.cost_price) * Number(b.initial_quantity), 0);
+                      const fakturImages = items.map(b => b.image_url ? `http://localhost:5000${b.image_url}` : '').filter(Boolean);
+                      const statusCounts: Record<string, number> = {};
+                      items.forEach(b => { statusCounts[b.status] = (statusCounts[b.status] || 0) + 1; });
+                      const isExpanded = expandedFaktur === invoiceNumber;
+                      const displayLabel = invoiceNumber === '__NO_INVOICE__' ? 'Tanpa No. Faktur' : invoiceNumber;
+
+                      return (
+                        <div key={invoiceNumber} className="border border-purple-200 rounded-xl overflow-hidden">
+                          <button onClick={() => setExpandedFaktur(isExpanded ? null : invoiceNumber)}
+                            className="w-full flex items-center gap-3 p-4 bg-purple-50 hover:bg-purple-100 transition-colors text-left">
+                            <FileText size={18} className="text-purple-600 shrink-0" />
+                            <div className="flex-1 min-w-0">
+                              <p className="font-semibold text-sm text-gray-800">{displayLabel}</p>
+                              <p className="text-xs text-gray-500">{items.length} produk · Total {totalQty} pcs · {formatIDR(totalCost)}</p>
+                            </div>
+                            <div className="flex gap-1 shrink-0">
+                              {Object.entries(statusCounts).map(([s, c]) => (
+                                <span key={s} className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
+                                  s === 'approved' ? 'bg-green-100 text-green-700' :
+                                  s === 'pending' ? 'bg-yellow-100 text-yellow-700' :
+                                  s === 'rejected' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-700'
+                                }`}>{c} {s === 'approved' ? '✓' : s === 'pending' ? '⏳' : s === 'rejected' ? '✗' : '?'}</span>
+                              ))}
+                            </div>
+                            <svg className={`w-4 h-4 text-purple-600 transition-transform ${isExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                          </button>
+                          {isExpanded && (
+                            <div className="p-3 space-y-2 bg-white border-t border-purple-100">
+                              {items.map(b => renderBatchDetail(b, fakturImages))}
                             </div>
                           )}
                         </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-gray-500 italic">Belum ada bukti faktur pembelian dari supplier ini.</p>
-                  )}
+                      );
+                    };
+
+                    const fakturKeys = Object.keys(grouped);
+                    const hasInvoiceSection = fakturKeys.some(k => k !== '__NO_INVOICE__');
+                    const noInvoiceItems = grouped['__NO_INVOICE__'] || [];
+
+                    return (
+                      <div className="space-y-3">
+                        {fakturKeys.filter(k => k !== '__NO_INVOICE__').sort().map(k => renderFakturCard(k, grouped[k]))}
+                        {hasInvoiceSection && noInvoiceItems.length > 0 && <hr className="my-2" />}
+                        {noInvoiceItems.length > 0 && renderFakturCard('__NO_INVOICE__', noInvoiceItems)}
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 {/* Purchases List */}
@@ -785,6 +797,34 @@ export default function SuppliersPage() {
         message={confirmModal.message}
         variant={confirmModal.variant}
       />
+
+      {/* Image Preview Modal */}
+      {previewImages.length > 0 && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => { setPreviewImages([]); setPreviewImageIdx(0); }}>
+          <div className="relative max-w-2xl w-full max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
+            <button onClick={() => { setPreviewImages([]); setPreviewImageIdx(0); }}
+              className="absolute -top-3 -right-3 w-8 h-8 bg-white rounded-full shadow-lg flex items-center justify-center hover:bg-gray-100 z-10">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
+            {previewImages.length > 1 && (
+              <>
+                <button onClick={() => setPreviewImageIdx(i => (i - 1 + previewImages.length) % previewImages.length)}
+                  className="absolute left-2 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/80 hover:bg-white rounded-full shadow-lg flex items-center justify-center z-10">
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+                </button>
+                <button onClick={() => setPreviewImageIdx(i => (i + 1) % previewImages.length)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/80 hover:bg-white rounded-full shadow-lg flex items-center justify-center z-10">
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                </button>
+                <div className="absolute bottom-3 left-1/2 -translate-x-1/2 bg-black/50 text-white text-xs px-2 py-1 rounded-full">
+                  {previewImageIdx + 1} / {previewImages.length}
+                </div>
+              </>
+            )}
+            <img src={previewImages[previewImageIdx]} alt="Preview" className="w-full h-auto max-h-[85vh] object-contain rounded-xl shadow-2xl" />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
