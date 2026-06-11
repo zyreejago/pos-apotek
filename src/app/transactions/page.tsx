@@ -1,13 +1,19 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Search, ShoppingCart, Plus, Minus, X, CreditCard } from 'lucide-react';
+import { Search, ShoppingCart, Plus, Minus, X, CreditCard, User, Pill } from 'lucide-react';
 
 import { goeyToast } from "@/components/ui/goey-toaster";
 import { useRequirePermission } from '@/hooks/useRequirePermission';
 import { useKeyboardShortcuts } from '@/context/KeyboardShortcutsContext';
 import PageHeader from '@/components/PageHeader';
 import { useRouter } from 'next/navigation';
+
+declare global {
+  interface Window {
+    snap: { pay: (token: string, options: Record<string, unknown>) => void };
+  }
+}
 
 interface Product {
   id: number;
@@ -23,6 +29,17 @@ interface Product {
 
 interface CartItem extends Product {
   quantity: number;
+  prescriptionLabel?: string;
+}
+
+interface PrescriptionData {
+  label: string;
+  prescription_code: string;
+  doctor_name: string;
+  instansi: string;
+  prescription_date: string;
+  notes: string;
+  items: { product: Product; quantity: number }[];
 }
 
 interface ReceiptData {
@@ -33,6 +50,9 @@ interface ReceiptData {
   discount: number;
   total: number;
   cashierName: string;
+  customerName?: string;
+  customerPhone?: string;
+  prescriptions?: PrescriptionData[];
 }
 
 export default function POSTransactionsPage() {
@@ -57,6 +77,17 @@ export default function POSTransactionsPage() {
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'midtrans'>('cash');
   const [highlightedProductId, setHighlightedProductId] = useState<number | null>(null);
   const [editingQty, setEditingQty] = useState<{id: number; value: string} | null>(null);
+  const [showBuyerForm, setShowBuyerForm] = useState(false);
+  const [customerName, setCustomerName] = useState('');
+  const [customerPhone, setCustomerPhone] = useState('');
+  const [searchingCustomer, setSearchingCustomer] = useState(false);
+  const customerTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const [prescriptions, setPrescriptions] = useState<PrescriptionData[]>([]);
+  const [showPrescriptionForm, setShowPrescriptionForm] = useState(false);
+  const [editingPrescriptionIdx, setEditingPrescriptionIdx] = useState<number | null>(null);
+  const [prescriptionSearch, setPrescriptionSearch] = useState('');
+  const [prescriptionItems, setPrescriptionItems] = useState<{ product: Product; quantity: number }[]>([]);
+  const [prescriptionForm, setPrescriptionForm] = useState({ prescription_code: '', doctor_name: '', instansi: '', prescription_date: new Date().toISOString().split('T')[0], notes: '' });
 
   // Fetch Data
   useEffect(() => {
@@ -177,8 +208,146 @@ export default function POSTransactionsPage() {
     }));
   };
 
+  const openNewPrescription = () => {
+    setPrescriptionForm({ prescription_code: '', doctor_name: '', instansi: '', prescription_date: new Date().toISOString().split('T')[0], notes: '' });
+    setPrescriptionItems([]);
+    setPrescriptionSearch('');
+    setEditingPrescriptionIdx(null);
+    setShowPrescriptionForm(true);
+  };
+
+  const openEditPrescription = (idx: number) => {
+    const p = prescriptions[idx];
+    setPrescriptionForm({
+      prescription_code: p.prescription_code,
+      doctor_name: p.doctor_name,
+      instansi: p.instansi,
+      prescription_date: p.prescription_date,
+      notes: p.notes,
+    });
+    setPrescriptionItems(p.items.map(i => ({ product: i.product, quantity: i.quantity })));
+    setEditingPrescriptionIdx(idx);
+    setShowPrescriptionForm(true);
+  };
+
+  const savePrescription = () => {
+    const label = editingPrescriptionIdx !== null
+      ? prescriptions[editingPrescriptionIdx].label
+      : `Resep ${prescriptions.length + 1}`;
+
+    const data: PrescriptionData = {
+      label,
+      ...prescriptionForm,
+      items: prescriptionItems.map(i => ({ product: i.product, quantity: i.quantity })),
+    };
+
+    if (editingPrescriptionIdx !== null) {
+      setCart(prev => prev.filter(item => item.prescriptionLabel !== label));
+      setPrescriptions(prev => prev.map((p, i) => i === editingPrescriptionIdx ? data : p));
+    } else {
+      setPrescriptions(prev => [...prev, data]);
+    }
+
+    const cartItems: CartItem[] = prescriptionItems.map(i => ({
+      ...i.product,
+      quantity: i.quantity,
+      prescriptionLabel: label,
+    }));
+
+    setCart(prev => {
+      const filtered = editingPrescriptionIdx !== null
+        ? prev.filter(item => item.prescriptionLabel !== label)
+        : prev;
+      const merged = [...filtered];
+      for (const newItem of cartItems) {
+        const existing = merged.find(item => item.id === newItem.id && item.prescriptionLabel === label);
+        if (existing) {
+          existing.quantity += newItem.quantity;
+        } else {
+          merged.push(newItem);
+        }
+      }
+      return merged;
+    });
+
+    setShowPrescriptionForm(false);
+  };
+
+  const deletePrescription = (idx: number) => {
+    const label = prescriptions[idx].label;
+    setCart(prev => prev.filter(item => item.prescriptionLabel !== label));
+    setPrescriptions(prev => prev.filter((_, i) => i !== idx));
+  };
+
+  const addPrescriptionItem = (product: Product) => {
+    setPrescriptionItems(prev => {
+      const existing = prev.find(i => i.product.id === product.id);
+      if (existing) {
+        return prev.map(i => i.product.id === product.id ? { ...i, quantity: i.quantity + 1 } : i);
+      }
+      return [...prev, { product, quantity: 1 }];
+    });
+  };
+
+  const removePrescriptionItem = (productId: number) => {
+    setPrescriptionItems(prev => prev.filter(i => i.product.id !== productId));
+  };
+
+  const updatePrescriptionItemQty = (productId: number, delta: number) => {
+    setPrescriptionItems(prev => prev.map(i =>
+      i.product.id === productId
+        ? { ...i, quantity: Math.max(1, i.quantity + delta) }
+        : i
+    ));
+  };
+
+  const filteredPrescriptionProducts = products.filter(p =>
+    p.name.toLowerCase().includes(prescriptionSearch.toLowerCase())
+  );
+
   const formatCurrency = (val: number) => 
     new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(val);
+
+  const saveCustomer = async () => {
+    if (!customerName || !customerPhone) return;
+    try {
+      const token = localStorage.getItem('token');
+      await fetch('http://localhost:5000/api/customers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ name: customerName, phone: customerPhone })
+      });
+    } catch (error) {
+      console.error('Error saving customer:', error);
+    }
+  };
+
+  const searchCustomerByPhone = async (phone: string) => {
+    if (!phone || phone.length < 4) return;
+    setSearchingCustomer(true);
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`http://localhost:5000/api/customers/search?phone=${encodeURIComponent(phone)}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.found && data.customer) {
+          setCustomerName(data.customer.name);
+        }
+      }
+    } catch (error) {
+      console.error('Error searching customer:', error);
+    } finally {
+      setSearchingCustomer(false);
+    }
+  };
+
+  const handlePhoneChange = (val: string) => {
+    setCustomerPhone(val);
+    if (customerTimerRef.current) clearTimeout(customerTimerRef.current);
+    customerTimerRef.current = setTimeout(() => searchCustomerByPhone(val), 500);
+  };
 
   const formatStock = (stock: number, multiplier: number, purchaseUnit: string, baseUnit: string) => {
     return `${stock} ${baseUnit || 'Tablet'}`;
@@ -223,7 +392,9 @@ export default function POSTransactionsPage() {
         subtotal: subtotal,
         tax_amount: ppn,
         discount_amount: discount,
-        payment_method: paymentMethod
+        payment_method: paymentMethod,
+        customer_name: customerName || null,
+        customer_phone: customerPhone || null
       };
 
       const res = await fetch('http://localhost:5000/api/transactions', {
@@ -250,7 +421,7 @@ export default function POSTransactionsPage() {
           const snapToken = urlParts[urlParts.length - 1];
           const orderId = data.order_id || `POS-${Date.now()}`; // Wait, we need backend to return order_id! Let's update backend first!
           
-          (window as any).snap.pay(snapToken, {
+          window.snap.pay(snapToken, {
             onSuccess: async () => {
               try {
                 const statusRes = await fetch(`http://localhost:5000/api/midtrans/status/${orderId}`, {
@@ -271,10 +442,17 @@ export default function POSTransactionsPage() {
                       ppn,
                       discount,
                       total,
-                      cashierName: currentUser?.username || 'Admin'
+                      cashierName: currentUser?.username || 'Admin',
+                      customerName: customerName || undefined,
+                      customerPhone: customerPhone || undefined,
+                      prescriptions: prescriptions.length > 0 ? prescriptions : undefined,
                     });
                     
+                    saveCustomer();
                     setCart([]);
+                    setPrescriptions([]);
+                    setCustomerName('');
+                    setCustomerPhone('');
                     // Refresh products
                     const prodRes = await fetch('http://localhost:5000/api/products?limit=100', {
                       headers: token ? { Authorization: `Bearer ${token}` } : {}
@@ -326,10 +504,17 @@ export default function POSTransactionsPage() {
             ppn,
             discount,
             total,
-            cashierName: currentUser?.username || 'Admin'
+            cashierName: currentUser?.username || 'Admin',
+            customerName: customerName || undefined,
+            customerPhone: customerPhone || undefined,
+            prescriptions: prescriptions.length > 0 ? prescriptions : undefined,
           });
           
-          setCart([]); // Clear cart
+          saveCustomer();
+          setCart([]);
+          setPrescriptions([]);
+          setCustomerName('');
+          setCustomerPhone('');
           // Refresh products to update stock
           const prodRes = await fetch('http://localhost:5000/api/products?limit=100', {
             headers: token ? { Authorization: `Bearer ${token}` } : {}
@@ -438,19 +623,39 @@ export default function POSTransactionsPage() {
         <div class="info">ID Transaksi : ${receiptData.id}</div>
         <div class="info">Tanggal      : ${new Date().toLocaleString('id-ID')}</div>
         <div class="info">Kasir        : ${receiptData.cashierName}</div>
+        ${receiptData.customerName ? `
+        <div class="info">Pembeli      : ${receiptData.customerName}${receiptData.customerPhone ? ` (${receiptData.customerPhone})` : ''}</div>
+        ` : ''}
         
         <div class="divider-dash"></div>
         
         <div class="items">
-          ${receiptData.items.map((item: CartItem) => `
-            <div class="item">
-              <div class="item-name">${item.name}</div>
-              <div class="item-qty-price">
-                <span>${item.quantity} ${item.unit}</span>
-                <span>${formatCurrency(item.selling_price * item.quantity)}</span>
-              </div>
+          ${receiptData.prescriptions ? receiptData.prescriptions.map(p => `
+            <div style="margin-bottom: 10px;">
+              <div style="font-weight: bold; font-size: 12px; color: #7c3aed; margin-bottom: 4px;">${p.label}${p.doctor_name ? ` - ${p.doctor_name}` : ''}</div>
+              ${p.items.map(pi => `
+                <div class="item" style="margin: 6px 0 6px 8px;">
+                  <div class="item-name" style="font-size: 11px;">${pi.product.name}</div>
+                  <div class="item-qty-price">
+                    <span>${pi.quantity} ${pi.product.unit}</span>
+                    <span>${formatCurrency(pi.product.selling_price * pi.quantity)}</span>
+                  </div>
+                </div>
+              `).join('')}
             </div>
-          `).join('')}
+          `).join('') : ''}
+          ${receiptData.items.filter((i: CartItem) => !i.prescriptionLabel).length > 0 ? `
+            ${receiptData.prescriptions ? '<div style="font-weight: bold; font-size: 12px; margin-bottom: 4px;">Non Resep</div>' : ''}
+            ${receiptData.items.filter((i: CartItem) => !i.prescriptionLabel).map((item: CartItem) => `
+              <div class="item">
+                <div class="item-name">${item.name}</div>
+                <div class="item-qty-price">
+                  <span>${item.quantity} ${item.unit}</span>
+                  <span>${formatCurrency(item.selling_price * item.quantity)}</span>
+                </div>
+              </div>
+            `).join('')}
+          ` : ''}
         </div>
         
         <div class="divider-dash"></div>
@@ -549,14 +754,15 @@ export default function POSTransactionsPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 pb-4">
                 {filteredProducts.map(product => {
                     const cartItem = cart.find(item => item.id === product.id);
-                    const isActive = !!cartItem;
-                    const quantity = cartItem?.quantity || 0;
+                    const prescItem = prescriptionItems.find(i => i.product.id === product.id);
+                    const isActive = showPrescriptionForm ? !!prescItem : !!cartItem;
+                    const quantity = showPrescriptionForm ? (prescItem?.quantity || 0) : (cartItem?.quantity || 0);
                     const isHighlighted = highlightedProductId === product.id;
                     
                     return (
                     <div 
                     key={product.id} 
-                    onClick={() => addToCart(product)}
+                    onClick={() => showPrescriptionForm ? addPrescriptionItem(product) : addToCart(product)}
                     className={`p-4 rounded-xl shadow-sm cursor-pointer transition-all duration-300 group relative ${
                         isActive 
                           ? 'bg-blue-50 border-2 border-blue-500 shadow-md' 
@@ -588,15 +794,15 @@ export default function POSTransactionsPage() {
                             </p>
                         </div>
                         <div className="flex items-center gap-1">
-                          {isActive && (
+                          {isActive && !showPrescriptionForm && (
                             <button onClick={(e) => { e.stopPropagation(); decrementProduct(product.id); }}
                               className="w-8 h-8 flex items-center justify-center rounded-lg transition-all bg-blue-600 text-white shadow-md">
                               <Minus size={16} />
                             </button>
                           )}
-                          <button onClick={(e) => { e.stopPropagation(); addToCart(product); }}
+                          <button onClick={(e) => { e.stopPropagation(); if (showPrescriptionForm) addPrescriptionItem(product); else addToCart(product); }}
                             className={`w-8 h-8 flex items-center justify-center rounded-lg transition-all ${
-                              isActive 
+                              isActive && !showPrescriptionForm
                                 ? 'bg-blue-600 text-white shadow-md' 
                                 : 'bg-blue-50 text-blue-600 opacity-0 group-hover:opacity-100'
                             }`}>
@@ -613,154 +819,345 @@ export default function POSTransactionsPage() {
         </div>
 
         {/* Right: Cart — side panel on desktop, slide-up bottom sheet on mobile */}
-        <div className={`
-          fixed sm:relative bottom-0 left-0 right-0 z-30
-          sm:w-96 sm:my-4 sm:mr-6 sm:ml-0
-          bg-white flex flex-col overflow-hidden
-          sm:h-[calc(100vh-8rem)]
-          transition-all duration-300 ease-out
-          ${cart.length > 0 
-            ? 'max-h-[55vh] sm:max-h-full shadow-2xl rounded-t-2xl sm:rounded-2xl sm:shadow-2xl sm:border sm:border-gray-100' 
-            : 'sm:max-h-full sm:shadow-2xl sm:border sm:border-gray-100 sm:rounded-2xl max-h-0 shadow-none'
-          }
-        `}>
-          {/* Cart Header — always visible on sm, toggle on mobile */}
+        {!showBuyerForm && !showPrescriptionForm && (
           <div className={`
-            px-3 sm:px-4 py-2 sm:py-3 shrink-0 bg-white border-b border-gray-100 flex items-center justify-between
-            ${cart.length === 0 ? 'border-b-0 sm:border-b' : ''}
+            fixed sm:relative bottom-0 left-0 right-0 z-30
+            sm:w-96 sm:my-4 sm:mr-6 sm:ml-0
+            bg-white flex flex-col overflow-hidden
+            sm:h-[calc(100vh-8rem)]
+            transition-all duration-300 ease-out
+            ${cart.length > 0 
+              ? 'max-h-[55vh] sm:max-h-full shadow-2xl rounded-t-2xl sm:rounded-2xl sm:shadow-2xl sm:border sm:border-gray-100' 
+              : 'sm:max-h-full sm:shadow-2xl sm:border sm:border-gray-100 sm:rounded-2xl max-h-0 shadow-none'
+            }
           `}>
-            <h2 className="text-sm sm:text-lg font-bold text-gray-800 flex items-center gap-2">
-              <ShoppingCart size={16} className="text-blue-600" />
-              Pesanan Saat Ini
-              {cart.length > 0 && <span className="text-xs bg-blue-600 text-white px-1.5 py-0.5 rounded-full">{cart.length}</span>}
-            </h2>
-            {cart.length > 0 && (
-              <button onClick={() => setCart([])} className="text-xs text-red-500 hover:text-red-700 sm:hidden">Hapus Semua</button>
-            )}
-          </div>
+            {/* Cart Header */}
+            <div className={`
+              px-3 sm:px-4 py-2 sm:py-3 shrink-0 bg-white border-b border-gray-100 flex items-center justify-between
+              ${cart.length === 0 ? 'border-b-0 sm:border-b' : ''}
+            `}>
+              <h2 className="text-sm sm:text-lg font-bold text-gray-800 flex items-center gap-2">
+                <ShoppingCart size={16} className="text-blue-600" />
+                Pesanan Saat Ini
+                {cart.length > 0 && <span className="text-xs bg-blue-600 text-white px-1.5 py-0.5 rounded-full">{cart.length}</span>}
+              </h2>
+              {cart.length > 0 && (
+                <button onClick={() => { setCart([]); setPrescriptions([]); }} className="text-xs text-red-500 hover:text-red-700 sm:hidden">Hapus Semua</button>
+              )}
+            </div>
 
-          {/* Cart Items */}
-          <div className={`flex-1 overflow-y-auto px-3 py-2 space-y-2 bg-white min-h-0 ${cart.length === 0 ? 'hidden sm:block' : ''}`}>
-            {cart.length === 0 ? (
-              <div className="text-center text-gray-400 py-8 flex flex-col items-center justify-center">
-                <ShoppingCart size={32} className="mb-2 opacity-20" />
-                <p className="text-sm">Belum ada pesanan</p>
-                <p className="text-xs mt-1 opacity-60">Klik produk untuk menambahkan</p>
-              </div>
-            ) : (
-              cart.map(item => (
-              <div key={item.id} className="relative flex gap-2 p-3 bg-white rounded-xl border border-gray-100 hover:shadow-sm transition-shadow">
-                <button 
-                  onClick={(e) => { e.stopPropagation(); removeFromCart(item.id); }}
-                  className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center shadow-md hover:bg-red-600 transition-colors z-10"
-                >
-                  <X size={10} />
-                </button>
-                <div className="flex-1 min-w-0 pr-6">
-                  <h4 className="font-semibold text-gray-800 text-xs sm:text-sm truncate">{item.name}</h4>
-                  <p className="text-blue-600 text-xs sm:text-sm font-bold mt-0.5">{formatCurrency(item.selling_price)}</p>
+            {/* Cart Items */}
+            <div className={`flex-1 overflow-y-auto px-3 py-2 space-y-2 bg-white min-h-0 ${cart.length === 0 ? 'hidden sm:block' : ''}`}>
+              {/* Prescription badges */}
+              {prescriptions.length > 0 && (
+                <div className="space-y-2 pb-1">
+                  {prescriptions.map((p, i) => (
+                    <div key={i} className="relative flex items-center gap-2 p-3 bg-purple-50 rounded-xl border border-purple-200">
+                      <button onClick={(e) => { e.stopPropagation(); deletePrescription(i); }}
+                        className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center shadow-md hover:bg-red-600 transition-colors z-10">
+                        <X size={10} />
+                      </button>
+                      <Pill size={16} className="text-purple-600 shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <h4 className="font-semibold text-gray-800 text-xs sm:text-sm">{p.label}</h4>
+                          <span className="text-[10px] font-medium text-purple-600 bg-purple-100 px-1.5 py-0.5 rounded">{p.items.length} item</span>
+                        </div>
+                        <p className="text-[11px] text-gray-500 truncate">{p.doctor_name || p.instansi ? `${p.doctor_name || ''}${p.doctor_name && p.instansi ? ' - ' : ''}${p.instansi || ''}` : 'Tanpa dokter'}</p>
+                      </div>
+                      <button onClick={(e) => { e.stopPropagation(); openEditPrescription(i); }}
+                        className="text-xs text-purple-600 hover:text-purple-800 font-medium shrink-0 border border-purple-300 px-2 py-1 rounded-lg">
+                        Edit
+                      </button>
+                    </div>
+                  ))}
                 </div>
-                <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1 shrink-0">
-                  <button onClick={(e) => { e.stopPropagation(); updateQuantity(item.id, -1); }}
-                    className="w-6 h-6 flex items-center justify-center hover:bg-white rounded-md text-gray-700 shadow-sm transition-all">
-                    <Minus size={12} />
-                  </button>
-                  {editingQty?.id === item.id ? (
-                    <input
-                      type="number"
-                      value={editingQty.value}
-                      onChange={(e) => setEditingQty({ id: item.id, value: e.target.value })}
-                      onBlur={() => {
-                        const val = parseInt(editingQty!.value);
-                        if (!isNaN(val) && val > 0) setQuantityDirect(item.id, val);
-                        setEditingQty(null);
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
-                        else if (e.key === 'Escape') setEditingQty(null);
-                      }}
-                      autoFocus
-                      className="w-10 text-center text-xs font-semibold border border-blue-300 rounded px-1 outline-none"
-                      onClick={(e) => e.stopPropagation()}
-                    />
-                  ) : (
-                    <span
-                      onClick={(e) => { e.stopPropagation(); setEditingQty({ id: item.id, value: String(item.quantity) }); }}
-                      className="text-xs font-semibold px-2 text-center min-w-[2rem] cursor-pointer hover:bg-white rounded"
-                    >
-                      {item.quantity}
-                    </span>
-                  )}
-                  <button onClick={(e) => { e.stopPropagation(); updateQuantity(item.id, 1); }}
-                    className="w-6 h-6 flex items-center justify-center hover:bg-white rounded-md text-gray-700 shadow-sm transition-all">
-                    <Plus size={12} />
-                  </button>
+              )}
+              {cart.filter(i => !i.prescriptionLabel).length === 0 && prescriptions.length === 0 ? (
+                <div className="text-center text-gray-400 py-8 flex flex-col items-center justify-center">
+                  <ShoppingCart size={32} className="mb-2 opacity-20" />
+                  <p className="text-sm">Belum ada pesanan</p>
+                  <p className="text-xs mt-1 opacity-60">Klik produk untuk menambahkan</p>
                 </div>
-              </div>
-              ))
-            )}
-          </div>
+              ) : (
+                cart.filter(i => !i.prescriptionLabel).map(item => (
+                <div key={`${item.id}-manual`} className="relative flex gap-2 p-3 bg-white rounded-xl border border-gray-100 hover:shadow-sm transition-shadow">
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); removeFromCart(item.id); }}
+                    className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center shadow-md hover:bg-red-600 transition-colors z-10"
+                  >
+                    <X size={10} />
+                  </button>
+                  <div className="flex-1 min-w-0 pr-6">
+                    <h4 className="font-semibold text-gray-800 text-xs sm:text-sm truncate">{item.name}</h4>
+                    <p className="text-blue-600 text-xs sm:text-sm font-bold mt-0.5">{formatCurrency(item.selling_price)}</p>
+                  </div>
+                  <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1 shrink-0">
+                    <button onClick={(e) => { e.stopPropagation(); updateQuantity(item.id, -1); }}
+                      className="w-6 h-6 flex items-center justify-center hover:bg-white rounded-md text-gray-700 shadow-sm transition-all">
+                      <Minus size={12} />
+                    </button>
+                    {editingQty?.id === item.id ? (
+                      <input
+                        type="number"
+                        value={editingQty.value}
+                        onChange={(e) => setEditingQty({ id: item.id, value: e.target.value })}
+                        onBlur={() => {
+                          const val = parseInt(editingQty!.value);
+                          if (!isNaN(val) && val > 0) setQuantityDirect(item.id, val);
+                          setEditingQty(null);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+                          else if (e.key === 'Escape') setEditingQty(null);
+                        }}
+                        autoFocus
+                        className="w-10 text-center text-xs font-semibold border border-blue-300 rounded px-1 outline-none"
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                    ) : (
+                      <span
+                        onClick={(e) => { e.stopPropagation(); setEditingQty({ id: item.id, value: String(item.quantity) }); }}
+                        className="text-xs font-semibold px-2 text-center min-w-[2rem] cursor-pointer hover:bg-white rounded"
+                      >
+                        {item.quantity}
+                      </span>
+                    )}
+                    <button onClick={(e) => { e.stopPropagation(); updateQuantity(item.id, 1); }}
+                      className="w-6 h-6 flex items-center justify-center hover:bg-white rounded-md text-gray-700 shadow-sm transition-all">
+                      <Plus size={12} />
+                    </button>
+                  </div>
+                </div>
+                ))
+              )}
+            </div>
 
-          {/* Payment Footer */}
-          <div className={`${cart.length === 0 ? 'hidden sm:block' : ''} p-3 sm:p-4 bg-gray-50 shrink-0 border-t border-gray-100`}>
-            <div className="space-y-1.5 mb-3 text-xs sm:text-sm">
-              <div className="flex justify-between text-gray-600">
-                <span>Sub total</span>
-                <span className="font-medium">{formatCurrency(subtotal)}</span>
-              </div>
-              {settings.ppn_rate > 0 && (
+            {/* Payment Footer */}
+            <div className={`${cart.length === 0 ? 'hidden sm:block' : ''} p-3 sm:p-4 bg-gray-50 shrink-0 border-t border-gray-100`}>
+              <div className="space-y-1.5 mb-3 text-xs sm:text-sm">
                 <div className="flex justify-between text-gray-600">
-                  <span>PPN ({settings.ppn_rate}%)</span>
-                  <span className="font-medium text-orange-600">+{formatCurrency(ppn)}</span>
+                  <span>Sub total</span>
+                  <span className="font-medium">{formatCurrency(subtotal)}</span>
                 </div>
-              )}
-              {settings.discount_rate > 0 && (
-                <div className="flex justify-between text-red-500">
-                  <span>Diskon ({settings.discount_rate}%)</span>
-                  <span className="font-medium">-{formatCurrency(discount)}</span>
+                {settings.ppn_rate > 0 && (
+                  <div className="flex justify-between text-gray-600">
+                    <span>PPN ({settings.ppn_rate}%)</span>
+                    <span className="font-medium text-orange-600">+{formatCurrency(ppn)}</span>
+                  </div>
+                )}
+                {settings.discount_rate > 0 && (
+                  <div className="flex justify-between text-red-500">
+                    <span>Diskon ({settings.discount_rate}%)</span>
+                    <span className="font-medium">-{formatCurrency(discount)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between text-gray-900 font-bold text-sm sm:text-base pt-2 border-t border-gray-100">
+                  <span>Total</span>
+                  <span>{formatCurrency(total)}</span>
                 </div>
-              )}
-              <div className="flex justify-between text-gray-900 font-bold text-sm sm:text-base pt-2 border-t border-gray-100">
-                <span>Total</span>
-                <span>{formatCurrency(total)}</span>
               </div>
-            </div>
 
-            <div className="mb-3">
-              <div className="grid grid-cols-2 gap-2">
-                <button onClick={() => setPaymentMethod('cash')}
-                  className={`p-2 sm:p-3 rounded-xl border-2 transition-all text-xs sm:text-sm ${
-                    paymentMethod === 'cash' 
-                      ? 'border-blue-600 bg-blue-50 text-blue-700' 
-                      : 'border-gray-200 bg-white text-gray-600'
-                  }`}>
-                  <div className="font-semibold">Cash</div>
-                  <div className="text-[10px] sm:text-xs opacity-75">Tunai</div>
-                </button>
-                <button onClick={() => setPaymentMethod('midtrans')}
-                  className={`p-2 sm:p-3 rounded-xl border-2 transition-all text-xs sm:text-sm ${
-                    paymentMethod === 'midtrans' 
-                      ? 'border-green-600 bg-green-50 text-green-700' 
-                      : 'border-gray-200 bg-white text-gray-600'
-                  }`}>
-                  <div className="font-semibold">Midtrans</div>
-                  <div className="text-[10px] sm:text-xs opacity-75">Transfer/QRIS</div>
-                </button>
+              <div className="mb-3">
+                <div className="grid grid-cols-2 gap-2">
+                  <button onClick={() => setPaymentMethod('cash')}
+                    className={`p-2 sm:p-3 rounded-xl border-2 transition-all text-xs sm:text-sm ${
+                      paymentMethod === 'cash' 
+                        ? 'border-blue-600 bg-blue-50 text-blue-700' 
+                        : 'border-gray-200 bg-white text-gray-600'
+                    }`}>
+                    <div className="font-semibold">Cash</div>
+                    <div className="text-[10px] sm:text-xs opacity-75">Tunai</div>
+                  </button>
+                  <button onClick={() => setPaymentMethod('midtrans')}
+                    className={`p-2 sm:p-3 rounded-xl border-2 transition-all text-xs sm:text-sm ${
+                      paymentMethod === 'midtrans' 
+                        ? 'border-green-600 bg-green-50 text-green-700' 
+                        : 'border-gray-200 bg-white text-gray-600'
+                    }`}>
+                    <div className="font-semibold">Midtrans</div>
+                    <div className="text-[10px] sm:text-xs opacity-75">Transfer/QRIS</div>
+                  </button>
+                </div>
               </div>
-            </div>
 
-            <button 
-              onClick={handlePayment}
-              disabled={processing || cart.length === 0}
-              className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-bold py-2.5 sm:py-3 rounded-xl shadow-lg shadow-blue-500/30 transition-all flex items-center justify-center gap-2 text-sm sm:text-base"
-            >
-              {processing ? 'Processing...' : (
-                <><CreditCard size={18} /> Pembayaran</>
-              )}
-            </button>
+              {/* Data Pembeli */}
+              <button
+                onClick={() => setShowBuyerForm(true)}
+                className={`w-full mb-2 py-2 rounded-xl border-2 transition-all text-xs sm:text-sm flex items-center justify-center gap-2 ${
+                  customerName || customerPhone
+                    ? 'border-blue-600 bg-blue-50 text-blue-700'
+                    : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+                }`}
+              >
+                <User size={14} />
+                {customerName ? `${customerName} (${customerPhone})` : 'Data Pembeli'}
+              </button>
+
+              {/* Resep */}
+              <button
+                onClick={openNewPrescription}
+                className={`w-full mb-2 py-2 rounded-xl border-2 transition-all text-xs sm:text-sm flex items-center justify-center gap-2 ${
+                  prescriptions.length > 0
+                    ? 'border-purple-600 bg-purple-50 text-purple-700'
+                    : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+                }`}
+              >
+                <Pill size={14} />
+                {prescriptions.length > 0 ? `+ Resep Lain` : 'Resep'}
+              </button>
+
+              <button 
+                onClick={handlePayment}
+                disabled={processing || cart.length === 0}
+                className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-bold py-2.5 sm:py-3 rounded-xl shadow-lg shadow-blue-500/30 transition-all flex items-center justify-center gap-2 text-sm sm:text-base"
+              >
+                {processing ? 'Processing...' : (
+                  <><CreditCard size={18} /> Pembayaran</>
+                )}
+              </button>
+            </div>
           </div>
-        </div>
+        )}
+
+        {/* Buyer Form Offcanvas */}
+        {showBuyerForm && (
+          <div className="fixed sm:relative bottom-0 left-0 right-0 z-30 sm:w-96 sm:my-4 sm:mr-6 sm:ml-0 bg-white flex flex-col overflow-hidden sm:h-[calc(100vh-8rem)] max-h-[80vh] sm:max-h-full shadow-2xl rounded-t-2xl sm:rounded-2xl sm:border sm:border-gray-100">
+            <div className="px-4 sm:px-5 py-3 sm:py-4 border-b border-gray-200 flex items-center justify-between shrink-0">
+              <h2 className="text-sm sm:text-base font-bold text-gray-800 flex items-center gap-2">
+                <User size={16} className="text-blue-600" />
+                Data Pembeli
+              </h2>
+              <button onClick={() => setShowBuyerForm(false)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500">
+                <X size={18} />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">No. Handphone</label>
+                <div className="relative">
+                  <input
+                    type="tel"
+                    value={customerPhone}
+                    onChange={(e) => handlePhoneChange(e.target.value)}
+                    placeholder="08xxxxxxxxxx"
+                    className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                  />
+                  {searchingCustomer && (
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                      <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Nama Pembeli</label>
+                <input
+                  type="text"
+                  value={customerName}
+                  onChange={(e) => setCustomerName(e.target.value)}
+                  placeholder="Nama pembeli"
+                  className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                />
+              </div>
+            </div>
+            <div className="px-4 sm:px-5 py-3 border-t border-gray-200 shrink-0">
+              <button
+                onClick={() => setShowBuyerForm(false)}
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 rounded-xl transition-all text-sm"
+              >
+                Simpan
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Prescription Form Offcanvas */}
+        {showPrescriptionForm && (
+          <div className="fixed sm:relative bottom-0 left-0 right-0 z-30 sm:w-96 sm:my-4 sm:mr-6 sm:ml-0 bg-white flex flex-col overflow-hidden sm:h-[calc(100vh-8rem)] max-h-[80vh] sm:max-h-full shadow-2xl rounded-t-2xl sm:rounded-2xl sm:border sm:border-gray-100">
+            <div className="px-4 sm:px-5 py-3 sm:py-4 border-b border-gray-200 flex items-center justify-between shrink-0">
+              <h2 className="text-sm sm:text-base font-bold text-gray-800 flex items-center gap-2">
+                <Pill size={16} className="text-purple-600" />
+                {editingPrescriptionIdx !== null ? `Edit ${prescriptions[editingPrescriptionIdx].label}` : 'Resep Baru'}
+              </h2>
+              <button onClick={() => setShowPrescriptionForm(false)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500">
+                <X size={18} />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="col-span-2">
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Kode Resep</label>
+                  <input type="text" value={prescriptionForm.prescription_code} onChange={(e) => setPrescriptionForm(p => ({ ...p, prescription_code: e.target.value }))} placeholder="Kode resep" className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Nama Dokter</label>
+                  <input type="text" value={prescriptionForm.doctor_name} onChange={(e) => setPrescriptionForm(p => ({ ...p, doctor_name: e.target.value }))} placeholder="Nama dokter" className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Instansi</label>
+                  <input type="text" value={prescriptionForm.instansi} onChange={(e) => setPrescriptionForm(p => ({ ...p, instansi: e.target.value }))} placeholder="Instansi" className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all" />
+                </div>
+                <div className="col-span-2">
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Tanggal Resep</label>
+                  <input type="date" value={prescriptionForm.prescription_date} onChange={(e) => setPrescriptionForm(p => ({ ...p, prescription_date: e.target.value }))} className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all" />
+                </div>
+                <div className="col-span-2">
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Catatan</label>
+                  <textarea value={prescriptionForm.notes} onChange={(e) => setPrescriptionForm(p => ({ ...p, notes: e.target.value }))} placeholder="Catatan resep" rows={2} className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all resize-none" />
+                </div>
+              </div>
+
+              <div className="border-t border-gray-200 pt-3">
+                <label className="block text-xs font-semibold text-gray-700 mb-2">Daftar Obat Resep</label>
+                <div className="relative mb-2">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
+                  <input type="text" value={prescriptionSearch} onChange={(e) => setPrescriptionSearch(e.target.value)} placeholder="Cari obat..." className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all" />
+                </div>
+                {prescriptionSearch && (
+                  <div className="max-h-32 overflow-y-auto border border-gray-200 rounded-xl mb-2">
+                    {filteredPrescriptionProducts.slice(0, 10).map(product => (
+                      <button key={product.id} onClick={() => addPrescriptionItem(product)}
+                        className="w-full text-left px-3 py-2 text-xs hover:bg-purple-50 border-b border-gray-100 last:border-b-0 flex justify-between items-center">
+                        <span className="truncate">{product.name}</span>
+                        <span className="text-purple-600 font-medium shrink-0 ml-2">+</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {prescriptionItems.length > 0 && (
+                  <div className="space-y-1.5">
+                    {prescriptionItems.map(item => (
+                      <div key={item.product.id} className="flex items-center gap-2 p-2 bg-purple-50 rounded-xl border border-purple-100">
+                        <button onClick={() => removePrescriptionItem(item.product.id)} className="text-red-500 hover:text-red-700 shrink-0">
+                          <X size={12} />
+                        </button>
+                        <span className="flex-1 text-xs truncate">{item.product.name}</span>
+                        <div className="flex items-center gap-1 bg-white rounded-lg p-0.5">
+                          <button onClick={() => updatePrescriptionItemQty(item.product.id, -1)} className="w-5 h-5 flex items-center justify-center text-gray-600 hover:bg-gray-100 rounded text-xs">-</button>
+                          <span className="text-xs font-semibold px-1 min-w-[1.5rem] text-center">{item.quantity}</span>
+                          <button onClick={() => updatePrescriptionItemQty(item.product.id, 1)} className="w-5 h-5 flex items-center justify-center text-gray-600 hover:bg-gray-100 rounded text-xs">+</button>
+                        </div>
+                        <span className="text-xs font-medium text-gray-600 min-w-[4rem] text-right">{formatCurrency(item.product.selling_price * item.quantity)}</span>
+                      </div>
+                    ))}
+                    <div className="flex justify-between text-xs font-semibold text-gray-700 pt-1 border-t border-purple-200">
+                      <span>Subtotal Obat Resep</span>
+                      <span>{formatCurrency(prescriptionItems.reduce((sum, i) => sum + i.product.selling_price * i.quantity, 0))}</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="px-4 sm:px-5 py-3 border-t border-gray-200 shrink-0">
+              <button onClick={savePrescription} className="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2.5 rounded-xl transition-all text-sm">
+                Simpan Resep
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
 }
+

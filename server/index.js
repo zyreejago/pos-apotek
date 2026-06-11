@@ -17,6 +17,7 @@ const registerStockForecastRoutes = require('./routes/stock-forecast');
 const registerStockForecastOpenRouterRoutes = require('./routes/stock-forecast-openrouter');
 const registerInventoryRoutes = require('./routes/inventory');
 const registerReturnRoutes = require('./routes/returns');
+const registerCustomerRoutes = require('./routes/customers');
 const { registerAuditTrailRoutes, createAuditTrail } = require('./routes/audit-trails');
 
 const envPath = path.join(__dirname, '..', '.env');
@@ -404,6 +405,7 @@ registerStockForecastRoutes(app, pool, authenticate, checkPermission);
 registerStockForecastOpenRouterRoutes(app, pool, authenticate, checkPermission);
 registerInventoryRoutes(app, pool, authenticate, checkPermission, upload, (params) => createAuditTrail(pool, params));
 registerReturnRoutes(app, pool, authenticate, checkPermission, (params) => createAuditTrail(pool, params));
+registerCustomerRoutes(app, pool, authenticate);
 
 async function startServer() {
   await initDB();

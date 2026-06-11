@@ -13,7 +13,7 @@ module.exports = function registerTransactionRoutes(app, pool, authenticate, che
     authenticate,
     checkPermission('Transactions', 'create'),
     async (req, res) => {
-    const { items, total_amount, tax_amount, discount_amount, subtotal, payment_method } =
+    const { items, total_amount, tax_amount, discount_amount, subtotal, payment_method, customer_name, customer_phone } =
       req.body;
 
     if (!items || items.length === 0) {
@@ -28,8 +28,8 @@ module.exports = function registerTransactionRoutes(app, pool, authenticate, che
       const today = new Date().toISOString().split('T')[0];
 
       const [transResult] = await connection.query(
-        'INSERT INTO transactions (total_amount, tax_amount, discount_amount, subtotal, payment_method, midtrans_order_id, payment_status, user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-        [total_amount, tax_amount || 0, discount_amount || 0, subtotal || 0, payment_method || 'cash', payment_method === 'midtrans' ? orderId : null, 'pending', req.user.id]
+        'INSERT INTO transactions (total_amount, tax_amount, discount_amount, subtotal, payment_method, midtrans_order_id, payment_status, user_id, customer_name, customer_phone) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [total_amount, tax_amount || 0, discount_amount || 0, subtotal || 0, payment_method || 'cash', payment_method === 'midtrans' ? orderId : null, 'pending', req.user.id, customer_name || null, customer_phone || null]
       );
       const transactionId = transResult.insertId;
 

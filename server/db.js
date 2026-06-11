@@ -520,6 +520,17 @@ const initDB = async () => {
       )
     `);
 
+    // Customers table
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS customers (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        phone VARCHAR(50) NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY unique_customer_phone (phone)
+      )
+    `);
+
     // Queues table
     await connection.query(`
       CREATE TABLE IF NOT EXISTS queues (
@@ -610,6 +621,12 @@ const initDB = async () => {
     } catch (e) {}
     try {
       await connection.query(`ALTER TABLE transactions ADD FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL`);
+    } catch (e) {}
+    try {
+      await connection.query(`ALTER TABLE transactions ADD COLUMN customer_name VARCHAR(255) NULL`);
+    } catch (e) {}
+    try {
+      await connection.query(`ALTER TABLE transactions ADD COLUMN customer_phone VARCHAR(50) NULL`);
     } catch (e) {}
     try {
       await connection.query(`ALTER TABLE transactions ADD COLUMN is_fully_returned BOOLEAN DEFAULT FALSE`);
