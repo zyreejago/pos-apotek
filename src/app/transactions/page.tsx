@@ -237,19 +237,28 @@ export default function POSTransactionsPage() {
       const userStr = localStorage.getItem('user');
       const currentUser = userStr ? JSON.parse(userStr) : null;
       const itemsPayload = data.items.map(i => ({ product_id: i.product.id, quantity: i.quantity, selling_price: i.product.selling_price }));
+      const body = {
+        prescription_code: data.prescription_code,
+        doctor_name: data.doctor_name,
+        instansi: data.instansi,
+        prescription_date: data.prescription_date,
+        notes: data.notes,
+        entered_by: currentUser?.id,
+        items: JSON.stringify(itemsPayload),
+      };
 
       if (data.id) {
         const res = await fetch(`http://localhost:5000/api/inventory/prescriptions/${data.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-          body: JSON.stringify({ ...prescriptionForm, entered_by: currentUser?.id, items: JSON.stringify(itemsPayload) }),
+          body: JSON.stringify(body),
         });
         if (res.ok) return data.id;
       } else {
         const res = await fetch('http://localhost:5000/api/inventory/prescriptions', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-          body: JSON.stringify({ ...prescriptionForm, entered_by: currentUser?.id, items: JSON.stringify(itemsPayload) }),
+          body: JSON.stringify(body),
         });
         if (res.ok) {
           const result = await res.json();
@@ -272,9 +281,6 @@ export default function POSTransactionsPage() {
       ...prescriptionForm,
       items: prescriptionItems.map(i => ({ product: i.product, quantity: i.quantity })),
     };
-
-    const savedId = await savePrescriptionToApi(data);
-    if (savedId) data.id = savedId;
 
     if (editingPrescriptionIdx !== null) {
       setCart(prev => prev.filter(item => item.prescriptionLabel !== label));
@@ -308,19 +314,8 @@ export default function POSTransactionsPage() {
     setShowPrescriptionForm(false);
   };
 
-  const deletePrescription = async (idx: number) => {
+  const deletePrescription = (idx: number) => {
     const p = prescriptions[idx];
-    if (p.id) {
-      try {
-        const token = localStorage.getItem('token');
-        await fetch(`http://localhost:5000/api/inventory/prescriptions/${p.id}`, {
-          method: 'DELETE',
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-        });
-      } catch (error) {
-        console.error('Error deleting prescription:', error);
-      }
-    }
     setCart(prev => prev.filter(item => item.prescriptionLabel !== p.label));
     setPrescriptions(prev => prev.filter((_, i) => i !== idx));
   };
@@ -410,6 +405,13 @@ export default function POSTransactionsPage() {
     p.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  // Save all prescriptions to API after successful payment
+  const saveAllPrescriptionsToApi = async () => {
+    for (const p of prescriptions) {
+      await savePrescriptionToApi(p);
+    }
+  };
+
   // Handle Payment
   const handlePayment = async () => {
     // Permission check for creating transaction (assuming 'create' is needed for payment)
@@ -495,6 +497,7 @@ export default function POSTransactionsPage() {
                     });
                     
                     saveCustomer();
+                    await saveAllPrescriptionsToApi();
                     setCart([]);
                     setPrescriptions([]);
                     setCustomerName('');
@@ -557,6 +560,7 @@ export default function POSTransactionsPage() {
           });
           
           saveCustomer();
+          await saveAllPrescriptionsToApi();
           setCart([]);
           setPrescriptions([]);
           setCustomerName('');
