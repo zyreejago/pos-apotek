@@ -759,7 +759,7 @@ export default function POSTransactionsPage() {
 
       <div className="flex flex-col sm:flex-row flex-1 overflow-hidden relative">
         {/* Left: Product Grid */}
-        <div className={`flex-1 flex flex-col p-3 sm:p-6 overflow-hidden ${cart.length > 0 ? 'pb-[45vh] sm:pb-0' : ''}`}>
+        <div className={`flex-1 flex flex-col p-3 sm:p-6 sm:pr-[26rem] overflow-hidden ${cart.length > 0 ? 'pb-[45vh] sm:pb-0' : ''}`}>
           {/* Search */}
           <div className="relative mb-6 shrink-0">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
@@ -867,10 +867,10 @@ export default function POSTransactionsPage() {
         {/* Right: Cart — side panel on desktop, slide-up bottom sheet on mobile */}
         {!showBuyerForm && !showPrescriptionForm && (
           <div className={`
-            fixed sm:relative bottom-0 left-0 right-0 z-30
-            sm:w-96 sm:my-4 sm:mr-6 sm:ml-0
+            fixed bottom-0 left-0 right-0 z-30
+            sm:fixed sm:right-6 sm:left-auto sm:top-[5rem] sm:w-96
             bg-white flex flex-col overflow-hidden
-            sm:h-[calc(100vh-8rem)]
+            sm:h-[calc(100vh-7rem)]
             transition-all duration-300 ease-out
             ${cart.length > 0 
               ? 'max-h-[55vh] sm:max-h-full shadow-2xl rounded-t-2xl sm:rounded-2xl sm:shadow-2xl sm:border sm:border-gray-100' 
@@ -1068,7 +1068,7 @@ export default function POSTransactionsPage() {
 
         {/* Buyer Form Offcanvas */}
         {showBuyerForm && (
-          <div className="fixed sm:relative bottom-0 left-0 right-0 z-30 sm:w-96 sm:my-4 sm:mr-6 sm:ml-0 bg-white flex flex-col overflow-hidden sm:h-[calc(100vh-8rem)] max-h-[80vh] sm:max-h-full shadow-2xl rounded-t-2xl sm:rounded-2xl sm:border sm:border-gray-100">
+          <div className="fixed bottom-0 left-0 right-0 z-30 sm:fixed sm:right-6 sm:left-auto sm:top-[5rem] sm:w-96 bg-white flex flex-col overflow-hidden sm:h-[calc(100vh-7rem)] max-h-[80vh] sm:max-h-full shadow-2xl rounded-t-2xl sm:rounded-2xl sm:border sm:border-gray-100">
             <div className="px-4 sm:px-5 py-3 sm:py-4 border-b border-gray-200 flex items-center justify-between shrink-0">
               <h2 className="text-sm sm:text-base font-bold text-gray-800 flex items-center gap-2">
                 <User size={16} className="text-blue-600" />
@@ -1120,7 +1120,7 @@ export default function POSTransactionsPage() {
 
         {/* Prescription Form Offcanvas */}
         {showPrescriptionForm && (
-          <div className="fixed sm:relative bottom-0 left-0 right-0 z-30 sm:w-96 sm:my-4 sm:mr-6 sm:ml-0 bg-white flex flex-col overflow-hidden sm:h-[calc(100vh-8rem)] max-h-[80vh] sm:max-h-full shadow-2xl rounded-t-2xl sm:rounded-2xl sm:border sm:border-gray-100">
+          <div className="fixed bottom-0 left-0 right-0 z-30 sm:fixed sm:right-6 sm:left-auto sm:top-[5rem] sm:w-96 bg-white flex flex-col overflow-hidden sm:h-[calc(100vh-7rem)] max-h-[80vh] sm:max-h-full shadow-2xl rounded-t-2xl sm:rounded-2xl sm:border sm:border-gray-100">
             <div className="px-4 sm:px-5 py-3 sm:py-4 border-b border-gray-200 flex items-center justify-between shrink-0">
               <h2 className="text-sm sm:text-base font-bold text-gray-800 flex items-center gap-2">
                 <Pill size={16} className="text-purple-600" />
