@@ -49,9 +49,9 @@ module.exports = function registerProductRoutes(app, pool, authenticate, checkPe
       let params = [];
 
       if (search) {
-        query += ' WHERE p.status = "active" AND p.is_active = 1 AND p.name LIKE ?';
-        countQuery += ' AND status = "active" AND name LIKE ?';
-        params.push(`%${search}%`);
+        query += ' WHERE p.status = "active" AND p.is_active = 1 AND (p.name LIKE ? OR p.description LIKE ?)';
+        countQuery += ' AND status = "active" AND (name LIKE ? OR description LIKE ?)';
+        params.push(`%${search}%`, `%${search}%`);
       } else {
         query += ' WHERE p.status = "active" AND p.is_active = 1';
         countQuery += ' AND status = "active"';
@@ -64,7 +64,7 @@ module.exports = function registerProductRoutes(app, pool, authenticate, checkPe
 
       const [countResult] = await connection.query(
         countQuery,
-        search ? [`%${search}%`] : []
+        search ? [`%${search}%`, `%${search}%`] : []
       );
       const total = countResult[0].total;
 

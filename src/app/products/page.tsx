@@ -1007,7 +1007,8 @@ export default function ProductsPage() {
       result = result.filter(p => 
         p.name.toLowerCase().includes(query) ||
         (p.supplier_name?.toLowerCase().includes(query)) ||
-        (p.location_code?.toLowerCase().includes(query))
+        (p.location_code?.toLowerCase().includes(query)) ||
+        (p.description?.toLowerCase().includes(query))
       );
     }
 
