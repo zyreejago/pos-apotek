@@ -242,12 +242,12 @@ function registerInventoryRoutes(app, pool, authenticate, checkPermission, uploa
   app.get('/api/inventory/pending-batches', authenticate, checkPermission('Approval Faktur', 'show'), async (req, res) => {
     try {
       const [rows] = await pool.query(`
-        SELECT b.*, s.name as supplier_name, p.name as product_name, p.status as product_status, p.unit as product_unit, p.purchase_unit as product_purchase_unit, p.unit_multiplier as product_unit_multiplier
+        SELECT b.*, s.name as supplier_name, p.name as product_name, p.status as product_status, p.unit as product_unit, p.purchase_unit as product_purchase_unit, p.unit_multiplier as product_unit_multiplier, p.location_code as product_location_code, p.selling_price as product_selling_price
         FROM batches b 
         LEFT JOIN suppliers s ON b.supplier_id = s.id 
         LEFT JOIN products p ON b.product_id = p.id
         WHERE b.status IN ('pending', 'revision', 'rejected')
-        ORDER BY b.created_at DESC
+        ORDER BY b.created_at ASC
       `);
       res.json({ success: true, data: rows });
     } catch (err) {
@@ -388,7 +388,7 @@ function registerInventoryRoutes(app, pool, authenticate, checkPermission, uploa
   app.put('/api/inventory/batches/:id', authenticate, checkPermission('Management Product', 'edit'), upload.array('images', 10), async (req, res) => {
     try {
       const { id } = req.params;
-      const { supplier_id, batch_number, invoice_number, stock_type, purchase_date, initial_quantity, remaining_quantity, cost_price, expired_date, dp_amount, due_date, notes } = req.body;
+      const { supplier_id, batch_number, invoice_number, stock_type, purchase_date, initial_quantity, remaining_quantity, cost_price, expired_date, dp_amount, due_date, notes, has_purchase_unit } = req.body;
       
       // Get the old batch first
       const [oldBatch] = await pool.query('SELECT remaining_quantity, product_id, image_url, status, stock_type FROM batches WHERE id = ?', [id]);
@@ -428,9 +428,11 @@ function registerInventoryRoutes(app, pool, authenticate, checkPermission, uploa
       // If status becomes pending or approved, clear old revision notes
       const finalNotes = (status === 'pending' || status === 'approved') ? null : (notes || null);
 
+      const hasPUValue = has_purchase_unit !== undefined ? (has_purchase_unit === '1' || has_purchase_unit === 1 ? 1 : 0) : null;
+      console.log('[Backend PUT] batchId:', id, 'has_purchase_unit:', has_purchase_unit, 'hasPUValue:', hasPUValue, 'initial_quantity:', initial_quantity, 'stock_type:', stock_type);
       await pool.query(`
         UPDATE batches 
-        SET supplier_id = ?, batch_number = ?, invoice_number = ?, stock_type = ?, purchase_date = ?, initial_quantity = ?, remaining_quantity = ?, cost_price = ?, expired_date = ?, dp_amount = ?, due_date = ?, image_url = ?, status = ?, notes = ?
+        SET supplier_id = ?, batch_number = ?, invoice_number = ?, stock_type = ?, purchase_date = ?, initial_quantity = ?, remaining_quantity = ?, cost_price = ?, expired_date = ?, dp_amount = ?, due_date = ?, image_url = ?, status = ?, notes = ?, has_purchase_unit = ?
         WHERE id = ?
       `, [
         supplier_id && supplier_id !== '' ? Number(supplier_id) : null, 
@@ -447,6 +449,7 @@ function registerInventoryRoutes(app, pool, authenticate, checkPermission, uploa
         image_url, 
         status,
         finalNotes,
+        hasPUValue,
         id
       ]);
       
@@ -537,8 +540,8 @@ function registerInventoryRoutes(app, pool, authenticate, checkPermission, uploa
 
       res.json({ success: true, status });
     } catch (err) {
-      console.error('Error updating batch:', err);
-      res.status(500).json({ success: false, message: 'Failed to update batch' });
+      console.error('Error updating batch:', err.message || err);
+      res.status(500).json({ success: false, message: err.message || 'Failed to update batch' });
     }
   });
 

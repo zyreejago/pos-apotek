@@ -248,7 +248,9 @@ export default function ProductsPage() {
 
   // Form State
   const [isMultipleProducts, setIsMultipleProducts] = useState(false);
+  const [isPerbaikanMultiMode, setIsPerbaikanMultiMode] = useState(false);
   const [hasPurchaseUnitForm, setHasPurchaseUnitForm] = useState(false);
+  const [pendingHasPU, setPendingHasPU] = useState<boolean | null>(null);
   const [fakturBatchImages, setFakturBatchImages] = useState<File[]>([]);
   const [fakturBatchPreviews, setFakturBatchPreviews] = useState<string[]>([]);
   const [formData, setFormData] = useState<ProductFormData>({
@@ -273,6 +275,8 @@ export default function ProductsPage() {
   const [productFormImageFiles, setProductFormImageFiles] = useState<File[]>([]);
   const [productFormImagePreviews, setProductFormImagePreviews] = useState<string[]>([]);
   const [multipleProducts, setMultipleProducts] = useState<ProductItem[]>([]);
+  const [perbaikanBatchIds, setPerbaikanBatchIds] = useState<Record<string, number>>({});
+  const [editingItemId, setEditingItemId] = useState<string | null>(null);
 
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
   const authHeaders = useMemo<Record<string, string>>(() => {
@@ -696,7 +700,7 @@ export default function ProductsPage() {
       formData.append('remaining_quantity', qtyInBaseUnit.toString());
       formData.append('cost_price', (Number(fakturFormData.cost_price) || 0).toString());
       formData.append('expired_date', fakturFormData.expired_date || '');
-      formData.append('has_purchase_unit', hasPurchaseUnitForm ? '1' : '0');
+      formData.append('has_purchase_unit', Number(fakturFormData.unit_multiplier) > 1 ? '1' : '0');
       if (fakturFormData.stock_type === 'dp' && fakturFormData.dp_awal) {
         formData.append('dp_awal', fakturFormData.dp_awal);
       }
@@ -895,6 +899,14 @@ export default function ProductsPage() {
   useEffect(() => {
     setCurrentPage(1);
   }, [sortField, sortDirection]);
+
+  // Apply pendingHasPU when offcanvas opens
+  useEffect(() => {
+    if (pendingHasPU !== null && isProductOffCanvasOpen) {
+      setHasPurchaseUnitForm(pendingHasPU);
+      setPendingHasPU(null);
+    }
+  }, [pendingHasPU, isProductOffCanvasOpen]);
 
   const formatStock = (stock: number, multiplier: number, purchaseUnit: string, baseUnit: string) => {
     return `${stock} ${baseUnit || 'Tablet'}`;
@@ -1113,6 +1125,10 @@ export default function ProductsPage() {
     });
     setIsMultipleProducts(false);
     setMultipleProducts([]);
+    setPerbaikanBatchIds({});
+    setIsPerbaikanMultiMode(false);
+    setEditingItemId(null);
+    setPendingHasPU(null);
   };
 
   const checkInvoiceNumber = async (value: string) => {
@@ -1297,7 +1313,7 @@ export default function ProductsPage() {
             productId = json.id;
           }
 
-          // Create batch/faktur only if supplier is selected (purchase record)
+          // Create or update batch/faktur
           if (productId && item.supplier_id) {
             const batchFormData = new FormData();
             batchFormData.append('product_id', productId.toString());
@@ -1313,11 +1329,14 @@ export default function ProductsPage() {
             if (item.dp_awal) batchFormData.append('dp_awal', item.dp_awal);
             if (item.dp_amount) batchFormData.append('dp_amount', item.dp_amount);
             if (item.due_date) batchFormData.append('due_date', item.due_date);
-            batchFormData.append('has_purchase_unit', hasPurchaseUnitForm ? '1' : '0');
+            batchFormData.append('has_purchase_unit', Number(item.unit_multiplier) > 1 ? '1' : '0');
             imageFiles.forEach(f => batchFormData.append('images', f));
 
-            const res = await fetch(`http://localhost:5000/api/inventory/batches`, {
-              method: 'POST',
+            const existingBatchId = (item as any).id ? perbaikanBatchIds[(item as any).id] : undefined;
+            const isUpdate = !!existingBatchId;
+
+            const res = await fetch(`http://localhost:5000/api/inventory/batches${isUpdate ? `/${existingBatchId}` : ''}`, {
+              method: isUpdate ? 'PUT' : 'POST',
               headers: {
                 ...authHeaders
               },
@@ -1326,14 +1345,14 @@ export default function ProductsPage() {
 
             if (res.ok) {
               const batchJson = await res.json();
-              if (batchJson.data.status === 'pending') {
+              if (batchJson.data?.status === 'pending') {
                 goeyToast.info('Persetujuan Diperlukan', {
                   description: `Faktur untuk ${item.name} memerlukan persetujuan.`
                 });
               }
             } else {
               const errData = await res.json().catch(() => ({}));
-              throw new Error(errData.message || `Gagal menyimpan faktur (${res.status})`);
+              throw new Error(errData.message || `Gagal ${isUpdate ? 'memperbarui' : 'menyimpan'} faktur (${res.status})`);
             }
           }
         };
@@ -1344,16 +1363,143 @@ export default function ProductsPage() {
             return;
           }
           for (const item of multipleProducts) {
-            await saveProductAndBatch(item, item.imageFiles || []);
+            const existingBatchId = perbaikanBatchIds[item.id];
+            if (existingBatchId) {
+              // Perbaikan multi: direct batch PUT + product PUT like single product
+              const batchFormData = new FormData();
+              batchFormData.append('supplier_id', item.supplier_id.toString());
+              batchFormData.append('invoice_number', item.invoice_number || '');
+              if (item.batch_number) batchFormData.append('batch_number', item.batch_number);
+              batchFormData.append('stock_type', item.stock_type || 'belum_bayar');
+              if (item.purchase_date) batchFormData.append('purchase_date', item.purchase_date);
+              batchFormData.append('initial_quantity', Number(item.stock).toString());
+              batchFormData.append('remaining_quantity', Number(item.stock).toString());
+              batchFormData.append('cost_price', (Number(item.cost_price) || 0).toString());
+              if (item.expired_date) batchFormData.append('expired_date', item.expired_date);
+              if (item.stock_type === 'dp' && item.dp_awal) batchFormData.append('dp_awal', item.dp_awal);
+              if (item.stock_type === 'dp' && item.dp_amount) batchFormData.append('dp_amount', item.dp_amount);
+              if (item.stock_type === 'dp' && item.due_date) batchFormData.append('due_date', item.due_date);
+              batchFormData.append('has_purchase_unit', Number(formData.unit_multiplier) > 1 ? '1' : '0');
+              (item.imageFiles || []).forEach(f => batchFormData.append('images', f));
+
+              const batchRes = await fetch(`http://localhost:5000/api/inventory/batches/${existingBatchId}`, {
+                method: 'PUT', headers: { ...authHeaders }, body: batchFormData
+              });
+              if (!batchRes.ok) {
+                const errData = await batchRes.json().catch(() => ({}));
+                throw new Error(errData.message || `Gagal memperbarui faktur (${batchRes.status})`);
+              }
+
+              // Update product fields
+              const prodId = perbaikanBatchIds[item.id + '_pid'];
+              if (prodId) {
+                let prodData = allProducts.find((p: any) => p.id === prodId);
+                if (!prodData) {
+                  const refreshRes = await fetch(`http://localhost:5000/api/products?limit=1000`, { headers: authHeaders });
+                  if (refreshRes.ok) {
+                    const refreshJson = await refreshRes.json();
+                    setAllProducts(refreshJson.data || []);
+                    prodData = (refreshJson.data || []).find((p: any) => p.id === prodId);
+                  }
+                }
+                const currentStock = prodData?.stock ?? 0;
+                const payload = {
+                  name: item.name || prodData?.name || '',
+                  cost_price: Number(item.cost_price) || prodData?.cost_price || 0,
+                  selling_price: Number(item.selling_price) || prodData?.selling_price || 0,
+                  stock: currentStock,
+                  product_category: item.product_category || (prodData as any)?.product_category || 'OBAT',
+                  unit: item.unit || prodData?.unit || 'Tablet',
+                  expired_date: item.expired_date || prodData?.expired_date || null,
+                  location_code: item.location_code || prodData?.location_code || null,
+                  purchase_unit: item.purchase_unit || prodData?.purchase_unit || 'Box',
+                  unit_multiplier: Number(item.unit_multiplier) || prodData?.unit_multiplier || 1
+                };
+                await fetch(`http://localhost:5000/api/products/${prodId}`, {
+                  method: 'PUT',
+                  headers: { 'Content-Type': 'application/json', ...authHeaders },
+                  body: JSON.stringify(payload)
+                });
+              }
+            } else {
+              await saveProductAndBatch(item, item.imageFiles || []);
+            }
           }
         } else {
           // Single product add
-          await saveProductAndBatch(formData, [...productFormImageFiles, ...fakturImageFiles]);
+          const singleBatchId = perbaikanBatchIds['single'];
+          console.log('[Submit Perbaikan] singleBatchId:', singleBatchId, 'formData.unit:', formData.unit, 'perbaikanBatchIds:', perbaikanBatchIds);
+          if (singleBatchId) {
+            const batchFormData = new FormData();
+            batchFormData.append('supplier_id', formData.supplier_id.toString());
+            batchFormData.append('invoice_number', formData.invoice_number || '');
+            if (formData.batch_number) batchFormData.append('batch_number', formData.batch_number);
+            batchFormData.append('stock_type', formData.stock_type || 'belum_bayar');
+            if (formData.purchase_date) batchFormData.append('purchase_date', formData.purchase_date);
+            batchFormData.append('initial_quantity', Number(formData.stock).toString());
+            batchFormData.append('remaining_quantity', Number(formData.stock).toString());
+            batchFormData.append('cost_price', (Number(formData.cost_price) || 0).toString());
+            if (formData.expired_date) batchFormData.append('expired_date', formData.expired_date);
+            if (formData.stock_type === 'dp' && formData.dp_awal) batchFormData.append('dp_awal', formData.dp_awal);
+            if (formData.stock_type === 'dp' && formData.dp_amount) batchFormData.append('dp_amount', formData.dp_amount);
+            if (formData.stock_type === 'dp' && formData.due_date) batchFormData.append('due_date', formData.due_date);
+            batchFormData.append('has_purchase_unit', Number(formData.unit_multiplier) > 1 ? '1' : '0');
+            [...productFormImageFiles, ...fakturImageFiles].forEach(f => batchFormData.append('images', f));
+
+            const res = await fetch(`http://localhost:5000/api/inventory/batches/${singleBatchId}`, {
+              method: 'PUT', headers: { ...authHeaders }, body: batchFormData
+            });
+            if (!res.ok) {
+              const errData = await res.json().catch(() => ({}));
+              throw new Error(errData.message || `Gagal memperbarui faktur (${res.status})`);
+            }
+            // Update product fields (unit, selling_price, expired_date, location, etc.)
+            const productId = perbaikanBatchIds['productId'];
+            console.log('[Submit Perbaikan] productId:', productId, 'formData.unit:', formData.unit);
+            if (productId) {
+              let prodData = allProducts.find(p => p.id === productId);
+              if (!prodData) {
+                const refreshRes = await fetch(`http://localhost:5000/api/products?limit=1000`, { headers: authHeaders });
+                if (refreshRes.ok) {
+                  const refreshJson = await refreshRes.json();
+                  setAllProducts(refreshJson.data || []);
+                  prodData = (refreshJson.data || []).find((p: any) => p.id === productId);
+                }
+              }
+              const currentStock = prodData?.stock ?? 0;
+              const payload = {
+                name: formData.name || prodData?.name || '',
+                cost_price: Number(formData.cost_price) || prodData?.cost_price || 0,
+                selling_price: Number(formData.selling_price) || prodData?.selling_price || 0,
+                stock: currentStock,
+                product_category: formData.product_category || (prodData as any)?.product_category || 'OBAT',
+                unit: formData.unit || prodData?.unit || 'Tablet',
+                expired_date: formData.expired_date || prodData?.expired_date || null,
+                location_code: formData.location_code || prodData?.location_code || null,
+                purchase_unit: formData.purchase_unit || prodData?.purchase_unit || 'Box',
+                unit_multiplier: Number(formData.unit_multiplier) || prodData?.unit_multiplier || 1
+              };
+              console.log('[Submit Perbaikan] SENDING product PUT for productId:', productId, 'payload:', payload);
+              const prodRes = await fetch(`http://localhost:5000/api/products/${productId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', ...authHeaders },
+                body: JSON.stringify(payload)
+              });
+              if (!prodRes.ok) {
+                const errData = await prodRes.json().catch(() => ({}));
+                throw new Error(errData.message || `Gagal memperbarui produk (${prodRes.status})`);
+              }
+              console.log('[Submit Perbaikan] Product PUT success');
+            }
+          } else {
+            await saveProductAndBatch(formData, [...productFormImageFiles, ...fakturImageFiles]);
+          }
         }
         
         handleCloseProductOffCanvas();
         fetchProducts();
-        goeyToast.success('Produk berhasil disimpan');
+        setPerbaikanBatchIds({});
+        goeyToast.success(Object.keys(perbaikanBatchIds).length > 0 ? 'Perbaikan disimpan, menunggu persetujuan ulang' : 'Produk berhasil disimpan');
       } catch (error: any) {
         console.error('Error adding product:', error);
         goeyToast.error(error.message || 'Gagal menambahkan produk');
@@ -1838,7 +1984,7 @@ export default function ProductsPage() {
             )}
 
             {/* Render form based on single/multiple */}
-            {productOffCanvasMode === 'edit' || !isMultipleProducts ? (
+            {productOffCanvasMode === 'edit' || (!isMultipleProducts && !isPerbaikanMultiMode) ? (
               <React.Fragment>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Product Name <span className="text-red-500">*</span></label>
@@ -1899,14 +2045,20 @@ export default function ProductsPage() {
                 <div className="flex items-center gap-3 py-2">
                   <button
                     type="button"
-                    onClick={() => setHasPurchaseUnitForm(!hasPurchaseUnitForm)}
+                    onClick={() => {
+                      if (hasPurchaseUnitForm) {
+                        setFormData(prev => ({...prev, unit_multiplier: '1', purchase_unit_stock: ''}));
+                      }
+                      setHasPurchaseUnitForm(!hasPurchaseUnitForm);
+                    }}
                     className={`relative w-11 h-6 rounded-full transition-colors ${hasPurchaseUnitForm ? 'bg-blue-600' : 'bg-gray-300'}`}
+                    style={{ backgroundColor: hasPurchaseUnitForm ? '#2563eb' : '#d1d5db' }}
                   >
                     <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-transform ${hasPurchaseUnitForm ? 'translate-x-5' : ''}`} />
                   </button>
                   <span className="text-sm font-medium text-gray-700">Memiliki satuan besar?</span>
                 </div>
-
+                
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Unit Dasar <span className="text-red-500">*</span></label>
@@ -2133,8 +2285,14 @@ export default function ProductsPage() {
                       <div className="flex items-center gap-2 mb-2">
                         <button
                           type="button"
-                          onClick={() => setHasPurchaseUnitForm(!hasPurchaseUnitForm)}
+                          onClick={() => {
+                            if (hasPurchaseUnitForm) {
+                              setFormData(prev => ({...prev, unit_multiplier: '1', purchase_unit_stock: ''}));
+                            }
+                            setHasPurchaseUnitForm(!hasPurchaseUnitForm);
+                          }}
                           className={`relative w-9 h-5 rounded-full transition-colors ${hasPurchaseUnitForm ? 'bg-blue-600' : 'bg-gray-300'}`}
+                          style={{ backgroundColor: hasPurchaseUnitForm ? '#2563eb' : '#d1d5db' }}
                         >
                           <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow-sm transition-transform ${hasPurchaseUnitForm ? 'translate-x-4' : ''}`} />
                         </button>
@@ -2260,26 +2418,33 @@ export default function ProductsPage() {
                       if (existingIndex > -1) {
                         const updatedList = [...multipleProducts];
                         const existingItem = updatedList[existingIndex];
+                        const isPerbaikan = Object.keys(perbaikanBatchIds).length > 0;
                         updatedList[existingIndex] = {
                           ...existingItem,
-                          stock: (Number(existingItem.stock) + Number(formData.stock)).toString(),
-                          cost_price: formData.cost_price, // Update with the latest cost price
-                          selling_price: formData.selling_price || existingItem.selling_price, // Update with latest selling price
+                          stock: isPerbaikan ? formData.stock : (Number(existingItem.stock) + Number(formData.stock)).toString(),
+                          cost_price: formData.cost_price,
+                          selling_price: formData.selling_price || existingItem.selling_price,
+                          unit: formData.unit || existingItem.unit,
+                          purchase_unit: formData.purchase_unit || existingItem.purchase_unit,
+                          unit_multiplier: formData.unit_multiplier || existingItem.unit_multiplier,
+                          expired_date: formData.expired_date || existingItem.expired_date,
                           imageFiles: productFormImageFiles
                         };
                         setMultipleProducts(updatedList);
                       } else {
+                        const preservedId = editingItemId || Date.now().toString();
                         setMultipleProducts([
                           ...multipleProducts,
                           {
                             ...formData,
-                            id: Date.now().toString(),
+                            id: preservedId,
                             imageFiles: productFormImageFiles
                           }
                         ]);
                       }
+                      setEditingItemId(null);
 
-                      // Reset form for next product
+                      // Reset form for next product (keep shared fields: invoice_number, dp_amount, dp_awal, due_date)
                       setFormData({
                         ...formData,
                         name: '',
@@ -2288,12 +2453,8 @@ export default function ProductsPage() {
                         cost_price: '',
                         selling_price: '',
                         stock: '',
-                        invoice_number: '',
                         batch_number: '',
-                        dp_amount: '',
-      dp_awal: '',
-                        due_date: '',
-      expired_date: '',
+                        expired_date: '',
                         purchase_unit: 'Box',
                         unit_multiplier: '1',
                         purchase_unit_stock: ''
@@ -2315,7 +2476,7 @@ export default function ProductsPage() {
                           <div className="text-sm">
                             <div className="font-medium text-gray-800">{index + 1}. {item.name}</div>
                              <div className="text-gray-600 text-xs">
-                              Kategori: {item.product_category === 'NON_OBAT' ? 'Non-Obat' : 'Obat'} | {formatCurrency(Number(item.cost_price))} | Stok: {item.stock} {item.purchase_unit} (isi: {item.unit_multiplier} {item.unit}) | Faktur: {item.invoice_number || '-'} | Batch: {item.batch_number || '-'} | {(() => {
+                              Kategori: {item.product_category === 'NON_OBAT' ? 'Non-Obat' : 'Obat'} | {formatCurrency(Number(item.cost_price))} | Stok: {item.stock}{Number(item.unit_multiplier) > 1 ? ' ' + item.purchase_unit + ' (isi: ' + item.unit_multiplier + ' ' + item.unit + ')' : ' ' + item.unit} | Faktur: {item.invoice_number || '-'} | Batch: {item.batch_number || '-'} | {(() => {
                                 const typeMap: Record<string, string> = {
                                   belum_bayar: 'Belum Bayar',
                                   konsinyasi: 'Konsinyasi',
@@ -2331,25 +2492,27 @@ export default function ProductsPage() {
                             <button
                               type="button"
                               onClick={() => {
+                                setEditingItemId(item.id);
+                                setHasPurchaseUnitForm(Number(item.unit_multiplier) > 1);
                                 setFormData({
-                                  name: item.name,
-                                  cost_price: item.cost_price,
-                                  selling_price: item.selling_price,
-                                  stock: item.stock,
-                                  unit: item.unit,
-                                  expired_date: item.expired_date,
-                                  location_code: item.location_code,
-                                  supplier_id: item.supplier_id,
-                                  stock_type: item.stock_type,
-                                  purchase_date: item.purchase_date,
+                                  name: item.name || '',
+                                  cost_price: item.cost_price || '',
+                                  selling_price: item.selling_price || '',
+                                  stock: item.stock || '',
+                                  unit: item.unit || 'Tablet',
+                                  expired_date: item.expired_date || '',
+                                  location_code: item.location_code || '',
+                                  supplier_id: item.supplier_id || '',
+                                  stock_type: item.stock_type || 'belum_bayar',
+                                  purchase_date: item.purchase_date || '',
                                   invoice_number: item.invoice_number || '',
                                   batch_number: item.batch_number || '',
                                   dp_amount: item.dp_amount || '',
                                   due_date: item.due_date || '',
-                                  purchase_unit: item.purchase_unit,
-                                  unit_multiplier: item.unit_multiplier,
+                                  purchase_unit: item.purchase_unit || 'Box',
+                                  unit_multiplier: item.unit_multiplier || '1',
                                   purchase_unit_stock: item.purchase_unit_stock || '',
-                                  product_category: item.product_category
+                                  product_category: item.product_category || 'OBAT'
                                 });
                                 setMultipleProducts(multipleProducts.filter(p => p.id !== item.id));
                               }}
@@ -3182,130 +3345,261 @@ export default function ProductsPage() {
                 </div>
               ) : (
                 <div className="flex flex-col gap-4 min-w-0 overflow-x-auto">
-                  {pendingFakturs.map((faktur) => (
-                    <div key={faktur.id} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-all group relative">
-                      {faktur.status === 'rejected' && (
-                        <button 
-                          onClick={() => handleDeleteFaktur(faktur)}
-                          className="absolute top-4 right-4 p-2 text-red-500 hover:text-white bg-red-50 hover:bg-red-600 rounded-lg border border-red-200 hover:border-red-600 transition-all shadow-sm hover:scale-105 duration-200 z-10"
-                          title="Hapus Faktur Ditolak"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      )}
-                      <div className="p-5">
-                        <div className="flex flex-row justify-between items-center gap-5">
-                          {/* Product Info */}
-                          <div className="flex-1 space-y-3">
-                            <div className="flex items-start gap-4">
-                              <div className="bg-blue-50 p-2.5 rounded-xl text-blue-600 shrink-0 group-hover:bg-blue-100 transition-colors">
-                                <Package size={22} />
-                              </div>
-                              <div className="flex-1">
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <h4 className="text-base font-bold text-gray-900">{faktur.product_name}</h4>
-                                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider border ${
-                                    faktur.status === 'pending' 
-                                      ? 'bg-yellow-100 text-yellow-700 border-yellow-200 animate-pulse' 
-                                      : faktur.status === 'rejected'
-                                      ? 'bg-red-100 text-red-700 border-red-200'
-                                      : 'bg-orange-100 text-orange-700 border-orange-200'
-                                  }`}>
-                                    {faktur.status === 'pending' ? 'Pending Approval' : faktur.status === 'rejected' ? 'Ditolak' : 'Menunggu Perbaikan'}
-                                  </span>
-                                  {faktur.product_status === 'pending' && (
-                                    <span className="bg-purple-100 text-purple-700 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider border border-purple-200">
-                                      Produk Baru
-                                    </span>
-                                  )}
+                  {(() => {
+                    const grouped: Record<string, typeof pendingFakturs> = {};
+                    for (const f of pendingFakturs) {
+                      const key = f.invoice_number || `__BATCH_${f.batch_number || f.id}`;
+                      if (!grouped[key]) grouped[key] = [];
+                      grouped[key].push(f);
+                    }
+                    const formatDate = (d: string) => new Date(d).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+
+                    return Object.entries(grouped).map(([invoiceKey, items]) => {
+                      const first = items[0];
+                      const totalQty = items.reduce((s, i) => s + i.quantity, 0);
+                      const totalCost = items.reduce((s, i) => s + i.cost_price * i.quantity, 0);
+                      const allStatuses = [...new Set(items.map(i => i.status))];
+                      const displayStatus = allStatuses.includes('pending') ? 'pending' : allStatuses.includes('revision') ? 'revision' : 'rejected';
+
+                      return (
+                        <div key={invoiceKey} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-all group relative">
+                          {displayStatus === 'rejected' && (
+                            <button 
+                              onClick={() => handleDeleteFaktur(first)}
+                              className="absolute top-4 right-4 p-2 text-red-500 hover:text-white bg-red-50 hover:bg-red-600 rounded-lg border border-red-200 hover:border-red-600 transition-all shadow-sm hover:scale-105 duration-200 z-10"
+                              title="Hapus Faktur Ditolak"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          )}
+                          <div className="p-5">
+                            <div className="flex flex-row justify-between items-start gap-5">
+                              <div className="flex-1 space-y-3">
+                                <div className="flex items-start gap-4">
+                                  <div className="bg-blue-50 p-2.5 rounded-xl text-blue-600 shrink-0 group-hover:bg-blue-100 transition-colors">
+                                    <Package size={22} />
+                                  </div>
+                                  <div className="flex-1">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      <h4 className="text-base font-bold text-gray-900">{first.invoice_number || `Batch: ${first.batch_number || '#' + first.id}`}</h4>
+                                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider border ${
+                                        displayStatus === 'pending' 
+                                          ? 'bg-yellow-100 text-yellow-700 border-yellow-200 animate-pulse' 
+                                          : displayStatus === 'rejected'
+                                          ? 'bg-red-100 text-red-700 border-red-200'
+                                          : 'bg-orange-100 text-orange-700 border-orange-200'
+                                      }`}>
+                                        {displayStatus === 'pending' ? 'Pending Approval' : displayStatus === 'rejected' ? 'Ditolak' : 'Menunggu Perbaikan'}
+                                      </span>
+                                    </div>
+                                    <p className="text-xs text-gray-500 mt-0.5 font-medium">{items.length} produk</p>
+                                  </div>
                                 </div>
-                                <p className="text-xs text-gray-500 mt-0.5 font-medium">ID: #{faktur.product_id} | Batch: {faktur.invoice_number || '-'}</p>
-                              </div>
-                            </div>
 
-                            {faktur.notes && (
-                              <div className="bg-orange-50 border border-orange-100 p-3 rounded-xl flex items-start gap-3">
-                                <AlertCircle size={16} className="text-orange-500 shrink-0 mt-0.5" />
-                                <div>
-                                  <p className="text-[11px] font-bold text-orange-800 uppercase tracking-wider">Catatan Perbaikan:</p>
-                                  <p className="text-sm text-orange-700 mt-0.5 leading-relaxed">{faktur.notes}</p>
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-[13px]">
+                                  <div className="flex items-center gap-2 text-gray-600 bg-gray-50 px-2 py-1 rounded-lg">
+                                    <Users size={14} className="text-gray-400" />
+                                    <span className="truncate">{first.supplier_name || 'Tanpa Supplier'}</span>
+                                  </div>
+                                  <div className="flex items-center gap-2 text-gray-600 bg-gray-50 px-2 py-1 rounded-lg">
+                                    <Calendar size={14} className="text-gray-400" />
+                                    <span>{first.purchase_date ? formatDate(first.purchase_date) : '-'}</span>
+                                  </div>
+                                  <div className="flex items-center gap-2 text-gray-600 bg-gray-50 px-2 py-1 rounded-lg">
+                                    <Info size={14} className="text-gray-400" />
+                                    <span className="capitalize">{first.stock_type.replace('_', ' ')}</span>
+                                  </div>
+                                </div>
+
+                                {/* Product List */}
+                                <div className="bg-gray-50 rounded-xl p-3 space-y-2">
+                                  {items.map((item, idx) => (
+                                    <div key={item.id} className="flex items-center justify-between text-sm">
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-gray-400 w-5">{idx + 1}.</span>
+                                        <span className="font-medium text-gray-800">{item.product_name}</span>
+                                        {item.product_status === 'pending' && (
+                                          <span className="bg-purple-100 text-purple-700 text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase tracking-wider border border-purple-200">
+                                            Baru
+                                          </span>
+                                        )}
+
+                                      </div>
+                                      <div className="flex items-center gap-4">
+                                        <span className="text-gray-600">{item.quantity / (item.product_unit_multiplier || 1)} {item.product_purchase_unit}</span>
+                                        <span className="text-blue-600 font-semibold">{formatCurrency(item.cost_price * item.quantity)}</span>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+
+                                {items.some(i => i.notes) && (
+                                  <div className="bg-orange-50 border border-orange-100 p-3 rounded-xl flex items-start gap-3">
+                                    <AlertCircle size={16} className="text-orange-500 shrink-0 mt-0.5" />
+                                    <div>
+                                      <p className="text-[11px] font-bold text-orange-800 uppercase tracking-wider">Catatan Perbaikan:</p>
+                                      {items.filter(i => i.notes).map(i => (
+                                        <p key={i.id} className="text-sm text-orange-700 mt-0.5 leading-relaxed">{i.product_name}: {i.notes}</p>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Financial Info */}
+                              <div className="w-56 bg-blue-50/50 p-4 rounded-xl border border-blue-100/50 flex flex-col justify-center gap-1.5 shrink-0">
+                                <div className="flex justify-between text-[13px]">
+                                  <span className="text-gray-500">Total Qty:</span>
+                                  <span className="font-bold text-gray-900">{totalQty} {first.product_unit}</span>
+                                </div>
+                                <div className="pt-2 mt-1 border-t border-blue-200/50 flex justify-between items-center">
+                                  <span className="text-[10px] font-extrabold text-blue-400 uppercase tracking-widest">Total</span>
+                                  <span className="text-lg font-black text-blue-700">{formatCurrency(totalCost)}</span>
                                 </div>
                               </div>
-                            )}
 
-                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-[13px]">
-                              <div className="flex items-center gap-2 text-gray-600 bg-gray-50 px-2 py-1 rounded-lg">
-                                <Users size={14} className="text-gray-400" />
-                                <span className="truncate">{faktur.supplier_name || 'Tanpa Supplier'}</span>
+                              {/* Bukti & Edit Button */}
+                              <div className={`flex flex-col gap-2 shrink-0 ${displayStatus === 'rejected' ? 'pr-8' : ''}`}>
+                                {items.some(i => i.image_url) && (
+                                  <button
+                                    onClick={() => {
+                                      const firstWithImage = items.find(i => i.image_url)!;
+                                      const urls = getImageUrls(firstWithImage.image_url).map(u => `http://localhost:5000${u}`);
+                                      if (urls.length > 0) openImagePreview(urls[0], urls);
+                                    }}
+                                    className="flex items-center gap-2 px-4 py-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-all text-xs font-bold border border-blue-200"
+                                  >
+                                    <FileText size={16} />
+                                    Lihat Bukti
+                                  </button>
+                                )}
+                                {items.some(i => i.status === 'revision') && (
+                                  <button
+                                    onClick={() => {
+                                      const revisionItems = items.filter(i => i.status === 'revision');
+                                      const firstRev = revisionItems[0];
+                                      // Check all revision items: if ANY has_purchase_unit OR product_unit_multiplier > 1, toggle ON
+                                      const hasPU = revisionItems.some(i => Number((i as any).has_purchase_unit) || Number(i.product_unit_multiplier) > 1);
+                                      console.log('[Perbaiki Data] hasPU:', hasPU, 'revisionItems count:', revisionItems.length, 'firstRev:', firstRev);
+                                      const dpAwalVal = firstRev.dp_payments && firstRev.dp_payments.length > 0 ? firstRev.dp_payments[0].amount.toString() : firstRev.dp_amount?.toString() || '';
+                                      const sellingPrice = (firstRev as any).product_selling_price || allProducts.find(p => p.id === firstRev.product_id)?.selling_price?.toString() || '';
+                                      if (items.length === 1) {
+                                        // Single product: open single product offcanvas
+                                        setPerbaikanBatchIds({ single: firstRev.id, productId: firstRev.product_id });
+                                        const fmtDate = (d: string | null | undefined) => d ? d.substring(0, 10) : '';
+                                        setFormData({
+                                          name: firstRev.product_name || '',
+                                          cost_price: firstRev.cost_price.toString(),
+                                          selling_price: sellingPrice,
+                                          stock: (firstRev.initial_quantity || firstRev.quantity || 0).toString(),
+                                          unit: firstRev.product_unit || 'Tablet',
+                                          expired_date: fmtDate(firstRev.expired_date),
+                                          location_code: (firstRev as any).product_location_code || allProducts.find(p => p.id === firstRev.product_id)?.location_code || '',
+                                          supplier_id: firstRev.supplier_id?.toString() || '',
+                                          stock_type: firstRev.stock_type,
+                                          purchase_date: fmtDate(firstRev.purchase_date),
+                                          invoice_number: firstRev.invoice_number || '',
+                                          dp_amount: firstRev.dp_amount?.toString() || '',
+                                          dp_awal: dpAwalVal,
+                                          due_date: fmtDate(firstRev.due_date),
+                                          purchase_unit: firstRev.product_purchase_unit || 'Box',
+                                          unit_multiplier: (firstRev.product_unit_multiplier || 1).toString(),
+                                          product_category: 'OBAT',
+                                          purchase_unit_stock: '',
+                                          batch_number: firstRev.batch_number || '',
+                                        });
+                                        if (firstRev.image_url) {
+                                          const urls = getImageUrls(firstRev.image_url).map(u => `http://localhost:5000${u}`);
+                                          setProductFormImagePreviews(urls);
+                                        }
+                                        setIsPerbaikanMultiMode(false);
+                                        setIsMultipleProducts(false);
+                                        setProductOffCanvasMode('add');
+                                        setPendingHasPU(hasPU);
+                                        setIsProductOffCanvasOpen(true);
+                                        setHasPurchaseUnitForm(hasPU);
+                                        setIsApprovalModalOpen(false);
+                                      } else {
+                                        // Multiple products: open multi-product offcanvas
+                                        const batchIdsMap: Record<string, number> = {};
+                                        const mappedItems = revisionItems.map(i => {
+                                          const itemId = String(Date.now()) + String(Math.random()).slice(2);
+                                          batchIdsMap[itemId] = i.id;
+                                          batchIdsMap[itemId + '_pid'] = i.product_id;
+                                          return {
+                                            id: itemId,
+                                            name: i.product_name || '',
+                                            product_category: 'OBAT' as const,
+                                            location_code: (i as any).product_location_code || allProducts.find(p => p.id === i.product_id)?.location_code || '',
+                                            cost_price: i.cost_price.toString(),
+                                            selling_price: (i as any).product_selling_price || '',
+                                            stock: (i.initial_quantity || i.quantity || 0).toString(),
+                                            unit: i.product_unit || 'Tablet',
+                                            purchase_unit: i.product_purchase_unit || 'Box',
+                                            unit_multiplier: (i.product_unit_multiplier || 1).toString(),
+                                            purchase_unit_stock: '',
+                                            expired_date: i.expired_date ? i.expired_date.substring(0, 10) : '',
+                                            batch_number: i.batch_number || '',
+                                            invoice_number: i.invoice_number || '',
+                                            dp_amount: i.dp_amount?.toString() || '',
+                                            dp_awal: '',
+                                            due_date: i.due_date ? i.due_date.substring(0, 10) : '',
+                                            supplier_id: i.supplier_id?.toString() || '',
+                                            stock_type: i.stock_type,
+                                            purchase_date: i.purchase_date || '',
+                                            imageFiles: [],
+                                          };
+                                        });
+                                        setMultipleProducts(mappedItems);
+                                        setPerbaikanBatchIds(batchIdsMap);
+                                        const fmtDate2 = (d: string | null | undefined) => d ? d.substring(0, 10) : '';
+                                        setFormData({
+                                          name: '',
+                                          cost_price: '',
+                                          selling_price: sellingPrice,
+                                          stock: '',
+                                          unit: firstRev.product_unit || 'Tablet',
+                                          expired_date: fmtDate2(firstRev.expired_date),
+                                          location_code: (firstRev as any).product_location_code || allProducts.find(p => p.id === firstRev.product_id)?.location_code || '',
+                                          supplier_id: firstRev.supplier_id?.toString() || '',
+                                          stock_type: firstRev.stock_type,
+                                          purchase_date: fmtDate2(firstRev.purchase_date),
+                                          invoice_number: firstRev.invoice_number || '',
+                                          dp_amount: firstRev.dp_amount?.toString() || '',
+                                          dp_awal: dpAwalVal,
+                                          due_date: fmtDate2(firstRev.due_date),
+                                          purchase_unit: firstRev.product_purchase_unit || 'Box',
+                                          unit_multiplier: (firstRev.product_unit_multiplier || 1).toString(),
+                                          product_category: 'OBAT',
+                                          purchase_unit_stock: '',
+                                          batch_number: '',
+                                        });
+                                        if (firstRev.image_url) {
+                                          const urls = getImageUrls(firstRev.image_url).map(u => `http://localhost:5000${u}`);
+                                          setProductFormImagePreviews(urls);
+                                        }
+                                        setIsPerbaikanMultiMode(true);
+                                        setIsMultipleProducts(true);
+                                        setProductOffCanvasMode('add');
+                                        setPendingHasPU(hasPU);
+                                        setHasPurchaseUnitForm(hasPU);
+                                        setIsProductOffCanvasOpen(true);
+                                        setIsApprovalModalOpen(false);
+                                      }
+                                    }}
+                                    className="flex items-center gap-2 px-4 py-2 text-orange-600 hover:bg-orange-50 rounded-lg transition-all text-xs font-bold border border-orange-200"
+                                  >
+                                    <Edit size={16} />
+                                    Perbaiki Data
+                                  </button>
+                                )}
                               </div>
-                              <div className="flex items-center gap-2 text-gray-600 bg-gray-50 px-2 py-1 rounded-lg">
-                                <Calendar size={14} className="text-gray-400" />
-                                <span>{faktur.purchase_date ? new Date(faktur.purchase_date).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }) : '-'}</span>
-                              </div>
-                              <div className="flex items-center gap-2 text-gray-600 bg-gray-50 px-2 py-1 rounded-lg">
-                                <Info size={14} className="text-gray-400" />
-                                <span className="capitalize">{faktur.stock_type.replace('_', ' ')}</span>
-                              </div>
                             </div>
-                          </div>
-
-                          {/* Financial Info */}
-                          <div className="w-56 bg-blue-50/50 p-4 rounded-xl border border-blue-100/50 flex flex-col justify-center gap-1.5 shrink-0">
-                            <div className="flex justify-between text-[13px]">
-                              <span className="text-gray-500">Jumlah:</span>
-                              <span className="font-bold text-gray-900">
-                                {faktur.quantity / (faktur.product_unit_multiplier || 1)} {faktur.product_purchase_unit}
-                              </span>
-                            </div>
-                            <div className="flex justify-between text-[13px]">
-                              <span className="text-gray-500">Harga:</span>
-                              <span className="font-bold text-gray-900">{formatCurrency(faktur.cost_price)}</span>
-                            </div>
-                            <div className="pt-2 mt-1 border-t border-blue-200/50 flex justify-between items-center">
-                              <span className="text-[10px] font-extrabold text-blue-400 uppercase tracking-widest">Total</span>
-                              <span className="text-lg font-black text-blue-700">{formatCurrency(faktur.cost_price * faktur.quantity)}</span>
-                            </div>
-                          </div>
-
-                          {/* Bukti & Edit Button */}
-                          <div className={`flex flex-col gap-2 shrink-0 ${faktur.status === 'rejected' ? 'pr-8' : ''}`}>
-                            {faktur.status === 'revision' && (
-                              <button 
-                                onClick={() => {
-                                  // Mock a product object for handleOpenEditFakturModal
-                                  const mockProduct = allProducts.find(p => p.id === faktur.product_id) || {
-                                    id: faktur.product_id,
-                                    name: faktur.product_name || '',
-                                    cost_price: faktur.cost_price || 0,
-                                    selling_price: 0,
-                                    stock: 0,
-                                    unit: faktur.product_unit || 'Tablet',
-                                    expired_date: null,
-                                    location_code: '',
-                                    supplier_id: faktur.supplier_id || null,
-                                    supplier_name: faktur.supplier_name || null,
-                                    stock_type: faktur.stock_type as any || 'belum_bayar',
-                                    purchase_date: faktur.purchase_date || null,
-                                    purchase_unit: faktur.product_purchase_unit || 'Box',
-                                    unit_multiplier: faktur.product_unit_multiplier || 1
-                                  } as Product;
-                                  
-                                  setSelectedProduct(mockProduct);
-                                  fetchFakturs(mockProduct.id);
-                                  handleOpenEditFakturModal(faktur, mockProduct);
-                                  setIsApprovalModalOpen(false);
-                                }}
-                                className="flex items-center gap-2 px-4 py-2 text-orange-600 hover:bg-orange-50 rounded-lg transition-all text-xs font-bold border border-orange-100"
-                              >
-                                <Edit size={18} />
-                                Perbaiki Data
-                              </button>
-                            )}
                           </div>
                         </div>
-                      </div>
-                    </div>
-                  ))}
+                      );
+                    });
+                  })()}
                 </div>
               )}
             </div>

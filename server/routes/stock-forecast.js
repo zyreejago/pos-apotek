@@ -600,7 +600,7 @@ async function generateStockRecommendation(options) {
   const windowSize = Number.isFinite(options.windowSize) ? options.windowSize : 7;
 
   const series = options.series || [];
-  const datasetWindowed = (createSlidingWindow(options.geminiSeries || series, windowSize, 1) );
+  const datasetWindowed = (createSlidingWindow(options.geminiSeries || series, windowSize, 7) );
 
   const stokSaatIni = Number(options.product.stok_saat_ini || 0);
   const perDayBaseline = fallbackExponentialSmoothing(series, 0.6);
@@ -893,16 +893,18 @@ async function runWeeklyForecastJob(pool, options = {}) {
       `SELECT sale_date AS day, quantity AS qty FROM sales_history WHERE product_id = ? ORDER BY sale_date ASC`,
       [p.id]
     );
-    const [transactionRows] = await pool.query(
-      `SELECT DATE(t.transaction_date) AS day, SUM(ti.quantity) AS qty
-       FROM transaction_items ti
-       JOIN transactions t ON ti.transaction_id = t.id
-       WHERE ti.product_id = ? AND t.payment_status = 'completed'
-       GROUP BY DATE(t.transaction_date)
-       ORDER BY day ASC`,
-      [p.id]
-    );
-    const allRows = [...salesRows, ...transactionRows];
+    // const [transactionRows] = await pool.query(
+    //   `SELECT DATE(t.transaction_date) AS day, SUM(ti.quantity) AS qty
+    //    FROM transaction_items ti
+    //    JOIN transactions t ON ti.transaction_id = t.id
+    //    WHERE ti.product_id = ? AND t.payment_status = 'completed'
+    //    GROUP BY DATE(t.transaction_date)
+    //    ORDER BY day ASC`,
+    //   [p.id]
+    // );
+    const allRows = [...salesRows];
+    //const allRows = [...salesRows, ...transactionRows];
+
     // Calculate actual date range from data, minimum 365 days
     let dataDays = 365;
     let actualDataDays = 0;
@@ -952,7 +954,8 @@ async function runWeeklyForecastJob(pool, options = {}) {
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         p.id,
-        'sales_history+transactions',
+        'sales_history',
+        //'sales_history+transactions',
         sourceEndDate,
         leadTime,
         windowSize,

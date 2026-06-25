@@ -1,0 +1,165 @@
+================================================================================
+                   WHITEBOX TESTING - FLOWGRAPH ANALYSIS (BACKEND)
+                   FUNGSI: POST /api/products
+================================================================================
+
+KODE YANG DIUJI (Source Code):
+===============================
+
+No. | Node | Kode
+----|------|-----
+ 1  |  1   | app.post('/api/products', authenticate, permission, async (req, res) => {
+ 2  |  2   |     const { name, cost_price, selling_price, stock, product_category, unit, ... } = req.body;
+ 3  |  3   |     if (!name || !cost_price) return res.status(400).json({ message: 'Required' });
+ 4  |  4   |     try {
+ 5  |  5   |         const status = req.body.needsApproval ? 'pending' : 'active';
+ 6  |  6   |         const connection = await pool.getConnection();
+ 7  |  7   |         await connection.query('INSERT INTO products ...', [name, cost_price, selling_price||0, ...]);
+ 8  |  8   |         connection.release();
+ 9  |  9   |         await createAuditTrail({ module: 'Management Product', action: 'create', description: `Membuat produk: ${name}` });
+10  |  10  |         res.status(201).json({ id: result.insertId, name, cost_price, selling_price, stock, status });
+11  |  11  |     } catch (error) { console.error(error); res.status(500).json({ message: 'Server error' }); }
+12  |  12  | });
+
+1. PENJELASAN NODE
+==================
+Node 1  : Deklarasi route handler POST /api/products
+Node 2  : Destructure body request
+Node 3  : Cek name dan cost_price wajib diisi -> jika tidak, return 400
+Node 4  : try { - Mulai blok try
+Node 5  : Tentukan status produk (pending jika needsApproval, active jika tidak)
+Node 6  : Get koneksi database dari pool
+Node 7  : INSERT produk ke database
+Node 8  : Release koneksi database
+Node 9  : Buat audit trail
+Node 10 : Return response 201 dengan data produk
+Node 11 : catch: log error, return 500
+Node 12 : Selesai
+
+2. FLOWGRAPH
+=============
+1 -> 2
+2 -> 3
+3 -> 12 (T), 3 -> 4 (F)
+4 -> 5
+5 -> 6 -> 7 -> 8 -> 9 -> 10 -> 12
+4 -> 11 (Exception)
+11 -> 12
+
+3. GAMBAR FLOWGRAPH (VISUAL)
+=============================
+
+                    ┌─────┐
+                    │  1  │
+                    └──┬──┘
+                       │
+                    ┌──▼──┐
+                    │  2  │
+                    └──┬──┘
+                       │
+                    ┌──▼──┐
+                    │  3  │
+                    └──┬──┘
+                       │
+                   ┌───┴───┐
+                   │ T     │ F
+                   │       │
+                ┌──▼──┐ ┌──▼──┐
+                │ 12  │ │  4  │
+                └─┬───┘ └──┬──┘
+                  │        │
+                  │     ┌──▼──┐
+                  │     │  5  │
+                  │     └──┬──┘
+                  │        │
+                  │     ┌──▼──┐
+                  │     │  6  │
+                  │     └──┬──┘
+                  │        │
+                  │     ┌──▼──┐
+                  │     │  7  │
+                  │     └──┬──┘
+                  │        │
+                  │     ┌──▼──┐
+                  │     │  8  │
+                  │     └──┬──┘
+                  │        │
+                  │     ┌──▼──┐
+                  │     │  9  │
+                  │     └──┬──┘
+                  │        │
+                  │     ┌──▼──┐
+                  │     │ 10  │
+                  │     └──┬──┘
+                  │        │
+                  │        ├───────────────────────┐
+                  │        │                       │ (Exception)
+                  │        │                    ┌──▼──┐
+                  │        │                    │ 11  │
+                  │        │                    └──┬──┘
+                  │        │                       │
+                  └────────┼───────────────────────┤
+                           │                       │
+                        ┌──▼───────────────────────▼──┐
+                        │             12              │
+                        └─────────────────────────────┘
+
+4. MENGHITUNG CC (CYCLOMATIC COMPLEXITY)
+==========================================
+Rumus 1: V(G) = E - N + 2
+E (Edge) = 13
+N (Node) = 12
+V(G) = 13 - 12 + 2 = 3
+
+Rumus 2: V(G) = P + 1
+Predicate Nodes: Node 3, Node 4
+V(G) = 2 + 1 = 3
+
+Rumus 3: V(G) = R (Region)
+Jumlah region tertutup + 1 region terbuka = 3
+V(G) = 3
+
+5. IDENTIFIKASI PATH
+=====================
+CC = 3, terdapat 3 jalur independen:
+
+----------------------------------------------------------------------
+PATH 1: Nama/cost_price tidak diisi
+1 -> 2 -> 3 -> 12
+
+PATH 2: Produk berhasil dibuat (sukses)
+1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10 -> 12
+
+PATH 3: Terjadi error server pada query/koneksi
+1 -> 2 -> 3 -> 4 -> 11 -> 12
+----------------------------------------------------------------------
+
+6. RINGKASAN
+=============
+N (Node)             : 12
+E (Edge)             : 13
+P (Predicate Node)   : 2
+V(G) = E - N + 2     : 3
+V(G) = P + 1         : 3
+V(G) = R             : 3
+Jumlah Path          : 3
+Interpretasi         : RENDAH (<=10) - Mudah di-test
+
+
+================================================================================
+           PROMPT GENERASI VISUAL FLOWGRAPH - BULATAN & ANGKA SAJA
+================================================================================
+ATURAN UTAMA:
+- Seluruh node WAJIB digambarkan menggunakan bentuk LINGKARAN/BULATAN sempurna yang HANYA berisi ANGKA node di dalamnya (tanpa label/teks deskripsi lain).
+- Hubungan antar node ditunjukkan dengan garis berpanah.
+- Percabangan ditunjukkan dengan garis panah berlabel "T" (True) dan "F" (False).
+- Format visual harus HITAM PUTIH bersih tanpa warna, tanpa background dekorasi.
+
+1. PROMPT POST /api/products (Total 12 Node):
+"Draw a black-and-white directed graph where every node is represented ONLY as a circle enclosing its node number. No text or descriptors should be inside the circles. Use directed arrow edges with optional branching labels 'T' and 'F'.
+Alur Node:
+- 1 -> 2 -> 3
+- Node 3 splits: T -> 12, F -> 4
+- Node 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10 -> 12
+- Exception path from Node 4/try-block -> 11 -> 12
+- Node 12 is the final single terminal node."

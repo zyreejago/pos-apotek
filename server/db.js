@@ -270,6 +270,25 @@ const initDB = async () => {
       )
     `);
 
+    // Stock Opname Sessions table
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS stock_opname_sessions (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        date DATE NOT NULL,
+        user_id INT NOT NULL,
+        total_items INT DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      )
+    `);
+
+    try {
+      await connection.query(`ALTER TABLE inventory_history ADD COLUMN session_id INT NULL`);
+    } catch (e) {}
+    try {
+      await connection.query(`ALTER TABLE inventory_history ADD FOREIGN KEY (session_id) REFERENCES stock_opname_sessions(id) ON DELETE SET NULL`);
+    } catch (e) {}
+
     // Batches table
     await connection.query(`
       CREATE TABLE IF NOT EXISTS batches (
@@ -350,6 +369,12 @@ const initDB = async () => {
 
     try {
       await connection.query(`ALTER TABLE batches ADD COLUMN is_archived BOOLEAN DEFAULT FALSE`);
+    } catch (e) {}
+    try {
+      await connection.query(`ALTER TABLE batches ADD COLUMN has_purchase_unit TINYINT(1) DEFAULT 0`);
+    } catch (e) {}
+    try {
+      await connection.query(`ALTER TABLE batches ADD COLUMN created_by INT NULL`);
     } catch (e) {}
 
     try {

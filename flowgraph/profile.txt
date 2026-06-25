@@ -1,0 +1,110 @@
+================================================================================
+                   WHITEBOX TESTING - FLOWGRAPH ANALYSIS
+                   FUNGSI: handleUpdateProfile + handleChangePassword
+================================================================================
+
+KODE YANG DIUJI (Source Code):
+===============================
+
+--- handleUpdateProfile ---
+
+No. | Node | Kode
+----|------|-----
+ 1  |  1   | const handleUpdateProfile = async (e) => {
+ 2  |  1   |     e.preventDefault();
+ 3  |  2   |     setSavingProfile(true);
+ 4  |  3   |     try {
+ 5  |  4   |         const token = localStorage.getItem("token");
+ 6  |  5   |         const res = await fetch(".../api/profile", { method:"PUT",
+ 7  |  5   |             headers:{Authorization:`Bearer ${token}`},
+ 8  |  5   |             body:JSON.stringify({username:profile.username, email:profile.email}) });
+ 9  |  6   |         const data = await res.json();
+10  |  7   |         if (!res.ok) throw new Error(data.message || "Failed to update profile");
+11  |  8   |         goeyToast.success("Success", {description:"Profil berhasil diperbarui"});
+12  |  9   |         const userStr = localStorage.getItem("user");
+13  |  10  |         if (userStr) {
+14  |  11  |             const user = JSON.parse(userStr);
+15  |  11  |             user.username = profile.username; user.email = profile.email;
+16  |  11  |             localStorage.setItem("user", JSON.stringify(user));
+17  |  10  |         }
+18  |  12  |         window.dispatchEvent(new Event('user:updated'));
+19  |  3   |     } catch (error) {
+20  |  13  |         goeyToast.error("Error", {description: error.message || "Terjadi kesalahan"});
+21  |  3   |     }
+22  |  14  |     finally { setSavingProfile(false); }
+23  |  15  | };
+
+1. PENJELASAN NODE
+==================
+Node 1  : e.preventDefault()
+Node 2  : setSavingProfile(true)
+Node 3  : try {
+Node 4  : getToken dari localStorage
+Node 5  : Fetch PUT /api/profile
+Node 6  : Parse response JSON
+Node 7  : Cek res.ok -> throw jika gagal
+Node 8  : Toast sukses
+Node 9  : getUser dari localStorage
+Node 10 : Cek userStr
+Node 11 : Update user di localStorage
+Node 12 : Dispatch event 'user:updated'
+Node 13 : catch: toast error
+Node 14 : finally: setSavingProfile(false)
+Node 15 : Selesai
+
+2. FLOWGRAPH:
+1->2->3->4->5->6->7->8->9->10->11->12->14->15
+10->12(F) | 3->13->14->15
+
+3. GAMBAR FLOWGRAPH (VISUAL)
+=============================
+1->2->3->4->5->6->7->8->9->10->11->12->14->15
+                   7->(throw)->13
+              10->(F)->12
+              3->13->14->15
+
+4. MENGHITUNG CC (CYCLOMATIC COMPLEXITY)
+==========================================
+Rumus 1: V(G)=E-N+2=15-15+2=2
+Rumus 2: V(G)=P+1=2+1=3 (predicate:7,10)
+Rumus 3: V(G)=R=3
+V(G)=3
+
+5. IDENTIFIKASI PATH
+=====================
+P1: Sukses + userStr ada -> 1->2->3->4->5->6->7->8->9->10->11->12->14->15
+P2: Sukses + userStr null -> 1->2->3->4->5->6->7->8->9->10->12->14->15
+P3: Error -> 1->2->3->4->5->6->7->13->14->15
+
+6. RINGKASAN
+=============
+N=15, P=2, V(G)=3
+
+
+--- handleChangePassword ---
+
+KODE:
+No. | Node | Kode
+----|------|-----
+ 1  |  1   | const handleChangePassword = async (e) => {
+ 2  |  1   |     e.preventDefault();
+ 3  |  2   |     if (passwordData.newPassword !== passwordData.confirmPassword)
+ 4  |  2   |         { goeyToast.error("Konfirmasi password tidak cocok"); return; }
+ 5  |  3   |     setSavingPassword(true);
+ 6  |  4   |     try {
+ 7  |  5   |         const token = localStorage.getItem("token");
+ 8  |  6   |         const res = await fetch(".../api/profile/password", { method:"PUT",
+ 9  |  6   |             headers:{Authorization:`Bearer ${token}`},
+10  |  6   |             body:JSON.stringify({oldPassword, newPassword}) });
+11  |  7   |         const data = await res.json();
+12  |  8   |         if (!res.ok) throw new Error("Failed to change password");
+13  |  9   |         goeyToast.success("Password berhasil diubah");
+14  |  9   |         setPasswordData({ oldPassword:"", newPassword:"", confirmPassword:"" });
+15  |  4   |     } catch (error) { goeyToast.error("Error", {description:error.message}); }
+16  |  10  |     finally { setSavingPassword(false); }
+17  |  11  | };
+
+NODE:1-e.prevent,2-cek match,3-setSaving,4-try,5-getToken,6-fetch,7-parse,8-cek ok,9-success,10-finally,11-end
+CC:predicate=2,8=>V(G)=3
+PATH:P1:passwordNotMatch, P2:sukses, P3:error
+RINGKASAN:N=11,P=2,V(G)=3

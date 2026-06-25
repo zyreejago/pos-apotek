@@ -1,0 +1,178 @@
+================================================================================
+                   WHITEBOX TESTING - FLOWGRAPH ANALYSIS
+                   FUNGSI: handleSubmit (Users Page)
+================================================================================
+
+KODE YANG DIUJI (Source Code):
+===============================
+
+No. | Node | Kode
+----|------|-----
+ 1  |  1   | const handleSubmit = async (e: React.FormEvent) => {
+ 2  |  1   |     e.preventDefault();
+ 3  |  2   |     if (offCanvasMode==='add' && !checkActionPermission('create'))
+ 4  |  3   |         { goeyToast.error('Akses Ditolak'); return; }
+ 5  |  4   |     if (offCanvasMode==='edit' && !checkActionPermission('edit'))
+ 6  |  5   |         { goeyToast.error('Akses Ditolak'); return; }
+ 7  |  6   |     const url = offCanvasMode==='add' ? '.../api/users' : `.../users/${selectedUser?.id}`;
+ 8  |  7   |     const method = offCanvasMode==='add' ? 'POST' : 'PUT';
+ 9  |  8   |     try {
+10  |  9   |         const payload = { username, email, role, status };
+11  |  10  |         if (offCanvasMode==='add' || formData.password.trim().length>0)
+12  |  10  |             payload.password = formData.password;
+13  |  11  |         const res = await fetch(url, { method, headers:{...}, body:JSON.stringify(payload) });
+14  |  12  |         if (res.status === 401) { handleUnauthorized(); return; }
+15  |  13  |         const data = await safeJson(res);
+16  |  14  |         if (res.ok) { handleCloseOffCanvas(); fetchUsers(); goeyToast.success(...); }
+17  |  15  |         else { goeyToast.error('Gagal Menyimpan Pengguna', {...}); }
+18  |  8   |     } catch (error) { console.error(error); goeyToast.error('Terjadi Kesalahan'); }
+19  |  16  | };
+
+1. PENJELASAN NODE
+==================
+Node 1  : e.preventDefault()
+Node 2  : Cek mode add && !permission create
+Node 3  : Jika true: toast error, proses dihentikan
+Node 4  : Cek mode edit && !permission edit
+Node 5  : Jika true: toast error, proses dihentikan
+Node 6  : Tentukan URL berdasarkan mode
+Node 7  : Tentukan method (POST/PUT)
+Node 8  : try {
+Node 9  : Buat payload user
+Node 10 : Cek password -> tambahkan ke payload jika ada
+Node 11 : Fetch ke API
+Node 12 : Cek status 401 -> handleUnauthorized
+Node 13 : Parse response JSON dengan safeJson
+Node 14 : Cek res.ok -> jika ok: close, fetch, toast
+Node 15 : Jika gagal: toast error
+Node 16 : Selesai
+
+2. FLOWGRAPH
+=============
+1 -> 2 -> 3 (T) -> 16
+2 -> 4 (F) -> 5 (T) -> 16
+4 -> 6 (F) -> 7 -> 8 -> 9 -> 10 -> 11 -> 12
+12 -> (T) -> 16
+12 -> (F) -> 13 -> 14 -> (T) -> 16
+13 -> 14 -> (F) -> 15 -> 16
+8 -> catch -> 16
+
+3. GAMBAR FLOWGRAPH (VISUAL)
+=============================
+    ┌──────┐
+    │  1   │
+    └──┬───┘
+       │
+    ┌──▼───┐
+    │  2   │
+    └──┬───┘
+       │
+   ┌───┴───┐
+   │ T     │ F
+   │       │
+┌──▼───┐ ┌──▼───┐
+│  3   │ │  4   │
+└──┬───┘ └──┬───┘
+   │        │
+   │    ┌───┴───┐
+   │    │ T     │ F
+   │    │       │
+   │ ┌──▼───┐ ┌──▼───┐
+   │ │  5   │ │  6   │
+   │ └──┬───┘ └──┬───┘
+   │    │        │
+   │    │    ┌──▼───┐
+   │    │    │  7   │
+   │    │    └──┬───┘
+   │    │       │
+   │    │    ┌──▼───┐
+   │    │    │  8   │
+   │    │    └──┬───┘
+   │    │       │
+   │    │    ┌──▼───┐
+   │    │    │  9   │
+   │    │    └──┬───┘
+   │    │       │
+   │    │    ┌──▼───┐
+   │    │    │ 10   │
+   │    │    └──┬───┘
+   │    │       │
+   │    │    ┌──▼───┐
+   │    │    │ 11   │
+   │    │    └──┬───┘
+   │    │       │
+   │    │    ┌──▼───┐
+   │    │    │ 12   │
+   │    │    └──┬───┘
+   │    │       │
+   │    │   ┌───┴───┐
+   │    │   │ T     │ F
+   │    │   │       │
+   │    │   │   ┌──▼───┐
+   │    │   │   │ 13   │
+   │    │   │   └──┬───┘
+   │    │   │      │
+   │    │   │   ┌──▼───┐
+   │    │   │   │ 14   │
+   │    │   │   └──┬───┘
+   │    │   │      │
+   │    │   │  ┌───┴───┐
+   │    │   │  │ T     │ F
+   │    │   │  │       │
+   │    │   │  │   ┌──▼───┐
+   │    │   │  │   │ 15   │
+   │    │   │  │   └──┬───┘
+   │    │   │  │      │
+   │    │   │  └──┬───┘
+   │    │   │     │
+   │    │   └──┬───┘
+   │    │      │
+   │    └──────┼──────┘
+   └───────────┘
+               │
+            ┌──▼───┐
+            │ 16   │
+            └──────┘
+
+4. MENGHITUNG CC (CYCLOMATIC COMPLEXITY)
+==========================================
+Rumus 1: V(G) = E - N + 2
+E = 19, N = 16
+V(G) = 19 - 16 + 2 = 5
+
+Rumus 2: V(G) = P + 1
+Predicate Nodes: 2, 4, 12, 14 = 4
+V(G) = 4 + 1 = 5
+
+Rumus 3: V(G) = R = 5
+
+V(G) = 5
+
+5. IDENTIFIKASI PATH
+=====================
+CC = 5, terdapat 5 jalur independen:
+
+PATH 1: Tidak punya izin create
+1 -> 2 -> 3 -> 16
+
+PATH 2: Tidak punya izin edit
+1 -> 2 -> 4 -> 5 -> 16
+
+PATH 3: Sesi expired (401)
+1 -> 2 -> 4 -> 6 -> 7 -> 8 -> 9 -> 10 -> 11 -> 12 -> 16
+
+PATH 4: Simpan user sukses
+1 -> 2 -> 4 -> 6 -> 7 -> 8 -> 9 -> 10 -> 11 -> 12 -> 13 -> 14 -> 16
+
+PATH 5: Simpan user gagal
+1 -> 2 -> 4 -> 6 -> 7 -> 8 -> 9 -> 10 -> 11 -> 12 -> 13 -> 14 -> 15 -> 16
+
+6. RINGKASAN
+=============
+N (Node)             : 16
+E (Edge)             : 19
+P (Predicate Node)   : 4
+V(G) = E - N + 2     : 5
+V(G) = P + 1         : 5
+Jumlah Path          : 5
+Interpretasi         : RENDAH (<=10) - Mudah di-test

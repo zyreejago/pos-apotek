@@ -22,8 +22,8 @@ module.exports = function registerProductRoutes(app, pool, authenticate, checkPe
                s.name AS supplier_name, 
                b.stock_type,
                (SELECT MIN(b2.expired_date) FROM batches b2 WHERE b2.product_id = p.id AND b2.is_archived = FALSE AND b2.status = 'approved') AS nearest_expired,
-               (SELECT MAX(ih.created_at) FROM inventory_history ih WHERE ih.product_id = p.id AND ih.type = 'opname') AS last_opname_at,
-               (SELECT u.username FROM inventory_history ih LEFT JOIN users u ON ih.user_id = u.id WHERE ih.product_id = p.id AND ih.type = 'opname' ORDER BY ih.created_at DESC LIMIT 1) AS last_opname_by
+                sos.date AS last_opname_at,
+                u_op.username AS last_opname_by
         FROM products p
         LEFT JOIN (
           SELECT b1.product_id, b1.supplier_id, b1.stock_type
@@ -39,6 +39,10 @@ module.exports = function registerProductRoutes(app, pool, authenticate, checkPe
           GROUP BY b1.product_id
         ) b ON p.id = b.product_id
         LEFT JOIN suppliers s ON b.supplier_id = s.id
+        LEFT JOIN stock_opname_sessions sos ON sos.id = (
+          SELECT MAX(sos2.id) FROM stock_opname_sessions sos2
+        )
+        LEFT JOIN users u_op ON sos.user_id = u_op.id
       `;
       let countQuery = 'SELECT COUNT(*) as total FROM products WHERE is_active = 1';
       let params = [];
@@ -374,6 +378,14 @@ module.exports = function registerProductRoutes(app, pool, authenticate, checkPe
       await connection.beginTransaction();
       const today = new Date().toISOString().split('T')[0];
 
+      // Create stock opname session
+      const changedItems = items.filter(item => item.actual_stock !== item.system_stock);
+      const [sessionResult] = await connection.query(
+        'INSERT INTO stock_opname_sessions (date, user_id, total_items) VALUES (?, ?, ?)',
+        [today, req.user.id, changedItems.length]
+      );
+      const sessionId = sessionResult.insertId;
+
       for (const item of items) {
         const { id, system_stock, actual_stock } = item;
         const difference = actual_stock - system_stock;
@@ -384,7 +396,6 @@ module.exports = function registerProductRoutes(app, pool, authenticate, checkPe
             id,
           ]);
 
-          // Get product cost price
           // Get product cost price, product_category, and name
           const [productResult] = await connection.query('SELECT cost_price, product_category, name FROM products WHERE id = ?', [id]);
           const costPrice = productResult[0]?.cost_price || 0;
@@ -416,7 +427,7 @@ module.exports = function registerProductRoutes(app, pool, authenticate, checkPe
           );
 
           await connection.query(
-            'INSERT INTO inventory_history (product_id, type, quantity_change, previous_stock, new_stock, note, user_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            'INSERT INTO inventory_history (product_id, type, quantity_change, previous_stock, new_stock, note, user_id, session_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
             [
               id,
               'opname',
@@ -425,19 +436,106 @@ module.exports = function registerProductRoutes(app, pool, authenticate, checkPe
               actual_stock,
               note || 'Stock Opname Adjustment',
               req.user.id,
+              sessionId,
             ]
           );
         }
       }
 
       await connection.commit();
-      res.json({ message: 'Stock Opname completed successfully' });
+      res.json({ message: 'Stock Opname completed successfully', sessionId });
     } catch (error) {
       await connection.rollback();
       console.error('Error processing Stock Opname:', error);
       res.status(500).json({ message: 'Server error' });
     } finally {
       connection.release();
+    }
+    }
+  );
+
+  // GET /api/stock-opname/sessions - Get all stock opname sessions
+  app.get(
+    '/api/stock-opname/sessions',
+    authenticate,
+    checkPermission('Stock Opname', 'show'),
+    async (req, res) => {
+    try {
+      const [sessions] = await pool.query(`
+        SELECT s.*, u.username
+        FROM stock_opname_sessions s
+        LEFT JOIN users u ON s.user_id = u.id
+        ORDER BY s.created_at DESC
+      `);
+      res.json({ data: sessions });
+    } catch (error) {
+      console.error('Error fetching opname sessions:', error);
+      res.status(500).json({ message: 'Server error' });
+    }
+    }
+  );
+
+  // GET /api/products/:id/opname-history - Get product-specific opname records
+  app.get(
+    '/api/products/:id/opname-history',
+    authenticate,
+    checkPermission('Stock Opname', 'show'),
+    async (req, res) => {
+    const { id } = req.params;
+    try {
+      const [records] = await pool.query(`
+        SELECT ih.*, sos.date, u.username
+        FROM inventory_history ih
+        LEFT JOIN stock_opname_sessions sos ON ih.session_id = sos.id
+        LEFT JOIN users u ON sos.user_id = u.id
+        WHERE ih.product_id = ? AND ih.type = 'opname'
+        ORDER BY ih.created_at DESC
+      `, [id]);
+
+      const [product] = await pool.query('SELECT name, unit FROM products WHERE id = ?', [id]);
+
+      res.json({
+        records,
+        product: product[0] || null
+      });
+    } catch (error) {
+      console.error('Error fetching product opname history:', error);
+      res.status(500).json({ message: 'Server error' });
+    }
+    }
+  );
+
+  // GET /api/stock-opname/sessions/:id - Get session detail (products counted)
+  app.get(
+    '/api/stock-opname/sessions/:id',
+    authenticate,
+    checkPermission('Stock Opname', 'show'),
+    async (req, res) => {
+    const { id } = req.params;
+    try {
+      const [session] = await pool.query(`
+        SELECT s.*, u.username
+        FROM stock_opname_sessions s
+        LEFT JOIN users u ON s.user_id = u.id
+        WHERE s.id = ?
+      `, [id]);
+
+      if (session.length === 0) {
+        return res.status(404).json({ message: 'Session not found' });
+      }
+
+      const [items] = await pool.query(`
+        SELECT ih.*, p.name AS product_name, p.unit
+        FROM inventory_history ih
+        LEFT JOIN products p ON ih.product_id = p.id
+        WHERE ih.session_id = ? AND ih.type = 'opname'
+        ORDER BY p.name ASC
+      `, [id]);
+
+      res.json({ session: session[0], items });
+    } catch (error) {
+      console.error('Error fetching session detail:', error);
+      res.status(500).json({ message: 'Server error' });
     }
     }
   );

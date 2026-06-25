@@ -1,0 +1,305 @@
+================================================================================
+                   WHITEBOX TESTING - FLOWGRAPH ANALYSIS
+                   FUNGSI: handleSubmit (Products Page)
+================================================================================
+
+KODE YANG DIUJI (Source Code):
+===============================
+
+No. | Node | Kode
+----|------|-----
+ 1  |  1   | const handleSubmit = async (e: React.FormEvent) => {
+ 2  |  1   |     e.preventDefault();
+ 3  |  2   |     if (productOffCanvasMode === 'add' && !checkActionPermission('create')) {
+ 4  |  3   |         goeyToast.error('Akses Ditolak', { description: "..." });
+ 5  |  3   |         return;
+ 6  |  4   |     if (productOffCanvasMode === 'edit' && !checkActionPermission('edit')) {
+ 7  |  5   |         goeyToast.error('Akses Ditolak', { description: "..." });
+ 8  |  5   |         return;
+ 9  |  6   |     if (productOffCanvasMode === 'add' && formData.invoice_number && invoiceNumberError) {
+10  |  7   |         goeyToast.error('No. Faktur sudah digunakan', { ... });
+11  |  7   |         return;
+12  |  8   |     if (productOffCanvasMode === 'edit' && selectedProduct) {
+13  |  9   |         // Edit mode - PUT product, close, fetch, toast
+14  |  9   |         try { ... } catch (error) { ... }
+15  |  10  |     } else {
+16  |  11  |         try {
+17  |  12  |             if (isMultipleProducts) {
+18  |  13  |                 if (multipleProducts.length === 0) { ... return; }
+19  |  15  |                 for (const item of multipleProducts) {
+20  |  16  |                     const existingBatchId = perbaikanBatchIds[item.id];
+21  |  17  |                     if (existingBatchId) {
+22  |  17  |                         // PUT batch
+23  |  18  |                     }
+24  |  18  |                     if (prodId) {
+25  |  19  |                         // PUT product
+26  |  18  |                     }
+27  |  20  |                     else { await saveProductAndBatch(item, ...); }
+28  |  21  |                 }
+29  |  22  |             } else {
+30  |  23  |                 const singleBatchId = perbaikanBatchIds['single'];
+31  |  24  |                 if (singleBatchId) {
+32  |  24  |                     // PUT batch
+33  |  25  |                 }
+34  |  25  |                 if (productId) {
+35  |  26  |                     // PUT product
+36  |  25  |                 }
+37  |  27  |                 else { await saveProductAndBatch(formData, ...); }
+38  |  28  |             }
+39  |  28  |             handleCloseProductOffCanvas();
+40  |  28  |             fetchProducts();
+41  |  28  |             setPerbaikanBatchIds({});
+42  |  28  |             goeyToast.success(...);
+43  |  29  |         } catch (error) { ... }
+44  |  10  |     }
+45  |  30  | };
+
+
+1. PENJELASAN NODE
+==================
+
+Node 1  : e.preventDefault() - Mencegah reload form saat submit
+Node 2  : Memeriksa apakah mode 'add' DAN tidak punya izin 'create'
+Node 3  : Jika tidak valid - kirim toast error "Akses Ditolak", proses dihentikan
+Node 4  : Memeriksa apakah mode 'edit' DAN tidak punya izin 'edit'
+Node 5  : Jika tidak valid - kirim toast error, proses dihentikan
+Node 6  : Memeriksa apakah mode 'add', invoice_number terisi, dan invoiceNumberError ada
+Node 7  : Jika tidak valid - toast "No. Faktur sudah digunakan", proses dihentikan
+Node 8  : Memeriksa apakah mode 'edit' DAN selectedProduct terpilih
+Node 9  : Jika valid (edit) - siapkan payload, PUT /products/:id, close, fetch, toast
+Node 10 : Jika tidak valid (bukan edit) - masuk blok Add mode
+Node 11 : try { - Mulai blok try untuk Add mode
+Node 12 : Memeriksa apakah isMultipleProducts true
+Node 13 : Jika ya - cek apakah multipleProducts.length === 0
+Node 14 : Jika kosong - toast "Daftar produk kosong", proses dihentikan
+Node 15 : Loop for setiap item di multipleProducts
+Node 16 : Cek apakah item memiliki existingBatchId di perbaikanBatchIds
+Node 17 : Jika perbaikan - siapkan FormData, PUT /batches/:id
+Node 18 : Cek apakah prodId ada di perbaikanBatchIds
+Node 19 : Jika prodId ada - cari produk, refresh jika perlu, PUT /products/:id
+Node 20 : Jika item baru - panggil saveProductAndBatch(item) => POST
+Node 21 : Kembali ke node 15 (loop next item) atau lanjut ke node 28
+Node 22 : Jika false (single) - jalur single product
+Node 23 : Cek apakah singleBatchId ada di perbaikanBatchIds['single']
+Node 24 : Jika perbaikan single - siapkan FormData, PUT /batches/:id
+Node 25 : Cek apakah productId ada di perbaikanBatchIds['productId']
+Node 26 : Jika ada - cari produk, refresh jika perlu, PUT /products/:id
+Node 27 : Jika single baru - panggil saveProductAndBatch(formData) => POST
+Node 28 : handleCloseProductOffCanvas(), fetchProducts(), setPerbaikanBatchIds({}), toast
+Node 29 : catch (error) - log error, toast "Gagal menambahkan produk"
+Node 30 : Selesai
+
+
+2. FLOWGRAPH
+=============
+
+1 -> 2
+2 -> 3 (T), 2 -> 4 (F)
+3 -> 30
+4 -> 5 (T), 4 -> 6 (F)
+5 -> 30
+6 -> 7 (T), 6 -> 8 (F)
+7 -> 30
+8 -> 9 (T), 8 -> 10 (F)
+9 -> 30
+10 -> 11
+11 -> 12
+12 -> 13 (T), 12 -> 22 (F)
+13 -> 14 (T), 13 -> 15 (F)
+14 -> 30
+15 -> 16
+16 -> 17 (T), 16 -> 20 (F)
+17 -> 18
+18 -> 19 (T), 18 -> 21 (F)
+19 -> 21
+20 -> 21
+21 -> 15 (loop), 21 -> 28 (loop selesai)
+22 -> 23
+23 -> 24 (T), 23 -> 27 (F)
+24 -> 25
+25 -> 26 (T), 25 -> 28 (F)
+26 -> 28
+27 -> 28
+28 -> 30
+
+
+3. GAMBAR FLOWGRAPH (VISUAL)
+=============================
+
+                    ┌─────┐
+                    │  1  │
+                    └──┬──┘
+                       │
+                    ┌──▼──┐
+               ┌────┤  2  │
+               │    └──┬──┘
+               │       │
+               │   ┌───┴───┐
+               │   │ T     │ F
+               │   │       │
+               │ ┌─▼──┐ ┌─▼──┐
+               │ │ 3  │ │ 4  │
+               │ └──┬─┘ └─┬──┘
+               │    │     │
+               │    │  ┌──┴───┐
+               │    │  │ T    │ F
+               │    │  │      │
+               │    │ ┌▼──┐ ┌─▼──┐
+               │    │ │ 5 │ │ 6  │
+               │    │ └┬──┘ └─┬──┘
+               │    │  │      │
+               │    │  │  ┌───┴───┐
+               │    │  │  │ T     │ F
+               │    │  │  │       │
+               │    │  │ ┌▼──┐ ┌─▼──┐
+               │    │  │ │ 7 │ │ 8  │
+               │    │  │ └┬──┘ └─┬──┘
+               │    │  │  │      │
+               │    │  │  │  ┌───┴───┐
+               │    │  │  │  │ T     │ F
+               │    │  │  │  │       │
+               │    │  │  │ ┌▼──┐ ┌─▼──┐
+               │    │  │  │ │ 9 │ │10  │
+               │    │  │  │ └┬──┘ └─┬──┘
+               │    │  │  │  │      │
+               │    │  │  │  │   ┌──▼──┐
+               │    │  │  │  │   │ 11  │
+               │    │  │  │  │   └──┬──┘
+               │    │  │  │  │      │
+               │    │  │  │  │   ┌──▼──┐
+               │    │  │  │  │   │ 12  │
+               │    │  │  │  │   └──┬──┘
+               │    │  │  │  │      │
+               │    │  │  │  │   ┌──┴──┐
+               │    │  │  │  │   │ T   │ F
+               │    │  │  │  │   │     │
+               │    │  │  │  │ ┌─▼──┐ ┌─▼──┐
+               │    │  │  │  │ │13  │ │22  │
+               │    │  │  │  │ └─┬──┘ └─┬──┘
+               │    │  │  │  │   │      │
+               │    │  │  │  │ ┌─▼──┐ ┌─▼──┐
+               │    │  │  │  │ │14  │ │23  │
+               │    │  │  │  │ └─┬──┘ └─┬──┘
+               │    │  │  │  │   │      │
+               │    │  │  │  │ ┌─▼──┐ ┌─┴──┐
+               │    │  │  │  │ │15  │ │T   │ F
+               │    │  │  │  │ └─┬──┘ │    │
+               │    │  │  │  │   │   ┌▼──┐┌─▼──┐
+               │    │  │  │  │ ┌─▼──┐│24 ││27  │
+               │    │  │  │  │ │16  ││└─┬─┘└─┬──┘
+               │    │  │  │  │ └─┬──┘│  │    │
+               │    │  │  │  │   │   │┌─▼─┐  │
+               │    │  │  │  │ ┌─┴──┐││25 │  │
+               │    │  │  │  │ │T  F││└─┬─┘  │
+               │    │  │  │  ││    │││  │    │
+               │    │  │  │  │┌▼┐ ┌▼┐││┌─▼─┐  │
+               │    │  │  │  ││17││20││││26 │  │
+               │    │  │  │  │└┬┘ └┬┘││└─┬─┘  │
+               │    │  │  │  │ │   │ ││  │    │
+               │    │  │  │  │┌▼──┐ │ ││  │    │
+               │    │  │  │  ││18 │ │ ││  │    │
+               │    │  │  │  │└┬──┘ │ ││  │    │
+               │    │  │  │  │ │   │ ││  │    │
+               │    │  │  │  │┌▼──┐│ │││  │    │
+               │    │  │  │  ││19 ││ ││││  │    │
+               │    │  │  │  │└┬──┘└─┘│││  │    │
+               │    │  │  │  │ │     ││││  │    │
+               │    │  │  │  └─┼─────┼┼┼──┘    │
+               │    │  │  │    │     │││       │
+               │    │  │  │    └──┬──┘││       │
+               │    │  │  │       │   ││       │
+               │    │  │  │    ┌──▼───┴┴──┐    │
+               │    │  │  │    │   21     │    │
+               │    │  │  │    └────┬─────┘    │
+               │    │  │  │         │          │
+               │    │  │  └─────────┼──────────┘
+               │    │  │           │
+               │    │  └───────────┼──────────┐
+               │    │              │          │
+               │    └──────────────┼──────────┘
+               │                   │
+               └───────────────────┘
+                                   │
+                               ┌───▼───┐
+                               │  28   │
+                               └───┬───┘
+                                   │
+                               ┌───▼───┐
+                               │  29   │
+                               └───┬───┘
+                                   │
+                               ┌───▼───┐
+                               │  30   │
+                               └───────┘
+
+
+4. MENGHITUNG CC (CYCLOMATIC COMPLEXITY)
+==========================================
+
+Rumus 1: V(G) = E - N + 2
+
+E (Edge)  = 34
+N (Node)  = 30
+P (Component) = 1
+
+V(G) = 34 - 30 + 2(1)
+V(G) = 6
+
+
+Rumus 2: V(G) = P + 1
+
+Predicate Nodes (node dengan >=2 edge keluar):
+2, 4, 6, 8, 12, 13, 16, 18, 23, 25
+
+Total Predicate Nodes = 5 (yang benar-benar predicate)
+
+V(G) = 5 + 1
+V(G) = 6
+
+
+Rumus 3: V(G) = R (Region)
+
+Jumlah region tertutup dalam flowgraph = 6
+
+V(G) = 6
+
+
+5. IDENTIFIKASI PATH
+=====================
+
+Berdasarkan CC = 6, terdapat 6 jalur independen:
+
+----------------------------------------------------------------------
+PATH 1: Tidak punya izin create
+1 -> 2 -> 3 -> 30
+
+PATH 2: Tidak punya izin edit
+1 -> 2 -> 4 -> 5 -> 30
+
+PATH 3: Invoice sudah dipakai
+1 -> 2 -> 4 -> 6 -> 7 -> 30
+
+PATH 4: Edit produk single
+1 -> 2 -> 4 -> 6 -> 8 -> 9 -> 30
+
+PATH 5: Multiple products - perbaikan (batch PUT + product PUT)
+1 -> 2 -> 4 -> 6 -> 8 -> 10 -> 11 -> 12 -> 13 -> 15 -> 16 -> 17
+    -> 18 -> 19 -> 21 -> 15 -> 28 -> 30
+
+PATH 6: Single product - perbaikan (batch PUT + product PUT)
+1 -> 2 -> 4 -> 6 -> 8 -> 10 -> 11 -> 12 -> 22 -> 23 -> 24 -> 25
+    -> 26 -> 28 -> 30
+----------------------------------------------------------------------
+
+
+6. RINGKASAN
+=============
+
+N (Node)             : 30
+E (Edge)             : 34
+P (Predicate Node)   : 5
+V(G) = E - N + 2     : 6
+V(G) = P + 1         : 6
+V(G) = R             : 6
+Jumlah Path          : 6
+Interpretasi         : RENDAH (<=10) - Mudah di-test

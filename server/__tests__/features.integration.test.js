@@ -533,8 +533,8 @@ describe('feature integration (backend)', () => {
   test('POST /api/stock-opname success returns 200', async () => {
     const { app, mockConnection, superadminToken } = await loadAppWithMockedDb();
     mockConnection.query
-      .mockResolvedValueOnce([{}, []])
-      .mockResolvedValueOnce([{}, []]);
+      .mockResolvedValueOnce([{ insertId: 1 }, []])
+      .mockResolvedValue([[{ id: 1 }], []]);
 
     const res = await request(app)
       .post('/api/stock-opname')

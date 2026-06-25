@@ -298,7 +298,9 @@ describe('products module', () => {
 
   test('POST /api/stock-opname success handles difference 0 and non-0', async () => {
     const connection = {
-      query: jest.fn().mockResolvedValue([{}, []]),
+      query: jest.fn()
+        .mockResolvedValueOnce([{ insertId: 1 }, []])
+        .mockResolvedValue([[{ id: 1 }], []]),
       beginTransaction: jest.fn().mockResolvedValue(undefined),
       commit: jest.fn().mockResolvedValue(undefined),
       rollback: jest.fn().mockResolvedValue(undefined),
@@ -315,11 +317,14 @@ describe('products module', () => {
       note: 'op',
     });
     expect(res.status).toBe(200);
+    expect(res.body).toHaveProperty('sessionId');
   });
 
   test('POST /api/stock-opname uses default note when missing', async () => {
     const connection = {
-      query: jest.fn().mockResolvedValue([{}, []]),
+      query: jest.fn()
+        .mockResolvedValueOnce([{ insertId: 1 }, []])
+        .mockResolvedValue([[{ id: 1 }], []]),
       beginTransaction: jest.fn().mockResolvedValue(undefined),
       commit: jest.fn().mockResolvedValue(undefined),
       rollback: jest.fn().mockResolvedValue(undefined),
@@ -337,9 +342,8 @@ describe('products module', () => {
   test('POST /api/stock-opname with OBAT product uses persediaan code 103', async () => {
     const connection = {
       query: jest.fn()
-        .mockResolvedValue([{}, []])
-        .mockResolvedValueOnce([{}, []])
-        .mockResolvedValueOnce([[{ cost_price: 1000, product_category: 'OBAT', name: 'Test' }], []]),
+        .mockResolvedValueOnce([{ insertId: 1 }, []])
+        .mockResolvedValue([[{ id: 1 }], []]),
       beginTransaction: jest.fn().mockResolvedValue(undefined),
       commit: jest.fn().mockResolvedValue(undefined),
       rollback: jest.fn().mockResolvedValue(undefined),
@@ -357,7 +361,9 @@ describe('products module', () => {
 
   test('POST /api/stock-opname error triggers rollback returns 500', async () => {
     const connection = {
-      query: jest.fn().mockRejectedValueOnce(new Error('db')),
+      query: jest.fn()
+        .mockResolvedValueOnce([{ insertId: 1 }, []])
+        .mockRejectedValueOnce(new Error('db')),
       beginTransaction: jest.fn().mockResolvedValue(undefined),
       commit: jest.fn(),
       rollback: jest.fn().mockResolvedValue(undefined),
@@ -436,7 +442,9 @@ describe('products module', () => {
 
   test('POST /api/stock-opname with stock increase triggers positive difference branch', async () => {
     const connection = {
-      query: jest.fn().mockResolvedValue([{}, []]),
+      query: jest.fn()
+        .mockResolvedValueOnce([{ insertId: 1 }, []])
+        .mockResolvedValue([[{ id: 1 }], []]),
       beginTransaction: jest.fn().mockResolvedValue(undefined),
       commit: jest.fn().mockResolvedValue(undefined),
       rollback: jest.fn().mockResolvedValue(undefined),

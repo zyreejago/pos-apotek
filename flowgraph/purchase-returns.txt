@@ -1,0 +1,159 @@
+================================================================================
+                   WHITEBOX TESTING - FLOWGRAPH ANALYSIS
+                   FILE: purchase-returns (handleLookup, handleSubmit, handleConfirmSubmit)
+================================================================================
+
+KODE YANG DIUJI (Source Code):
+===============================
+
+--- handleLookup ---
+
+No. | Node | Kode
+----|------|-----
+ 1  |  1   | const handleLookup = async () => {
+ 2  |  2   |     if (!invoiceNo.trim()) { goeyToast.error('Masukkan nomor faktur'); return; }
+ 3  |  3   |     setLoading(true); setSearched(true); setLookupResult(null);
+ 4  |  3   |     setReturnQuantities({}); setConditions({});
+ 5  |  4   |     try {
+ 6  |  5   |         const res = await fetch(`.../returns/purchases/lookup?invoice_no=...`, {headers: authHeaders});
+ 7  |  6   |         if (res.status===401) { router.push('/login'); return; }
+ 8  |  7   |         if (res.status===404) { goeyToast.error('Faktur tidak ditemukan'); return; }
+ 9  |  8   |         const data = await res.json(); setLookupResult(data);
+10  |  4   |     } catch { goeyToast.error('Gagal terhubung ke server'); }
+11  |  9   |     finally { setLoading(false); }
+12  |  10  | };
+
+1. PENJELASAN NODE
+==================
+Node 1  : Deklarasi fungsi handleLookup
+Node 2  : Cek invoiceNo kosong -> toast, return
+Node 3  : Set state
+Node 4  : try {
+Node 5  : Fetch lookup API
+Node 6  : Cek status 401 -> redirect login
+Node 7  : Cek status 404 -> toast, return
+Node 8  : Parse data, set state
+Node 9  : finally setLoading(false)
+Node 10 : Selesai
+
+2. FLOWGRAPH: 1->2(T)->10 | 2->3(F)->4->5->6(T)->10 | 6->7(F)->(T)->10 | 7->8(F)->9->10
+
+3. GAMBAR FLOWGRAPH (VISUAL)
+=============================
+    ┌──────┐
+    │  1   │
+    └──┬───┘
+       │
+    ┌──▼───┐
+    │  2   │
+    └──┬───┘
+       │
+   ┌───┴───┐
+   │ T     │ F
+   │       │
+┌──▼───┐ ┌──▼───┐
+│ 10   │ │  3   │
+└──────┘ └──┬───┘
+            │
+        ┌───▼───┐
+        │  4    │
+        └───┬───┘
+            │
+        ┌───▼───┐
+        │  5    │
+        └───┬───┘
+            │
+        ┌───▼───┐
+        │  6    │
+        └───┬───┘
+            │
+       ┌────┴────┐
+       │ T      │ F
+       │        │
+    ┌──▼───┐ ┌──▼───┐
+    │ 10   │ │  7   │
+    └──────┘ └──┬───┘
+                │
+           ┌────┴────┐
+           │ T      │ F
+           │        │
+        ┌──▼───┐ ┌──▼───┐
+        │ 10   │ │  8   │
+        └──────┘ └──┬───┘
+                    │
+                ┌───▼───┐
+                │  9    │
+                └───┬───┘
+                    │
+                ┌───▼───┐
+                │  10   │
+                └───────┘
+
+4. MENGHITUNG CC (CYCLOMATIC COMPLEXITY)
+==========================================
+Rumus 1: V(G)=E-N+2=12-10+2=4
+Rumus 2: V(G)=P+1=3+1=4 (predicate:2,6,7)
+Rumus 3: V(G)=R=4
+V(G)=4
+
+5. IDENTIFIKASI PATH
+=====================
+P1: invoice kosong -> 1->2->10
+P2: 401 -> 1->2->3->4->5->6->10
+P3: 404 -> 1->2->3->4->5->6->7->10
+P4: sukses -> 1->2->3->4->5->6->7->8->9->10
+
+6. RINGKASAN
+=============
+N=10, P=3, V(G)=4
+
+
+--- handleSubmit ---
+
+1. PENJELASAN NODE
+==================
+Node 1 : Deklarasi, Node 2 : cek lookupResult, Node 3 : cek permission, Node 4 : cek reason
+Node 5 : cek handling, Node 6 : validasi items, Node 7 : cek invalidItems
+Node 8 : filter items valid, Node 9 : cek items.length, Node 10 : setShowConfirm, Node 11 : end
+
+2. FLOWGRAPH: 1->2->3->4->5->6->7->8->9->10->11 (dengan return early di node 2-9)
+
+3. GAMBAR FLOWGRAPH: linear dengan return early
+
+4. MENGHITUNG CC (CYCLOMATIC COMPLEXITY)
+==========================================
+Predicate: 2,3,4,5,7,9 = 6
+V(G) = P + 1 = 6 + 1 = 7
+
+5. IDENTIFIKASI PATH
+=====================
+P1-P6: return early (masing-masing predikat false)
+P7: setShowConfirm(true) -> 1->2->3->4->5->6->7->8->9->10->11
+
+6. RINGKASAN: N=11, P=6, V(G)=7
+
+
+--- handleConfirmSubmit ---
+
+1. PENJELASAN NODE
+==================
+Node 1 : Deklarasi, Node 2 : cek lookupResult, Node 3 : set state, Node 4 : filter items
+Node 5 : try, Node 6 : fetch, Node 7 : cek res.ok, Node 8 : success, Node 9 : fail
+Node 10 : finally, Node 11 : end
+
+2. FLOWGRAPH: 1->2(T)->11 | 2->3->4->5->6->7->8->10->11 | 7->9->10->11
+
+3. GAMBAR FLOWGRAPH: percabangan di node 2 dan node 7
+
+4. MENGHITUNG CC (CYCLOMATIC COMPLEXITY)
+==========================================
+Predicate: 2, 7 = 2
+V(G) = P + 1 = 2 + 1 = 3
+
+5. IDENTIFIKASI PATH
+=====================
+P1: lookupResult null -> 1->2->11
+P2: sukses -> 1->2->3->4->5->6->7->8->10->11
+P3: gagal -> 1->2->3->4->5->6->7->9->10->11
+
+6. RINGKASAN: N=11, P=2, V(G)=3

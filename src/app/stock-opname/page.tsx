@@ -2,11 +2,12 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { Search, Filter, Save, AlertCircle } from 'lucide-react';
+import { Search, Save, AlertCircle, Eye, X } from 'lucide-react';
 import { goeyToast } from "@/components/ui/goey-toaster";
 import ConfirmModal from '@/components/ConfirmModal';
 import { useRequirePermission } from '@/hooks/useRequirePermission';
 import PageHeader from '@/components/PageHeader';
+import OffCanvas from '@/components/OffCanvas';
 
 interface Product {
   id: number;
@@ -30,6 +31,36 @@ interface OpnameEntry {
   system: number;
 }
 
+interface OpnameSession {
+  id: number;
+  date: string;
+  user_id: number;
+  total_items: number;
+  created_at: string;
+  username: string;
+}
+
+interface SessionDetail {
+  id: number;
+  product_id: number;
+  product_name: string;
+  unit: string;
+  type: string;
+  quantity_change: number;
+  previous_stock: number;
+  new_stock: number;
+}
+
+interface ProductHistoryRecord {
+  id: number;
+  product_id: number;
+  previous_stock: number;
+  new_stock: number;
+  quantity_change: number;
+  date: string;
+  username: string;
+}
+
 export default function StockOpnamePage() {
   // Permission Check
   const { checkActionPermission } = useRequirePermission('Stock Opname');
@@ -51,6 +82,20 @@ export default function StockOpnamePage() {
   const [opnameData, setOpnameData] = useState<Record<number, OpnameEntry>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Product History Modal State
+  const [productHistoryOpen, setProductHistoryOpen] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState<{ id: number; name: string; unit: string } | null>(null);
+  const [productHistoryRecords, setProductHistoryRecords] = useState<ProductHistoryRecord[]>([]);
+  const [productHistoryLoading, setProductHistoryLoading] = useState(false);
+
+  // History Modal State
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [sessions, setSessions] = useState<OpnameSession[]>([]);
+  const [sessionsLoading, setSessionsLoading] = useState(false);
+  const [selectedSession, setSelectedSession] = useState<OpnameSession | null>(null);
+  const [sessionDetail, setSessionDetail] = useState<SessionDetail[]>([]);
+  const [detailLoading, setDetailLoading] = useState(false);
+
   // Confirm Modal State
   const [confirmModal, setConfirmModal] = useState({
     isOpen: false,
@@ -63,6 +108,78 @@ export default function StockOpnamePage() {
   const router = useRouter();
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
   const authHeaders = React.useMemo((): HeadersInit => (token ? { 'Authorization': `Bearer ${token}` } : {}), [token]);
+
+  const fetchSessions = useCallback(async () => {
+    setSessionsLoading(true);
+    try {
+      const res = await fetch('http://localhost:5000/api/stock-opname/sessions', {
+        headers: authHeaders
+      });
+      const data = await res.json();
+      setSessions(data.data || []);
+    } catch (error) {
+      console.error('Error fetching sessions:', error);
+    } finally {
+      setSessionsLoading(false);
+    }
+  }, [authHeaders]);
+
+  const fetchSessionDetail = useCallback(async (sessionId: number) => {
+    setDetailLoading(true);
+    try {
+      const res = await fetch(`http://localhost:5000/api/stock-opname/sessions/${sessionId}`, {
+        headers: authHeaders
+      });
+      const data = await res.json();
+      setSessionDetail(data.items || []);
+      setSelectedSession(data.session || null);
+    } catch (error) {
+      console.error('Error fetching session detail:', error);
+    } finally {
+      setDetailLoading(false);
+    }
+  }, [authHeaders]);
+
+  const openHistoryModal = () => {
+    setHistoryOpen(true);
+    fetchSessions();
+  };
+
+  const openSessionDetail = (session: OpnameSession) => {
+    fetchSessionDetail(session.id);
+  };
+
+  const closeHistoryModal = () => {
+    setHistoryOpen(false);
+    setSelectedSession(null);
+    setSessionDetail([]);
+  };
+
+  const fetchProductOpnameHistory = useCallback(async (productId: number) => {
+    setProductHistoryLoading(true);
+    try {
+      const res = await fetch(`http://localhost:5000/api/products/${productId}/opname-history`, {
+        headers: authHeaders
+      });
+      const data = await res.json();
+      setProductHistoryRecords(data.records || []);
+      setSelectedProduct(data.product || null);
+      setProductHistoryOpen(true);
+    } catch (error) {
+      console.error('Error fetching product opname history:', error);
+      goeyToast.error('Gagal Memuat Riwayat', {
+        description: "Terjadi kesalahan saat memuat riwayat opname produk."
+      });
+    } finally {
+      setProductHistoryLoading(false);
+    }
+  }, [authHeaders]);
+
+  const closeProductHistory = () => {
+    setProductHistoryOpen(false);
+    setSelectedProduct(null);
+    setProductHistoryRecords([]);
+  };
 
   const fetchProducts = useCallback(async (page: number, limit: number, search: string) => {
     setLoading(true);
@@ -265,47 +382,83 @@ export default function StockOpnamePage() {
         title="Stock Opname"
         breadcrumbs={[{ label: 'Inventory' }, { label: 'Stock Opname' }]}
         rightContent={
-          !isOpnameActive ? (
-            (checkActionPermission('create') || checkActionPermission('edit')) && (
-            <button 
-              onClick={handleStartOpname}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm"
-            >
-              Mulai Stock Opname
-            </button>
-            )
-          ) : (
-            <div className="flex gap-2">
-              <button 
-                onClick={handleCancelOpname}
-                className="bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-                disabled={isSubmitting}
-              >
-                Cancel
-              </button>
-              <button 
-                onClick={handleSubmitOpname}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm flex items-center gap-2"
-                disabled={isSubmitting}
-              >
-                <Save size={16} />
-                {isSubmitting ? 'Saving...' : 'Submit Opname'}
-              </button>
-            </div>
-          )
+          <div className="flex items-center gap-2">
+            {!isOpnameActive ? (
+              <>
+                <button
+                  onClick={openHistoryModal}
+                  className="bg-white border border-gray-200 text-gray-600 hover:bg-gray-50 px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+                >
+                  <Eye size={16} />
+                  Riwayat
+                </button>
+                {(checkActionPermission('create') || checkActionPermission('edit')) && (
+                <button 
+                  onClick={handleStartOpname}
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm"
+                >
+                  Mulai Stock Opname
+                </button>
+                )}
+              </>
+            ) : (
+              <div className="flex gap-2">
+                <button 
+                  onClick={handleCancelOpname}
+                  className="bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                  disabled={isSubmitting}
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={handleSubmitOpname}
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm flex items-center gap-2"
+                  disabled={isSubmitting}
+                >
+                  <Save size={16} />
+                  {isSubmitting ? 'Saving...' : 'Submit Opname'}
+                </button>
+              </div>
+            )}
+          </div>
         }
       />
 
       {/* Main Content */}
       <div className="p-3 sm:p-4 md:p-8 pt-0">
         <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+        {/* General Info */}
+        <div className="p-4 border-b border-gray-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+          <div className="text-sm text-gray-500">
+            {products.length > 0 && products[0].last_opname_at ? (
+              <span className="text-gray-600">
+                <span className="font-medium">Opname Terakhir:</span>{' '}
+                {new Date(products[0].last_opname_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
+                {products[0].last_opname_by && (
+                  <span> oleh <span className="font-medium">{products[0].last_opname_by}</span></span>
+                )}
+              </span>
+            ) : (
+              <span className="text-gray-400">Belum pernah melakukan stock opname</span>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            {isOpnameActive && (
+              <span className="text-blue-600 font-medium flex items-center gap-1 text-xs">
+                <AlertCircle size={14}/> 
+                Recording mode active
+              </span>
+            )}
+          </div>
+        </div>
+
         {/* Toolbar */}
         <div className="p-4 flex flex-col md:flex-row justify-between items-center gap-4">
             <div className="w-full md:w-auto text-sm text-gray-500">
                {isOpnameActive && (
                  <span className="text-blue-600 font-medium flex items-center gap-1">
                    <AlertCircle size={14}/> 
-                   Recording mode active. Only items with entered values will be updated.
+                   Hanya produk dengan nilai yang dimasukkan akan diperbarui
                  </span>
                )}
             </div>
@@ -321,10 +474,6 @@ export default function StockOpnamePage() {
                     onChange={(e) => setSearchQuery(e.target.value)}
                     />
                 </div>
-                {/* <button className="px-4 py-2 bg-blue-50 text-blue-600 rounded-lg text-sm font-medium hover:bg-blue-100 flex items-center gap-2">
-                    <Filter size={16} />
-                    Filters
-                </button> */}
             </div>
         </div>
 
@@ -338,20 +487,19 @@ export default function StockOpnamePage() {
                 <th className="px-6 py-4 text-left">Stock Faktual</th>
                 <th className="px-6 py-4 text-left">Selisih</th>
                 <th className="px-6 py-4 text-right">Unit</th>
-                <th className="px-6 py-4 text-left">Opname Terakhir</th>
-                <th className="px-6 py-4 text-left">Oleh</th>
+                <th className="px-6 py-4 text-center">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {loading ? (
                 <tr>
-                  <td colSpan={8} className="px-6 py-8 text-center text-gray-500">
+                  <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
                     Loading products...
                   </td>
                 </tr>
               ) : products.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-6 py-8 text-center text-gray-500">
+                  <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
                     No products found
                   </td>
                 </tr>
@@ -367,7 +515,6 @@ export default function StockOpnamePage() {
                     <tr key={product.id} className="hover:bg-gray-50 transition-colors">
                         <td className="px-3 sm:px-6 py-4">
                         <div className="font-medium text-gray-900">{product.name}</div>
-                        <div className="text-xs text-gray-500">{product.category}</div>
                         </td>
                         <td className="px-6 py-4 text-gray-600 font-medium">{product.stock}</td>
                         <td className="px-3 sm:px-6 py-4">
@@ -396,11 +543,14 @@ export default function StockOpnamePage() {
                         <td className="px-6 py-4 text-right text-gray-500 text-sm">
                             {product.unit}
                         </td>
-                        <td className="px-6 py-4 text-gray-500 text-xs whitespace-nowrap">
-                            {product.last_opname_at ? new Date(product.last_opname_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) : '-'}
-                        </td>
-                        <td className="px-6 py-4 text-gray-500 text-xs">
-                            {product.last_opname_by || '-'}
+                        <td className="px-6 py-4 text-center">
+                            <button
+                              onClick={() => fetchProductOpnameHistory(product.id)}
+                              className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                              title="Lihat Riwayat Opname"
+                            >
+                              <Eye size={16} />
+                            </button>
                         </td>
                     </tr>
                   );
@@ -463,6 +613,142 @@ export default function StockOpnamePage() {
         </div>
       </div>
       </div>
+      {/* History Modal */}
+      {historyOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[80vh] flex flex-col mx-4">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+              <h2 className="text-lg font-semibold text-gray-900">
+                {selectedSession ? 'Detail Stock Opname' : 'Riwayat Stock Opname'}
+              </h2>
+              <button onClick={closeHistoryModal} className="p-1 hover:bg-gray-100 rounded-lg transition-colors">
+                <X size={20} className="text-gray-500" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-6">
+              {selectedSession ? (
+                <>
+                  <div className="mb-4 p-3 bg-gray-50 rounded-lg text-sm text-gray-600 flex flex-wrap gap-x-6 gap-y-1">
+                    <span><span className="font-medium">Tanggal:</span> {new Date(selectedSession.date).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
+                    <span><span className="font-medium">Oleh:</span> {selectedSession.username || '-'}</span>
+                    <span><span className="font-medium">Jumlah Produk:</span> {selectedSession.total_items}</span>
+                  </div>
+                  {detailLoading ? (
+                    <div className="text-center py-8 text-gray-500">Loading detail...</div>
+                  ) : (
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-gray-200 text-gray-500">
+                          <th className="text-left py-2 px-2">Produk</th>
+                          <th className="text-right py-2 px-2">Stok Sistem</th>
+                          <th className="text-right py-2 px-2">Stok Aktual</th>
+                          <th className="text-right py-2 px-2">Selisih</th>
+                          <th className="text-right py-2 px-2">Unit</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {sessionDetail.map((item) => (
+                          <tr key={item.id} className="border-b border-gray-100">
+                            <td className="py-2 px-2 font-medium text-gray-900">{item.product_name}</td>
+                            <td className="py-2 px-2 text-right text-gray-600">{item.previous_stock}</td>
+                            <td className="py-2 px-2 text-right text-gray-600">{item.new_stock}</td>
+                            <td className={`py-2 px-2 text-right font-medium ${item.quantity_change > 0 ? 'text-green-600' : item.quantity_change < 0 ? 'text-red-600' : 'text-gray-600'}`}>
+                              {item.quantity_change > 0 ? '+' : ''}{item.quantity_change}
+                            </td>
+                            <td className="py-2 px-2 text-right text-gray-500">{item.unit}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                  <button
+                    onClick={() => { setSelectedSession(null); setSessionDetail([]); }}
+                    className="mt-4 text-sm text-blue-600 hover:text-blue-700 font-medium"
+                  >
+                    &larr; Kembali ke daftar
+                  </button>
+                </>
+              ) : (
+                <>
+                  {sessionsLoading ? (
+                    <div className="text-center py-8 text-gray-500">Loading...</div>
+                  ) : sessions.length === 0 ? (
+                    <div className="text-center py-8 text-gray-400">Belum ada riwayat stock opname</div>
+                  ) : (
+                    <div className="space-y-2">
+                      {sessions.map((session) => (
+                        <div
+                          key={session.id}
+                          onClick={() => openSessionDetail(session)}
+                          className="flex items-center justify-between p-3 rounded-lg border border-gray-200 hover:bg-gray-50 cursor-pointer transition-colors"
+                        >
+                          <div className="flex items-center gap-4">
+                            <div className="flex items-center justify-center w-10 h-10 rounded-full bg-blue-50 text-blue-600">
+                              <Eye size={18} />
+                            </div>
+                            <div>
+                              <div className="font-medium text-gray-900">
+                                {new Date(session.date).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
+                              </div>
+                              <div className="text-sm text-gray-500">
+                                {session.total_items} produk diperbarui oleh {session.username || '-'}
+                              </div>
+                            </div>
+                          </div>
+                          <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                          </svg>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Product History Offcanvas */}
+      <OffCanvas
+        isOpen={productHistoryOpen}
+        onClose={closeProductHistory}
+        title={`Riwayat Opname - ${selectedProduct?.name || ''}`}
+        width="450px"
+      >
+        {productHistoryLoading ? (
+          <div className="text-center py-8 text-gray-500">Loading...</div>
+        ) : productHistoryRecords.length === 0 ? (
+          <div className="text-center py-8 text-gray-400">Belum ada riwayat opname untuk produk ini</div>
+        ) : (
+          <div className="space-y-3">
+            {productHistoryRecords.map((record) => (
+              <div key={record.id} className="p-3 rounded-lg border border-gray-200">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium text-gray-900">
+                    {record.date ? new Date(record.date).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }) : '-'}
+                  </span>
+                  <span className="text-xs text-gray-500">
+                    oleh {record.username || '-'}
+                  </span>
+                </div>
+                <div className="flex items-center gap-4 text-sm">
+                  <span className="text-gray-500">
+                    Stok Sistem: <span className="font-medium text-gray-700">{record.previous_stock}</span>
+                  </span>
+                  <span className="text-gray-500">
+                    Stok Aktual: <span className="font-medium text-gray-700">{record.new_stock}</span>
+                  </span>
+                  <span className={`font-medium ${record.quantity_change > 0 ? 'text-green-600' : record.quantity_change < 0 ? 'text-red-600' : 'text-gray-600'}`}>
+                    {record.quantity_change > 0 ? '+' : ''}{record.quantity_change}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </OffCanvas>
+
       {/* Confirm Modal */}
       <ConfirmModal
         isOpen={confirmModal.isOpen}

@@ -1,0 +1,232 @@
+================================================================================
+                   WHITEBOX TESTING - FLOWGRAPH ANALYSIS
+                   FUNGSI: handleSubmitOpname (Stock Opname Page)
+================================================================================
+
+KODE YANG DIUJI (Source Code):
+===============================
+
+No. | Node | Kode
+----|------|-----
+ 1  |  1   | const handleSubmitOpname = async () => {
+ 2  |  2   |     if (!checkActionPermission('create') && !checkActionPermission('edit'))
+ 3  |  3   |         { goeyToast.error('Anda tidak memiliki izin...'); return; }
+ 4  |  4   |     const payload = Object.entries(opnameData).map(([id,data])=>({
+ 5  |  4   |         id: parseInt(id), system_stock: data.system, actual_stock: data.actual }));
+ 6  |  5   |     if (payload.length === 0)
+ 7  |  6   |         { goeyToast.info('Tidak Ada Perubahan'); return; }
+ 8  |  7   |     setConfirmModal({ isOpen:true, title:'Kirim Stock Opname',
+ 9  |  7   |         message:`Anda akan memperbarui stok untuk ${payload.length} produk.`,
+10  |  7   |         onConfirm: async () => {
+11  |  8   |             setConfirmModal(prev=>({...prev,isOpen:false}));
+12  |  9   |             setIsSubmitting(true);
+13  |  10  |             try {
+14  |  11  |                 const res=await fetch('.../api/stock-opname',{method:'POST',headers:{...},body:JSON.stringify({items:payload})});
+15  |  12  |                 if(res.status===401){localStorage.removeItem('token');...router.push('/login');return;}
+16  |  14  |                 if(res.ok){
+17  |  15  |                     goeyToast.success('Stock Opname Selesai');
+18  |  15  |                     setIsOpnameActive(false);setOpnameData({});fetchProducts(...);
+19  |  16  |                 }else{goeyToast.error('Gagal Mengirim Data');}
+20  |  10  |             }catch(error){console.error(error);goeyToast.error('Terjadi kesalahan sistem');}
+21  |  17  |             finally{setIsSubmitting(false);}
+22  |  7   |         }
+23  |  7   |     });
+24  |  18  | };
+
+1. PENJELASAN NODE
+==================
+Node 1  : Deklarasi fungsi handleSubmitOpname
+Node 2  : Cek permission 'create' atau 'edit' -> jika tidak ada, toast error dan return
+Node 3  : Izin ditolak -> toast error, proses selesai
+Node 4  : Map opnameData ke array payload
+Node 5  : Cek apakah payload kosong (payload.length === 0) -> jika ya, toast info dan return
+Node 6  : Payload kosong -> toast info "Tidak Ada Perubahan", proses selesai
+Node 7  : setConfirmModal - Tampilkan modal konfirmasi ke user
+Node 8  : onConfirm: Tutup modal konfirmasi
+Node 9  : Set status submitting = true
+Node 10 : try { - Mulai blok try
+Node 11 : Fetch POST /api/stock-opname
+Node 12 : Cek status 401 (Unauthorized) -> jika ya, hapus token, redirect ke login, dan return
+Node 13 : Sesi kedaluwarsa -> redirect ke login, proses selesai
+Node 14 : Cek apakah response ok -> jika ya ke 15, jika tidak ke 16
+Node 15 : Response ok -> toast sukses, reset state, fetch produk baru
+Node 16 : Response error -> toast error "Gagal Mengirim Data"
+Node 17 : finally: setIsSubmitting(false)
+Node 18 : Selesai
+
+2. FLOWGRAPH
+=============
+1 -> 2
+2 -> 3 (T), 2 -> 4 (F)
+3 -> 18
+4 -> 5
+5 -> 6 (T), 5 -> 7 (F)
+6 -> 18
+7 -> 8 -> 9 -> 10 -> 11 -> 12
+12 -> 13 (T), 12 -> 14 (F)
+13 -> 18
+14 -> 15 (T), 14 -> 16 (F)
+15 -> 17
+16 -> 17
+17 -> 18
+10 -> 17 (Exception)
+17 -> 18
+
+3. GAMBAR FLOWGRAPH (VISUAL)
+=============================
+
+                    ┌─────┐
+                    │  1  │
+                    └──┬──┘
+                       │
+                    ┌──▼──┐
+                    │  2  │
+                    └──┬──┘
+                       │
+                   ┌───┴───┐
+                   │ T     │ F
+                   │       │
+                ┌──▼──┐ ┌──▼──┐
+                │  3  │ │  4  │
+                └─┬───┘ └──┬──┘
+                  │        │
+                  │     ┌──▼──┐
+                  │     │  5  │
+                  │     └──┬──┘
+                  │        │
+                  │    ┌───┴───┐
+                  │    │ T     │ F
+                  │    │       │
+                  │ ┌──▼──┐ ┌──▼──┐
+                  │ │  6  │ │  7  │
+                  │ └─┬───┘ └──┬──┘
+                  │   │        │
+                  │   │     ┌──▼──┐
+                  │   │     │  8  │
+                  │   │     └──┬──┘
+                  │   │        │
+                  │   │     ┌──▼──┐
+                  │   │     │  9  │
+                  │   │     └──┬──┘
+                  │   │        │
+                  │   │     ┌──▼──┐
+                  │   │     │ 10  │
+                  │   │     └──┬──┘
+                  │   │        │
+                  │   │     ┌──▼──┐
+                  │   │     │ 11  │
+                  │   │     └──┬──┘
+                  │   │        │
+                  │   │     ┌──▼──┐
+                  │   │     │ 12  │
+                  │   │     └──┬──┘
+                  │   │        │
+                  │   │    ┌───┴───┐
+                  │   │    │ T     │ F
+                  │   │    │       │
+                  │   │ ┌──▼──┐ ┌──▼──┐
+                  │   │ │ 13  │ │ 14  │
+                  │   │ └─┬───┘ └──┬──┘
+                  │   │   │        │
+                  │   │   │    ┌───┴───┐
+                  │   │   │    │ T     │ F
+                  │   │   │    │       │
+                  │   │   │ ┌──▼──┐ ┌──▼──┐
+                  │   │   │ │ 15  │ │ 16  │
+                  │   │   │ └─┬───┘ └─┬───┘
+                  │   │   │   │       │
+                  │   │   │   │       ├───────────────────────┐
+                  │   │   │   │       │                       │ (Exception)
+                  │   │   │   │       │                    ┌──▼──┐
+                  │   │   │   │       │                    │ 17  │
+                  │   │   │   │       │                    └──┬──┘
+                  │   │   │   │       │                       │
+                  │   │   │   └───────┼───────────────────────┘
+                  │   │   │           │
+                  │   │   │        ┌──▼──┐
+                  │   │   │        │ 17  │
+                  │   │   │        └──┬──┘
+                  │   │   │           │
+                  └───┴───┴───────────┼───────────────────────┘
+                                      │
+                                   ┌──▼──┐
+                                   │ 18  │
+                                   └─────┘
+
+4. MENGHITUNG CC (CYCLOMATIC COMPLEXITY)
+==========================================
+Rumus 1: V(G) = E - N + 2
+E (Edge) = 22
+N (Node) = 18
+V(G) = 22 - 18 + 2 = 6
+
+Rumus 2: V(G) = P + 1
+Predicate Nodes: Node 2, Node 5, Node 12, Node 14, Node 10 (Exception) (Total = 5 Predicate Nodes)
+V(G) = 5 + 1 = 6
+
+Rumus 3: V(G) = R (Region)
+Jumlah region tertutup + 1 region terbuka = 6
+V(G) = 6
+
+5. IDENTIFIKASI PATH
+=====================
+CC = 6, terdapat 6 jalur independen:
+
+----------------------------------------------------------------------
+PATH 1: Tidak punya izin create maupun edit
+1 -> 2 -> 3 -> 18
+
+PATH 2: Tidak ada perubahan data (payload kosong)
+1 -> 2 -> 4 -> 5 -> 6 -> 18
+
+PATH 3: Sesi kedaluwarsa (HTTP 401 Unauthorized)
+1 -> 2 -> 4 -> 5 -> 7 -> 8 -> 9 -> 10 -> 11 -> 12 -> 13 -> 18
+
+PATH 4: Kirim data stock opname sukses (ok)
+1 -> 2 -> 4 -> 5 -> 7 -> 8 -> 9 -> 10 -> 11 -> 12 -> 14 -> 15 -> 17 -> 18
+
+PATH 5: Kirim data stock opname gagal dari server
+1 -> 2 -> 4 -> 5 -> 7 -> 8 -> 9 -> 10 -> 11 -> 12 -> 14 -> 16 -> 17 -> 18
+
+PATH 6 (Exception): Terjadi kegagalan koneksi/sistem saat submit
+1 -> 2 -> 4 -> 5 -> 7 -> 8 -> 9 -> 10 -> 17 -> 18
+----------------------------------------------------------------------
+
+6. RINGKASAN
+=============
+N (Node)             : 18
+E (Edge)             : 22
+P (Predicate Node)   : 5
+V(G) = E - N + 2     : 6
+V(G) = P + 1         : 6
+V(G) = R             : 6
+Jumlah Path          : 6
+Interpretasi         : RENDAH (<=10) - Mudah di-test
+
+
+================================================================================
+           PROMPT GENERASI VISUAL FLOWGRAPH - BULATAN & ANGKA SAJA
+================================================================================
+ATURAN UTAMA:
+- Seluruh node WAJIB digambarkan menggunakan bentuk LINGKARAN/BULATAN sempurna yang HANYA berisi ANGKA node di dalamnya (tanpa label/teks deskripsi lain).
+- Hubungan antar node ditunjukkan dengan garis berpanah.
+- Percabangan ditunjukkan dengan garis panah berlabel "T" (True) dan "F" (False).
+- Format visual harus HITAM PUTIH bersih tanpa warna, tanpa background dekorasi.
+
+1. PROMPT handleSubmitOpname (Total 18 Node):
+"Draw a black-and-white directed graph where every node is represented ONLY as a circle enclosing its node number. No text or descriptors should be inside the circles. Use directed arrow edges with optional branching labels 'T' and 'F'.
+Alur Node:
+- 1 -> 2
+- Node 2 splits: T -> 3, F -> 4
+- Node 3 -> 18
+- Node 4 -> 5
+- Node 5 splits: T -> 6, F -> 7
+- Node 6 -> 18
+- Node 7 -> 8 -> 9 -> 10 -> 11 -> 12
+- Node 12 splits: T -> 13, F -> 14
+- Node 13 -> 18
+- Node 14 splits: T -> 15, F -> 16
+- Node 15 -> 17, Node 16 -> 17
+- Exception path from Node 10/try-block -> 17
+- Node 17 -> 18
+- Node 18 is the final single terminal node."
