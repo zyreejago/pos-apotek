@@ -356,6 +356,10 @@ const initDB = async () => {
     } catch (e) {}
 
     try {
+      await connection.query(`ALTER TABLE products ADD COLUMN description TEXT NULL`);
+    } catch (e) {}
+
+    try {
       await connection.query(`ALTER TABLE batches ADD COLUMN status ENUM('approved', 'pending', 'rejected', 'revision') DEFAULT 'approved'`);
     } catch (e) {}
     

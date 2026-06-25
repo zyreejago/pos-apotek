@@ -1,4 +1,5 @@
 const { createJournalEntry } = require('../utils/journal');
+const axios = require('axios');
 
 module.exports = function registerProductRoutes(app, pool, authenticate, checkPermission, createAuditTrail) {
 
@@ -90,7 +91,7 @@ module.exports = function registerProductRoutes(app, pool, authenticate, checkPe
     authenticate,
     checkPermission('Management Product', 'create'),
     async (req, res) => {
-    const { name, cost_price, selling_price, stock, category, product_category, unit, expired_date, location_code, purchase_unit, unit_multiplier } =
+    const { name, cost_price, selling_price, stock, category, product_category, unit, expired_date, location_code, purchase_unit, unit_multiplier, description } =
       req.body;
 
     if (!name || !cost_price) {
@@ -114,7 +115,7 @@ module.exports = function registerProductRoutes(app, pool, authenticate, checkPe
 
       const connection = await pool.getConnection();
       const [result] = await connection.query(
-        'INSERT INTO products (name, cost_price, selling_price, stock, category, product_category, unit, expired_date, location_code, purchase_unit, unit_multiplier, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        'INSERT INTO products (name, cost_price, selling_price, stock, category, product_category, unit, expired_date, location_code, purchase_unit, unit_multiplier, status, description) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
         [
           name,
           cost_price,
@@ -127,7 +128,8 @@ module.exports = function registerProductRoutes(app, pool, authenticate, checkPe
           location_code || null,
           purchase_unit || 'Box',
           unit_multiplier || 1,
-          status
+          status,
+          description || null
         ]
       );
       connection.release();
@@ -154,7 +156,8 @@ module.exports = function registerProductRoutes(app, pool, authenticate, checkPe
         location_code,
         purchase_unit: purchase_unit || 'Box',
         unit_multiplier: unit_multiplier || 1,
-        status
+        status,
+        description: description || null
       });
     } catch (error) {
       console.error('Error adding product:', error);
@@ -169,7 +172,7 @@ module.exports = function registerProductRoutes(app, pool, authenticate, checkPe
     checkPermission('Management Product', 'edit'),
     async (req, res) => {
     const { id } = req.params;
-    const { name, cost_price, selling_price, stock, category, product_category, unit, expired_date, location_code, purchase_unit, unit_multiplier } =
+    const { name, cost_price, selling_price, stock, category, product_category, unit, expired_date, location_code, purchase_unit, unit_multiplier, description } =
       req.body;
 
     // Helper function to format date for MySQL (YYYY-MM-DD)
@@ -187,8 +190,8 @@ module.exports = function registerProductRoutes(app, pool, authenticate, checkPe
       const [currentProduct] = await connection.query('SELECT name FROM products WHERE id = ?', [id]);
       
       await connection.query(
-        'UPDATE products SET name = ?, cost_price = ?, selling_price = ?, stock = ?, category = ?, product_category = ?, unit = ?, expired_date = ?, location_code = ?, purchase_unit = ?, unit_multiplier = ? WHERE id = ?',
-        [name, cost_price, selling_price, stock, category, product_category || 'OBAT', unit, formatDate(expired_date), location_code || null, purchase_unit || 'Box', unit_multiplier || 1, id]
+        'UPDATE products SET name = ?, cost_price = ?, selling_price = ?, stock = ?, category = ?, product_category = ?, unit = ?, expired_date = ?, location_code = ?, purchase_unit = ?, unit_multiplier = ?, description = ? WHERE id = ?',
+        [name, cost_price, selling_price, stock, category, product_category || 'OBAT', unit, formatDate(expired_date), location_code || null, purchase_unit || 'Box', unit_multiplier || 1, description || null, id]
       );
       connection.release();
 
@@ -205,6 +208,181 @@ module.exports = function registerProductRoutes(app, pool, authenticate, checkPe
     } catch (error) {
       console.error('Error updating product:', error);
       res.status(500).json({ message: 'Server error' });
+    }
+    }
+  );
+
+  // GET /api/knowledge/search - Search knowledge.csv by product name
+  app.get(
+    '/api/knowledge/search',
+    authenticate,
+    async (req, res) => {
+    const name = (req.query.name || '').toString().trim().toLowerCase();
+    if (!name) return res.json({ data: [] });
+
+    try {
+      const fs = require('fs');
+      const path = require('path');
+      const filePath = path.join(__dirname, '..', '..', 'knowledge.csv');
+
+      if (!fs.existsSync(filePath)) return res.json({ data: [] });
+
+      const content = fs.readFileSync(filePath, 'utf-8');
+      const lines = content.split('\n').map(l => l.trim()).filter(l => l);
+      if (lines.length < 2) return res.json({ data: [] });
+
+      const parseCSVLine = (line) => {
+        const result = [];
+        let current = '';
+        let inQuotes = false;
+        for (let i = 0; i < line.length; i++) {
+          const ch = line[i];
+          if (ch === '"') {
+            inQuotes = !inQuotes;
+          } else if (ch === ',' && !inQuotes) {
+            result.push(current);
+            current = '';
+          } else {
+            current += ch;
+          }
+        }
+        result.push(current);
+        return result;
+      };
+
+      const header = parseCSVLine(lines[0]);
+      const nameIdx = header.indexOf('name');
+      const descIdx = header.indexOf('description');
+      const compIdx = header.indexOf('composition');
+      if (nameIdx === -1) return res.json({ data: [] });
+
+      const cleanDescription = (raw) => {
+        if (!raw) return '';
+        let text = raw
+          .replace(/^search\s+search\s+Cari\s+[^]+?Deskripsi\s*&?\s*Manfaat\s*/i, '')
+          .replace(/^search\s+search\s+Cari\s+[^]+?Deskripsi\s*/i, '')
+          .replace(/Tambah ke Keranjang[^]+?(?=Deskripsi|Informasi|Indikasi|Dosis|$)/i, '')
+          .replace(/Kemasan aman[^]+?(?=Deskripsi|Informasi|Indikasi|Dosis|$)/i, '')
+          .replace(/Siap diantar[^]+?(?=Deskripsi|Informasi|Indikasi|Dosis|$)/i, '')
+          .replace(/Dikirim dari apotek resmi\s*/i, '')
+          .replace(/\*Harga berbeda di tiap apotik\*/i, '')
+          .trim();
+        const indikasiMatch = text.match(/Indikasi\s*(Umum|Khusus)?\s*[:.]?\s*([^]+?)(?=\s*(Komposisi|Dosis|Aturan|Informasi|Keamanan|Detail|Golongan|Manufaktur|Kemasan|No\.|Recomendasi|$))/i);
+        if (indikasiMatch) {
+          return indikasiMatch[2].trim().replace(/^[:\s]+/, '').replace(/\s+/g, ' ');
+        }
+        const descEndMatch = text.match(/^([^]+?)(?=\s*(Informasi|Dosis|Aturan|Komposisi|Keamanan|Detail|Golongan|Manufaktur|Kemasan|$))/i);
+        if (descEndMatch) {
+          return descEndMatch[1].trim().replace(/^[:\s]+/, '').replace(/\s+/g, ' ');
+        }
+        return text.substring(0, 500).trim().replace(/\s+/g, ' ');
+      };
+
+      const results = [];
+      for (let i = 1; i < lines.length; i++) {
+        const cols = parseCSVLine(lines[i]);
+        const productName = (cols[nameIdx] || '').trim().toLowerCase();
+        if (productName.includes(name)) {
+          const rawDesc = descIdx !== -1 ? cols[descIdx] || '' : '';
+          results.push({
+            name: cols[nameIdx] || '',
+            description: cleanDescription(rawDesc),
+            composition: compIdx !== -1 ? cols[compIdx] || '' : '',
+          });
+        }
+      }
+
+      res.json({ data: results });
+    } catch (error) {
+      console.error('Error searching knowledge:', error);
+      res.status(500).json({ message: 'Server error' });
+    }
+    }
+  );
+
+  // POST /api/knowledge/ai-description - AI verifies/generates product description
+  app.post(
+    '/api/knowledge/ai-description',
+    authenticate,
+    async (req, res) => {
+    const { name, knowledgeDescription } = req.body;
+    if (!name || !name.trim()) return res.status(400).json({ message: 'Nama produk wajib diisi' });
+
+    try {
+      const apiKeys = [
+        process.env.OPEN_ROUTER_API_1,
+        process.env.OPEN_ROUTER_API_2,
+        process.env.OPEN_ROUTER_API_3,
+        process.env.OPEN_ROUTER_API_4,
+      ].filter(Boolean);
+
+      if (apiKeys.length === 0) {
+        return res.json({ description: knowledgeDescription || '', source: 'knowledge' });
+      }
+
+      const prompt = knowledgeDescription
+        ? `Produk: "${name}"
+Deskripsi dari database: "${knowledgeDescription}"
+
+Tugas: Verifikasi apakah deskripsi di atas benar untuk produk ini.
+Jika benar, gunakan deskripsi tersebut.
+WAJIB: Akhiri kalimat dengan "Obat ini untuk [penyakit/kondisi]."
+
+Format jawaban HANYA teks deskripsi saja, tanpa kata lain, tanpa label.`
+        : `Produk: "${name}"
+
+Tugas: Jelaskan secara singkat obat ini digunakan untuk apa (indikasi).
+WAJIB: Akhiri kalimat dengan "Obat ini untuk [penyakit/kondisi]."
+Jika tidak tahu, jawab "Tidak ada informasi."
+
+Format jawaban HANYA teks deskripsi saja, tanpa kata lain, tanpa label.`;
+
+      const models = [
+        'openai/gpt-4o-mini',
+        'openai/gpt-4o',
+        'deepseek/deepseek-chat-v3-0324',
+        'meta-llama/llama-3.3-70b-instruct',
+        'cohere/command-r-plus-08-2024',
+      ];
+
+      let lastError = null;
+      for (const key of apiKeys) {
+        for (const model of models) {
+          try {
+            const { data } = await axios.post(
+              'https://openrouter.ai/api/v1/chat/completions',
+              {
+                model,
+                messages: [
+                  { role: 'system', content: 'Kamu adalah asisten AI yang membantu identifikasi obat. Jawab HANYA dengan teks deskripsi, tanpa kata lain.' },
+                  { role: 'user', content: prompt }
+                ],
+                temperature: 0,
+                max_tokens: 300,
+              },
+              {
+                headers: {
+                  'Authorization': `Bearer ${key}`,
+                  'Content-Type': 'application/json',
+                },
+                timeout: 15000,
+              }
+            );
+
+            const aiText = data?.choices?.[0]?.message?.content?.trim();
+            if (aiText) {
+              return res.json({ description: aiText, source: 'ai' });
+            }
+          } catch (e) {
+            lastError = e;
+          }
+        }
+      }
+
+      return res.json({ description: knowledgeDescription || '', source: lastError ? 'knowledge' : 'knowledge' });
+    } catch (error) {
+      console.error('Error calling AI:', error);
+      res.json({ description: knowledgeDescription || '', source: 'knowledge' });
     }
     }
   );

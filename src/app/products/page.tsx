@@ -30,6 +30,7 @@ interface Product {
   unit_multiplier?: number;
   product_category?: 'OBAT' | 'NON_OBAT';
   nearest_expired?: string | null;
+  description?: string | null;
 }
 
 interface DpPayment {
@@ -122,6 +123,7 @@ interface ProductFormData {
   unit_multiplier?: string;
   purchase_unit_stock?: string;
   product_category: 'OBAT' | 'NON_OBAT';
+  description?: string;
 }
 
 // For multiple products
@@ -265,12 +267,10 @@ export default function ProductsPage() {
     stock_type: 'belum_bayar',
     purchase_date: new Date().toISOString().split('T')[0],
     invoice_number: '',
-    dp_amount: '',
-      dp_awal: '',
-    due_date: '',
     purchase_unit: 'Box',
     unit_multiplier: '1',
-    product_category: 'OBAT'
+    product_category: 'OBAT',
+    description: ''
   });
   const [productFormImageFiles, setProductFormImageFiles] = useState<File[]>([]);
   const [productFormImagePreviews, setProductFormImagePreviews] = useState<string[]>([]);
@@ -1064,7 +1064,8 @@ export default function ProductsPage() {
       purchase_unit: 'Box',
       unit_multiplier: '1',
       purchase_unit_stock: '',
-      product_category: 'OBAT'
+      product_category: 'OBAT',
+      description: ''
     });
     setIsProductOffCanvasOpen(true);
   };
@@ -1093,7 +1094,8 @@ export default function ProductsPage() {
       purchase_unit: product.purchase_unit || 'Box',
       unit_multiplier: multiplier.toString(),
       purchase_unit_stock: calculatedPurchaseStock,
-      product_category: product.product_category || 'OBAT'
+      product_category: product.product_category || 'OBAT',
+      description: product.description || ''
     });
     setIsProductOffCanvasOpen(true);
   };
@@ -1121,7 +1123,8 @@ export default function ProductsPage() {
       due_date: '',
       purchase_unit: 'Box',
       unit_multiplier: '1',
-      product_category: 'OBAT'
+      product_category: 'OBAT',
+      description: ''
     });
     setIsMultipleProducts(false);
     setMultipleProducts([]);
@@ -1170,6 +1173,25 @@ export default function ProductsPage() {
           updated.selling_price = matchedProduct.selling_price.toString();
           updated.location_code = matchedProduct.location_code || '';
           updated.cost_price = prev.cost_price; // Keep manual cost price
+        }
+
+        // Auto-fill description from AI
+        if (value.trim().length >= 2) {
+          fetch(`http://localhost:5000/api/knowledge/ai-description`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', ...authHeaders },
+            body: JSON.stringify({ name: value.trim() })
+          })
+            .then(r => r.json())
+            .then(aiResult => {
+              if (aiResult.description) {
+                setFormData(current => ({
+                  ...current,
+                  description: aiResult.description
+                }));
+              }
+            })
+            .catch(() => {});
         }
       }
 
@@ -1231,7 +1253,8 @@ export default function ProductsPage() {
           location_code: formData.location_code || null,
           purchase_unit: formData.purchase_unit || 'Box',
           unit_multiplier: multiplier,
-          product_category: formData.product_category
+          product_category: formData.product_category,
+          description: formData.description || null
         };
         const res = await fetch(`http://localhost:5000/api/products/${selectedProduct.id}`, {
           method: 'PUT',
@@ -1277,7 +1300,8 @@ export default function ProductsPage() {
               location_code: item.location_code || existingProduct.location_code || null,
               purchase_unit: item.purchase_unit || existingProduct.purchase_unit || 'Box',
               unit_multiplier: multiplier,
-              product_category: item.product_category
+              product_category: item.product_category,
+              description: item.description || existingProduct.description || null
             };
             await fetch(`http://localhost:5000/api/products/${productId}`, {
               method: 'PUT',
@@ -1301,8 +1325,9 @@ export default function ProductsPage() {
               location_code: item.location_code || null,
               purchase_unit: item.purchase_unit || 'Box',
               unit_multiplier: multiplier,
-              needsApproval: needsApproval, // Pass flag to backend
-              product_category: item.product_category
+              needsApproval: needsApproval,
+              product_category: item.product_category,
+              description: item.description || null
             };
             const res = await fetch(`http://localhost:5000/api/products`, {
               method: 'POST',
@@ -1413,7 +1438,8 @@ export default function ProductsPage() {
                   expired_date: item.expired_date || prodData?.expired_date || null,
                   location_code: item.location_code || prodData?.location_code || null,
                   purchase_unit: item.purchase_unit || prodData?.purchase_unit || 'Box',
-                  unit_multiplier: Number(item.unit_multiplier) || prodData?.unit_multiplier || 1
+                  unit_multiplier: Number(item.unit_multiplier) || prodData?.unit_multiplier || 1,
+                  description: item.description || (prodData as any)?.description || null
                 };
                 await fetch(`http://localhost:5000/api/products/${prodId}`, {
                   method: 'PUT',
@@ -1477,7 +1503,8 @@ export default function ProductsPage() {
                 expired_date: formData.expired_date || prodData?.expired_date || null,
                 location_code: formData.location_code || prodData?.location_code || null,
                 purchase_unit: formData.purchase_unit || prodData?.purchase_unit || 'Box',
-                unit_multiplier: Number(formData.unit_multiplier) || prodData?.unit_multiplier || 1
+                unit_multiplier: Number(formData.unit_multiplier) || prodData?.unit_multiplier || 1,
+                description: formData.description || (prodData as any)?.description || null
               };
               console.log('[Submit Perbaikan] SENDING product PUT for productId:', productId, 'payload:', payload);
               const prodRes = await fetch(`http://localhost:5000/api/products/${productId}`, {
@@ -2012,6 +2039,18 @@ export default function ProductsPage() {
                     <option value="NON_OBAT">Non-Obat</option>
                   </select>
                 </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Deskripsi / Penjelasan</label>
+                  <textarea
+                    name="description"
+                    value={formData.description || ''}
+                    onChange={handleInputChange}
+                    rows={3}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-sm"
+                    placeholder="Penjelasan obat akan terisi otomatis dari database pengetahuan saat mengetik nama produk"
+                  />
+                </div>
                 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
@@ -2402,6 +2441,17 @@ export default function ProductsPage() {
                         placeholder="Masukkan nomor batch"
                       />
                     </div>
+                    <div className="col-span-2">
+                      <label className="block text-xs text-gray-600 mb-1">Deskripsi / Penjelasan</label>
+                      <textarea
+                        name="description"
+                        value={formData.description || ''}
+                        onChange={handleInputChange}
+                        rows={2}
+                        className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm"
+                        placeholder="Penjelasan akan terisi otomatis saat mengetik nama produk"
+                      />
+                    </div>
                 </div>
                   {/* DP Fields for multiple products */}
                 
@@ -2457,7 +2507,8 @@ export default function ProductsPage() {
                         expired_date: '',
                         purchase_unit: 'Box',
                         unit_multiplier: '1',
-                        purchase_unit_stock: ''
+                        purchase_unit_stock: '',
+                        description: ''
                       });
                     }}
                     className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-md transition-colors"
@@ -2512,7 +2563,8 @@ export default function ProductsPage() {
                                   purchase_unit: item.purchase_unit || 'Box',
                                   unit_multiplier: item.unit_multiplier || '1',
                                   purchase_unit_stock: item.purchase_unit_stock || '',
-                                  product_category: item.product_category || 'OBAT'
+                                  product_category: item.product_category || 'OBAT',
+                                  description: item.description || ''
                                 });
                                 setMultipleProducts(multipleProducts.filter(p => p.id !== item.id));
                               }}
@@ -3657,6 +3709,14 @@ export default function ProductsPage() {
                   {detailProduct.product_category === 'NON_OBAT' ? 'Non-Obat' : 'Obat'}
                 </span>
               </div>
+
+              {/* Deskripsi */}
+              {detailProduct.description && (
+                <div className="bg-gray-50 p-4 rounded-xl">
+                  <p className="text-xs text-gray-500 font-medium uppercase tracking-wider mb-1">Penjelasan</p>
+                  <p className="text-sm text-gray-700 leading-relaxed">{detailProduct.description}</p>
+                </div>
+              )}
 
               {/* Info Grid */}
               <div className="grid grid-cols-2 gap-3">
