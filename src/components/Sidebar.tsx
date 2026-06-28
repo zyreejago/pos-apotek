@@ -1,5 +1,6 @@
 "use client";
 
+import { API_URL } from '@/lib/api-config';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
@@ -54,7 +55,7 @@ export default function Sidebar() {
         setLoading(false);
         return;
       }
-      const res = await fetch(`http://localhost:5000/api/rbac/permissions?roleName=${role}&t=${Date.now()}`, {
+      const res = await fetch(`${API_URL}/api/rbac/permissions?roleName=${role}&t=${Date.now()}`, {
         headers: { 'Authorization': `Bearer ${token}` },
         cache: 'no-store'
       });

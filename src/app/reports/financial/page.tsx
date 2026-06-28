@@ -6,6 +6,7 @@ import { goeyToast } from '@/components/ui/goey-toaster';
 import { Download, Calendar, Loader2 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { API_URL } from '@/lib/api-config';
 
 interface Account {
   code: string;
@@ -31,7 +32,7 @@ export default function ProfitLossAccountingPage() {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`http://localhost:5000/api/financial/profit-loss-accounting?month=${month}&year=${year}`, {
+      const res = await fetch(`${API_URL}/api/financial/profit-loss-accounting?month=${month}&year=${year}`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {}
       });
       

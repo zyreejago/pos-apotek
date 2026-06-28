@@ -5,6 +5,7 @@ import PageHeader from '@/components/PageHeader';
 import { goeyToast } from '@/components/ui/goey-toaster';
 import { Plus, Trash2, Calendar, Loader2, Save, FileText, X } from 'lucide-react';
 import OffCanvas from '@/components/OffCanvas';
+import { API_URL } from '@/lib/api-config';
 
 interface Account {
   id: number;
@@ -70,7 +71,7 @@ export default function GeneralJournalPage() {
         startDate,
         endDate
       });
-      const res = await fetch(`http://localhost:5000/api/accounting/journal-entries?${queryParams}`, {
+      const res = await fetch(`${API_URL}/api/accounting/journal-entries?${queryParams}`, {
         headers: authHeaders
       });
       if (res.ok) {
@@ -93,7 +94,7 @@ export default function GeneralJournalPage() {
       const now = new Date();
       const m = now.getMonth() + 1;
       const y = now.getFullYear();
-      const res = await fetch(`http://localhost:5000/api/accounting/general-ledger?month=${m}&year=${y}`, {
+      const res = await fetch(`${API_URL}/api/accounting/general-ledger?month=${m}&year=${y}`, {
         headers: authHeaders
       });
       if (res.ok) {
@@ -158,7 +159,7 @@ export default function GeneralJournalPage() {
     }
 
     try {
-      const res = await fetch('http://localhost:5000/api/accounting/journal-entries', {
+      const res = await fetch(`${API_URL}/api/accounting/journal-entries`, {
         method: 'POST',
         headers: authHeaders,
         body: JSON.stringify({

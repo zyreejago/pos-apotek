@@ -1,5 +1,6 @@
 'use client';
 
+import { API_URL } from '@/lib/api-config';
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Search, ArrowLeft, AlertTriangle, Package, RotateCcw, History, Eye, X, Info, TrendingDown, DollarSign, Calendar, ShoppingBag, CheckCircle, AlertCircle, HelpCircle } from 'lucide-react';
@@ -50,7 +51,7 @@ export default function PurchaseReturnsPage() {
   useEffect(() => { setMounted(true); }, []);
 
   useEffect(() => {
-    fetch('http://localhost:5000/api/returns/purchases', { headers: authHeaders })
+    fetch(`${API_URL}/api/returns/purchases`, { headers: authHeaders })
       .then(res => res.json())
       .then(data => setHistoryList(data.data || []))
       .catch(() => {});
@@ -73,7 +74,7 @@ export default function PurchaseReturnsPage() {
     setReturnQuantities({});
     setConditions({});
     try {
-      const res = await fetch(`http://localhost:5000/api/returns/purchases/lookup?invoice_no=${encodeURIComponent(invoiceNo.trim())}`, {
+      const res = await fetch(`${API_URL}/api/returns/purchases/lookup?invoice_no=${encodeURIComponent(invoiceNo.trim())}`, {
         headers: authHeaders,
       });
       if (res.status === 401) { router.push('/login'); return; }
@@ -165,7 +166,7 @@ export default function PurchaseReturnsPage() {
       }));
 
     try {
-      const res = await fetch('http://localhost:5000/api/returns/purchases', {
+      const res = await fetch(`${API_URL}/api/returns/purchases`, {
         method: 'POST',
         headers: authHeaders,
         body: JSON.stringify({
@@ -185,7 +186,7 @@ export default function PurchaseReturnsPage() {
         setReturnQuantities({});
         setConditions({});
         setSearched(false);
-        fetch('http://localhost:5000/api/returns/purchases', { headers: authHeaders })
+        fetch(`${API_URL}/api/returns/purchases`, { headers: authHeaders })
           .then(res => res.json())
           .then(data => setHistoryList(data.data || []))
           .catch(() => {});
@@ -617,7 +618,7 @@ export default function PurchaseReturnsPage() {
                         <button
                           onClick={async () => {
                             try {
-                              const res = await fetch(`http://localhost:5000/api/returns/purchases/${ret.id}`, { headers: authHeaders });
+                              const res = await fetch(`${API_URL}/api/returns/purchases/${ret.id}`, { headers: authHeaders });
                               if (res.ok) {
                                 const data = await res.json();
                                 setSelectedHistory(data);

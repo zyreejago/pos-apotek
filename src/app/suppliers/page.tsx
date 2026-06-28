@@ -1,5 +1,6 @@
 'use client';
 
+import { API_URL } from '@/lib/api-config';
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { Search, Filter, Edit, Trash2, Eye, FileText, ShoppingBag } from 'lucide-react';
@@ -84,7 +85,7 @@ export default function SuppliersPage() {
   const fetchSuppliers = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`http://localhost:5000/api/suppliers?page=${currentPage}&limit=${itemsPerPage}&search=${searchQuery}`, {
+      const res = await fetch(`${API_URL}/api/suppliers?page=${currentPage}&limit=${itemsPerPage}&search=${searchQuery}`, {
         headers: authHeaders
       });
 
@@ -159,7 +160,7 @@ export default function SuppliersPage() {
     setIsOffCanvasOpen(true);
     
     try {
-      const res = await fetch(`http://localhost:5000/api/suppliers/${supplier.id}`, {
+      const res = await fetch(`${API_URL}/api/suppliers/${supplier.id}`, {
         headers: authHeaders
       });
       if (res.ok) {
@@ -204,8 +205,8 @@ export default function SuppliersPage() {
 
     try {
       const url = offCanvasMode === 'add' 
-        ? 'http://localhost:5000/api/suppliers' 
-        : `http://localhost:5000/api/suppliers/${selectedSupplier?.id}`;
+        ? `${API_URL}/api/suppliers` 
+        : `${API_URL}/api/suppliers/${selectedSupplier?.id}`;
       
       const method = offCanvasMode === 'add' ? 'POST' : 'PUT';
       
@@ -247,7 +248,7 @@ export default function SuppliersPage() {
     }
 
     try {
-      const res = await fetch(`http://localhost:5000/api/suppliers/${supplier.id}`, {
+      const res = await fetch(`${API_URL}/api/suppliers/${supplier.id}`, {
         method: 'DELETE',
         headers: authHeaders
       });
@@ -565,10 +566,10 @@ export default function SuppliersPage() {
                         {batch.notes && <p className="text-xs text-gray-400 italic mt-1">{batch.notes}</p>}
                         {batch.image_url && (
                           <div className="mt-2">
-                            <img src={`http://localhost:5000${batch.image_url}`} alt="Bukti"
+                            <img src={`${API_URL}${batch.image_url}`} alt="Bukti"
                               className="h-20 w-auto object-cover rounded border cursor-pointer hover:opacity-80 transition-opacity"
                               onClick={() => {
-                                const idx = fakturImages.indexOf(`http://localhost:5000${batch.image_url}`);
+                                const idx = fakturImages.indexOf(`${API_URL}${batch.image_url}`);
                                 setPreviewImageIdx(idx >= 0 ? idx : 0);
                                 setPreviewImages(fakturImages);
                               }} />
@@ -580,7 +581,7 @@ export default function SuppliersPage() {
                     const renderFakturCard = (invoiceNumber: string, items: any[]) => {
                       const totalQty = items.reduce((s, b) => s + Number(b.initial_quantity), 0);
                       const totalCost = items.reduce((s, b) => s + Number(b.cost_price) * Number(b.initial_quantity), 0);
-                      const fakturImages = items.map(b => b.image_url ? `http://localhost:5000${b.image_url}` : '').filter(Boolean);
+                      const fakturImages = items.map(b => b.image_url ? `${API_URL}${b.image_url}` : '').filter(Boolean);
                       const statusCounts: Record<string, number> = {};
                       items.forEach(b => { statusCounts[b.status] = (statusCounts[b.status] || 0) + 1; });
                       const isExpanded = expandedFaktur === invoiceNumber;

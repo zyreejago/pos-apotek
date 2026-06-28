@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useRequirePermission } from '@/hooks/useRequirePermission';
 import PageHeader from '@/components/PageHeader';
 import { goeyToast } from '@/components/ui/goey-toaster';
+import { API_URL } from '@/lib/api-config';
 
 type ForecastRow = {
   id: number;
@@ -66,7 +67,7 @@ export default function Page() {
     setLoading(true);
     try {
       const res = await fetch(
-        `http://localhost:5000/api/forecast-openrouter/latest?search=${encodeURIComponent(debouncedSearchQuery)}&t=${Date.now()}`,
+        `${API_URL}/api/forecast-openrouter/latest?search=${encodeURIComponent(debouncedSearchQuery)}&t=${Date.now()}`,
         { headers: authHeaders, cache: 'no-store' }
       );
 
@@ -108,7 +109,7 @@ export default function Page() {
     setRefreshLoading(true);
     try {
       console.log('[FRONTEND] Running forecast with OpenRouter...');
-      const runRes = await fetch('http://localhost:5000/api/forecast-openrouter/run', {
+      const runRes = await fetch(`${API_URL}/api/forecast-openrouter/run`, {
         method: 'POST',
         headers: authHeaders,
       });
@@ -141,7 +142,7 @@ export default function Page() {
     
     try {
       console.log('[FRONTEND] Fetching forecast detail for product:', product.id);
-      const res = await fetch('http://localhost:5000/api/forecast-openrouter/stock', {
+      const res = await fetch(`${API_URL}/api/forecast-openrouter/stock`, {
         method: 'POST',
         headers: {
           ...authHeaders,

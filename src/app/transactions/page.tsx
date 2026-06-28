@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Search, ShoppingCart, Plus, Minus, X, CreditCard, User, Pill } from 'lucide-react';
 
+import { API_URL } from '@/lib/api-config';
 import { goeyToast } from "@/components/ui/goey-toaster";
 import { useRequirePermission } from '@/hooks/useRequirePermission';
 import { useKeyboardShortcuts } from '@/context/KeyboardShortcutsContext';
@@ -99,8 +100,8 @@ export default function POSTransactionsPage() {
         const token = localStorage.getItem('token');
         const authHeaders: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
         const [prodRes, settingsRes] = await Promise.all([
-          fetch('http://localhost:5000/api/products?limit=100', { headers: authHeaders }), // Get enough products
-          fetch(`http://localhost:5000/api/settings?t=${Date.now()}`, {
+          fetch(`${API_URL}/api/products?limit=100`, { headers: authHeaders }), // Get enough products
+          fetch(`${API_URL}/api/settings?t=${Date.now()}`, {
             headers: authHeaders
           })
         ]);
@@ -250,14 +251,14 @@ export default function POSTransactionsPage() {
       };
 
       if (data.id) {
-        const res = await fetch(`http://localhost:5000/api/inventory/prescriptions/${data.id}`, {
+        const res = await fetch(`${API_URL}/api/inventory/prescriptions/${data.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
           body: JSON.stringify(body),
         });
         if (res.ok) return data.id;
       } else {
-        const res = await fetch('http://localhost:5000/api/inventory/prescriptions', {
+        const res = await fetch(`${API_URL}/api/inventory/prescriptions`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
           body: JSON.stringify(body),
@@ -355,7 +356,7 @@ export default function POSTransactionsPage() {
     if (!customerName || !customerPhone) return;
     try {
       const token = localStorage.getItem('token');
-      await fetch('http://localhost:5000/api/customers', {
+      await fetch(`${API_URL}/api/customers`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
         body: JSON.stringify({ name: customerName, phone: customerPhone })
@@ -370,7 +371,7 @@ export default function POSTransactionsPage() {
     setSearchingCustomer(true);
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`http://localhost:5000/api/customers/search?phone=${encodeURIComponent(phone)}`, {
+      const res = await fetch(`${API_URL}/api/customers/search?phone=${encodeURIComponent(phone)}`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {}
       });
       if (res.ok) {
@@ -449,7 +450,7 @@ export default function POSTransactionsPage() {
         customer_phone: customerPhone || null
       };
 
-      const res = await fetch('http://localhost:5000/api/transactions', {
+      const res = await fetch(`${API_URL}/api/transactions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
         body: JSON.stringify(payload)
@@ -476,7 +477,7 @@ export default function POSTransactionsPage() {
           window.snap.pay(snapToken, {
             onSuccess: async () => {
               try {
-                const statusRes = await fetch(`http://localhost:5000/api/midtrans/status/${orderId}`, {
+                const statusRes = await fetch(`${API_URL}/api/midtrans/status/${orderId}`, {
                   headers: { Authorization: `Bearer ${token}` }
                 });
                 
@@ -507,7 +508,7 @@ export default function POSTransactionsPage() {
                     setCustomerName('');
                     setCustomerPhone('');
                     // Refresh products
-                    const prodRes = await fetch('http://localhost:5000/api/products?limit=100', {
+                    const prodRes = await fetch(`${API_URL}/api/products?limit=100`, {
                       headers: token ? { Authorization: `Bearer ${token}` } : {}
                     });
                     const prodData = await prodRes.json();
@@ -570,7 +571,7 @@ export default function POSTransactionsPage() {
           setCustomerName('');
           setCustomerPhone('');
           // Refresh products to update stock
-          const prodRes = await fetch('http://localhost:5000/api/products?limit=100', {
+          const prodRes = await fetch(`${API_URL}/api/products?limit=100`, {
             headers: token ? { Authorization: `Bearer ${token}` } : {}
           });
           const prodData = await prodRes.json();

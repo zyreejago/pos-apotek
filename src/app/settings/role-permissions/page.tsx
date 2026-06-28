@@ -1,5 +1,6 @@
 "use client";
 
+import { API_URL } from '@/lib/api-config';
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Trash2 } from "lucide-react";
@@ -73,7 +74,7 @@ export default function Page() {
 
   const fetchRoles = useCallback(async () => {
     try {
-      const res = await fetch(`http://localhost:5000/api/rbac/roles?t=${Date.now()}`, { headers: authHeaders });
+      const res = await fetch(`${API_URL}/api/rbac/roles?t=${Date.now()}`, { headers: authHeaders });
       
       if (res.status === 401) {
         goeyToast.error("Sesi berakhir. Silakan login kembali.", {
@@ -99,7 +100,7 @@ export default function Page() {
     setLoading(true);
     setHasChanges(false);
     try {
-      const res = await fetch(`http://localhost:5000/api/rbac/permissions?roleId=${roleId}&t=${Date.now()}`, { headers: authHeaders });
+      const res = await fetch(`${API_URL}/api/rbac/permissions?roleId=${roleId}&t=${Date.now()}`, { headers: authHeaders });
       
       if (res.status === 401) {
         goeyToast.error("Sesi berakhir. Silakan login kembali.", {
@@ -176,7 +177,7 @@ export default function Page() {
     if (!canManage) return;
     setIsSaving(true);
     try {
-      const res = await fetch("http://localhost:5000/api/rbac/permissions", {
+      const res = await fetch(`${API_URL}/api/rbac/permissions`, {
         method: "PUT",
         headers: { "Content-Type": "application/json", ...authHeaders },
         body: JSON.stringify({ 
@@ -223,7 +224,7 @@ export default function Page() {
       variant: 'danger',
       onConfirm: async () => {
         try {
-          const res = await fetch(`http://localhost:5000/api/rbac/roles/${role.id}`, {
+          const res = await fetch(`${API_URL}/api/rbac/roles/${role.id}`, {
             method: "DELETE",
             headers: authHeaders
           });
@@ -270,7 +271,7 @@ export default function Page() {
 
     setIsSaving(true);
     try {
-      const res = await fetch("http://localhost:5000/api/rbac/roles", {
+      const res = await fetch(`${API_URL}/api/rbac/roles`, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...authHeaders },
         body: JSON.stringify({ name })

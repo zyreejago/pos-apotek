@@ -5,6 +5,7 @@ import PageHeader from '@/components/PageHeader';
 import { goeyToast } from '@/components/ui/goey-toaster';
 import { Wallet, Landmark, TrendingUp, Cpu, Truck, UserCheck, RefreshCw, Send, Ban } from 'lucide-react';
 import { useRequirePermission } from '@/hooks/useRequirePermission';
+import { API_URL } from '@/lib/api-config';
 
 interface Account {
   id: number;
@@ -58,7 +59,7 @@ export default function FinancialTransactionsPage() {
       const now = new Date();
       const m = now.getMonth() + 1;
       const y = now.getFullYear();
-      const res = await fetch(`http://localhost:5000/api/accounting/general-ledger?month=${m}&year=${y}`, {
+      const res = await fetch(`${API_URL}/api/accounting/general-ledger?month=${m}&year=${y}`, {
         headers: authHeaders
       });
       if (res.ok) {
@@ -106,7 +107,7 @@ export default function FinancialTransactionsPage() {
   const handlePostTransaction = async (date: string, description: string, items: { account_id: number; debit: number; credit: number }[]) => {
     setLoading(true);
     try {
-      const res = await fetch('http://localhost:5000/api/accounting/journal-entries', {
+      const res = await fetch(`${API_URL}/api/accounting/journal-entries`, {
         method: 'POST',
         headers: authHeaders,
         body: JSON.stringify({ date, description, items })

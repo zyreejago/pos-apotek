@@ -6,6 +6,7 @@ import { goeyToast } from '@/components/ui/goey-toaster';
 import { Download, Calendar, Loader2 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { API_URL } from '@/lib/api-config';
 
 interface Account {
   id: number;
@@ -32,7 +33,7 @@ export default function BalanceSheetAccountingPage() {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`http://localhost:5000/api/reports/balance-accounting?month=${month}&year=${year}`, {
+      const res = await fetch(`${API_URL}/api/reports/balance-accounting?month=${month}&year=${year}`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {}
       });
       

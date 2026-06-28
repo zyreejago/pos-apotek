@@ -1,5 +1,6 @@
 'use client';
 
+import { API_URL } from '@/lib/api-config';
 import React, { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { Search, ArrowLeft, ShoppingCart, RotateCcw, History, Eye, X, Info, Calendar, DollarSign, TrendingUp, AlertCircle, AlertTriangle, CheckCircle, Package } from 'lucide-react';
@@ -46,7 +47,7 @@ export default function SaleReturnsPage() {
   useEffect(() => { setMounted(true); }, []);
 
   useEffect(() => {
-    fetch('http://localhost:5000/api/returns/sales', { headers: authHeaders })
+    fetch(`${API_URL}/api/returns/sales`, { headers: authHeaders })
       .then(res => res.json())
       .then(data => setHistoryList(data.data || []))
       .catch(() => {});
@@ -68,7 +69,7 @@ export default function SaleReturnsPage() {
     setLookupResult(null);
     setReturnQuantities({});
     try {
-      const res = await fetch(`http://localhost:5000/api/returns/sales/lookup?sale_id=${encodeURIComponent(saleId.trim())}`, {
+      const res = await fetch(`${API_URL}/api/returns/sales/lookup?sale_id=${encodeURIComponent(saleId.trim())}`, {
         headers: authHeaders,
       });
       if (res.status === 401) { router.push('/login'); return; }
@@ -165,7 +166,7 @@ export default function SaleReturnsPage() {
       }));
 
     try {
-      const res = await fetch('http://localhost:5000/api/returns/sales', {
+      const res = await fetch(`${API_URL}/api/returns/sales`, {
         method: 'POST',
         headers: authHeaders,
         body: JSON.stringify({
@@ -184,7 +185,7 @@ export default function SaleReturnsPage() {
         setRefundMethod('cash');
         setReturnQuantities({});
         setSearched(false);
-        fetch('http://localhost:5000/api/returns/sales', { headers: authHeaders })
+        fetch(`${API_URL}/api/returns/sales`, { headers: authHeaders })
           .then(res => res.json())
           .then(data => setHistoryList(data.data || []))
           .catch(() => {});
@@ -594,7 +595,7 @@ export default function SaleReturnsPage() {
                         <button
                           onClick={async () => {
                             try {
-                              const res = await fetch(`http://localhost:5000/api/returns/sales/${ret.id}`, { headers: authHeaders });
+                              const res = await fetch(`${API_URL}/api/returns/sales/${ret.id}`, { headers: authHeaders });
                               if (res.ok) {
                                 const data = await res.json();
                                 setSelectedHistory(data);

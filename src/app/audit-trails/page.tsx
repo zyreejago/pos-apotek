@@ -1,5 +1,6 @@
 'use client';
 
+import { API_URL } from '@/lib/api-config';
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Search, Calendar, User, Clock, Activity } from 'lucide-react';
 import { goeyToast } from "@/components/ui/goey-toaster";
@@ -74,7 +75,7 @@ export default function AuditTrailsPage() {
   const fetchAuditTrails = useCallback(async () => {
     setLoading(true);
     try {
-      let url = `http://localhost:5000/api/audit-trails?page=${currentPage}&limit=${itemsPerPage}`;
+      let url = `${API_URL}/api/audit-trails?page=${currentPage}&limit=${itemsPerPage}`;
       if (filterModule) {
         url += `&module=${encodeURIComponent(filterModule)}`;
       }

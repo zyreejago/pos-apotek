@@ -1,5 +1,6 @@
 "use client";
 
+import { API_URL } from '@/lib/api-config';
 import React, { useEffect, useState, useRef } from 'react';
 import { useKeyboardShortcuts } from '@/context/KeyboardShortcutsContext';
 import { useRouter } from 'next/navigation';
@@ -71,7 +72,7 @@ export default function Dashboard() {
           return;
         }
 
-        const response = await fetch('http://localhost:5000/api/dashboard', {
+        const response = await fetch(`${API_URL}/api/dashboard`, {
           headers: {
             'Authorization': `Bearer ${token}`
           }

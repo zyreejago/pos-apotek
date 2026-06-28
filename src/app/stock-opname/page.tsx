@@ -1,5 +1,6 @@
 'use client';
 
+import { API_URL } from '@/lib/api-config';
 import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Search, Save, AlertCircle, Eye, X } from 'lucide-react';
@@ -112,7 +113,7 @@ export default function StockOpnamePage() {
   const fetchSessions = useCallback(async () => {
     setSessionsLoading(true);
     try {
-      const res = await fetch('http://localhost:5000/api/stock-opname/sessions', {
+      const res = await fetch(`${API_URL}/api/stock-opname/sessions`, {
         headers: authHeaders
       });
       const data = await res.json();
@@ -127,7 +128,7 @@ export default function StockOpnamePage() {
   const fetchSessionDetail = useCallback(async (sessionId: number) => {
     setDetailLoading(true);
     try {
-      const res = await fetch(`http://localhost:5000/api/stock-opname/sessions/${sessionId}`, {
+      const res = await fetch(`${API_URL}/api/stock-opname/sessions/${sessionId}`, {
         headers: authHeaders
       });
       const data = await res.json();
@@ -158,7 +159,7 @@ export default function StockOpnamePage() {
   const fetchProductOpnameHistory = useCallback(async (productId: number) => {
     setProductHistoryLoading(true);
     try {
-      const res = await fetch(`http://localhost:5000/api/products/${productId}/opname-history`, {
+      const res = await fetch(`${API_URL}/api/products/${productId}/opname-history`, {
         headers: authHeaders
       });
       const data = await res.json();
@@ -184,7 +185,7 @@ export default function StockOpnamePage() {
   const fetchProducts = useCallback(async (page: number, limit: number, search: string) => {
     setLoading(true);
     try {
-      const res = await fetch(`http://localhost:5000/api/products?page=${page}&limit=${limit}&search=${search}`, {
+      const res = await fetch(`${API_URL}/api/products?page=${page}&limit=${limit}&search=${search}`, {
         headers: authHeaders
       });
 
@@ -319,7 +320,7 @@ export default function StockOpnamePage() {
         setConfirmModal(prev => ({ ...prev, isOpen: false }));
         setIsSubmitting(true);
         try {
-          const res = await fetch('http://localhost:5000/api/stock-opname', {
+          const res = await fetch(`${API_URL}/api/stock-opname`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', ...authHeaders },
             body: JSON.stringify({ items: payload })

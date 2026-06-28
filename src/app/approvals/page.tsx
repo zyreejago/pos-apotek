@@ -1,5 +1,6 @@
 'use client';
 
+import { API_URL } from '@/lib/api-config';
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Search, Check, X, AlertCircle, FileText, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { goeyToast } from "@/components/ui/goey-toaster";
@@ -73,7 +74,7 @@ export default function ApprovalsPage() {
   const fetchPendingFakturs = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch('http://localhost:5000/api/inventory/pending-batches', {
+      const res = await fetch(`${API_URL}/api/inventory/pending-batches`, {
         headers: authHeaders
       });
       if (res.ok) {
@@ -101,7 +102,7 @@ export default function ApprovalsPage() {
         setConfirmModal(prev => ({ ...prev, isOpen: false }));
         try {
           for (const item of items) {
-            await fetch(`http://localhost:5000/api/inventory/batches/${item.id}/approve`, {
+            await fetch(`${API_URL}/api/inventory/batches/${item.id}/approve`, {
               method: 'PUT', headers: authHeaders
             });
           }
@@ -124,7 +125,7 @@ export default function ApprovalsPage() {
         setConfirmModal(prev => ({ ...prev, isOpen: false }));
         try {
           for (const item of items) {
-            await fetch(`http://localhost:5000/api/inventory/batches/${item.id}/reject`, {
+            await fetch(`${API_URL}/api/inventory/batches/${item.id}/reject`, {
               method: 'PUT', headers: authHeaders
             });
           }
@@ -143,7 +144,7 @@ export default function ApprovalsPage() {
     if (!window.confirm(`Hapus semua batch pada faktur ${label}?`)) return;
     try {
       for (const item of items) {
-        await fetch(`http://localhost:5000/api/inventory/batches/${item.id}`, {
+        await fetch(`${API_URL}/api/inventory/batches/${item.id}`, {
           method: 'DELETE', headers: authHeaders
         });
       }
@@ -172,7 +173,7 @@ export default function ApprovalsPage() {
     setIsSubmittingRevision(true);
     try {
       for (const item of items) {
-        await fetch(`http://localhost:5000/api/inventory/batches/${item.id}/revision`, {
+        await fetch(`${API_URL}/api/inventory/batches/${item.id}/revision`, {
           method: 'PUT',
           headers: { ...authHeaders, 'Content-Type': 'application/json' },
           body: JSON.stringify({ notes: revisionNotes })
@@ -318,7 +319,7 @@ export default function ApprovalsPage() {
                             <td className="px-2 sm:px-4 py-1 sm:py-3">
                               <div className="flex items-center gap-1.5">
                                 {items.some(i => i.image_url) && (
-                                  <button onClick={(e) => { e.stopPropagation(); const urls = getImageUrls(items.find(i => i.image_url)!.image_url).map(u => `http://localhost:5000${u}`); openImagePreview(urls); }}
+                                  <button onClick={(e) => { e.stopPropagation(); const urls = getImageUrls(items.find(i => i.image_url)!.image_url).map(u => `${API_URL}${u}`); openImagePreview(urls); }}
                                     className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg" title="Lihat Bukti">
                                     <FileText size={14} />
                                   </button>

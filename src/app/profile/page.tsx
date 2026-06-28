@@ -1,5 +1,6 @@
 "use client";
 
+import { API_URL } from '@/lib/api-config';
 import { useState, useEffect } from "react";
 import PageHeader from "@/components/PageHeader";
 import { goeyToast } from "@/components/ui/goey-toaster";
@@ -29,7 +30,7 @@ export default function ProfilePage() {
   const fetchProfile = async () => {
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/profile`, {
+      const res = await fetch(`${API_URL}/api/profile`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (!res.ok) throw new Error("Failed to fetch profile");
@@ -52,7 +53,7 @@ export default function ProfilePage() {
     setSavingProfile(true);
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/profile`, {
+      const res = await fetch(`${API_URL}/api/profile`, {
         method: "PUT",
         headers: { 
           "Content-Type": "application/json",
@@ -99,7 +100,7 @@ export default function ProfilePage() {
     setSavingPassword(true);
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/profile/password`, {
+      const res = await fetch(`${API_URL}/api/profile/password`, {
         method: "PUT",
         headers: { 
           "Content-Type": "application/json",

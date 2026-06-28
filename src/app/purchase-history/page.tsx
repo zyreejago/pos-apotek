@@ -1,5 +1,6 @@
 'use client';
 
+import { API_URL } from '@/lib/api-config';
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Search, FileText, Package, Filter } from 'lucide-react';
 import { goeyToast } from "@/components/ui/goey-toaster";
@@ -69,7 +70,7 @@ export default function PurchaseHistoryPage() {
   const fetchHistory = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch('http://localhost:5000/api/inventory/history', {
+      const res = await fetch(`${API_URL}/api/inventory/history`, {
         headers: authHeaders
       });
       if (res.ok) {
@@ -302,10 +303,10 @@ export default function PurchaseHistoryPage() {
 
                     {batch.image_url && (
                       <div className="mt-2">
-                        <img src={(() => { const urls = getImageUrls(batch.image_url); return urls[0]?.startsWith('http') ? urls[0] : `http://localhost:5000${urls[0]}`; })()}
+                        <img src={(() => { const urls = getImageUrls(batch.image_url); return urls[0]?.startsWith('http') ? urls[0] : `${API_URL}${urls[0]}`; })()}
                           alt="Bukti" className="h-16 w-auto object-cover rounded border cursor-pointer hover:opacity-80 transition-opacity"
                           onClick={() => {
-                            const urls = getImageUrls(batch.image_url).map((u: string) => u.startsWith('http') ? u : `http://localhost:5000${u}`);
+                            const urls = getImageUrls(batch.image_url).map((u: string) => u.startsWith('http') ? u : `${API_URL}${u}`);
                             setPreviewImageList(urls);
                             setPreviewImageIndex(0);
                             setPreviewImageUrl(urls[0]);

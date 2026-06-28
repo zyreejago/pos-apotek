@@ -1,3 +1,4 @@
+import { API_URL } from '@/lib/api-config';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
@@ -39,7 +40,7 @@ export function useRequirePermission(moduleName: string, options?: { redirectOnD
           return;
         }
 
-        const res = await fetch(`http://localhost:5000/api/rbac/permissions?roleName=${user.role}&t=${Date.now()}`, {
+        const res = await fetch(`${API_URL}/api/rbac/permissions?roleName=${user.role}&t=${Date.now()}`, {
           headers: { 'Authorization': `Bearer ${token}` },
           cache: 'no-store'
         });

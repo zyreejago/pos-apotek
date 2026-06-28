@@ -1,5 +1,6 @@
 'use client';
 
+import { API_URL } from '@/lib/api-config';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Search, Plus, Edit, Trash2 } from 'lucide-react';
@@ -119,7 +120,7 @@ export default function UsersPage() {
   const fetchUsers = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`http://localhost:5000/api/users?page=${currentPage}&limit=${itemsPerPage}&search=${debouncedSearchQuery}`, {
+      const res = await fetch(`${API_URL}/api/users?page=${currentPage}&limit=${itemsPerPage}&search=${debouncedSearchQuery}`, {
         headers: authHeaders
       });
       
@@ -149,7 +150,7 @@ export default function UsersPage() {
 
   const fetchRoles = useCallback(async () => {
     try {
-      const res = await fetch('http://localhost:5000/api/rbac/roles', { headers: authHeaders });
+      const res = await fetch(`${API_URL}/api/rbac/roles`, { headers: authHeaders });
       if (res.status === 401) {
         handleUnauthorized();
         return;
@@ -230,8 +231,8 @@ export default function UsersPage() {
     }
 
     const url = offCanvasMode === 'add' 
-      ? 'http://localhost:5000/api/users'
-      : `http://localhost:5000/api/users/${selectedUser?.id}`;
+      ? `${API_URL}/api/users`
+      : `${API_URL}/api/users/${selectedUser?.id}`;
     
     const method = offCanvasMode === 'add' ? 'POST' : 'PUT';
     
@@ -305,7 +306,7 @@ export default function UsersPage() {
         }
         
         try {
-          const res = await fetch(`http://localhost:5000/api/users/${user.id}`, {
+          const res = await fetch(`${API_URL}/api/users/${user.id}`, {
             method: 'DELETE',
             headers: authHeaders
           });

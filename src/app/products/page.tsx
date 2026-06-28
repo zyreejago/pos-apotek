@@ -1,5 +1,6 @@
 'use client';
 
+import { API_URL } from '@/lib/api-config';
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import { Search, Plus, Edit, Trash2, FileText, Info, UploadCloud, Camera, X, Check, AlertCircle, CheckCircle, Package, Users, Calendar, AlertTriangle, ArrowUpDown, Wallet } from 'lucide-react';
@@ -287,7 +288,7 @@ export default function ProductsPage() {
   const fetchProducts = useCallback(async () => {
     setLoading(true);
     try {
-      let url = `http://localhost:5000/api/products?page=${currentPage}&limit=${itemsPerPage}`;
+      let url = `${API_URL}/api/products?page=${currentPage}&limit=${itemsPerPage}`;
       if (debouncedSearchQuery) {
         url += `&search=${encodeURIComponent(debouncedSearchQuery)}`;
       }
@@ -304,7 +305,7 @@ export default function ProductsPage() {
       });
       
       // Fetch all products for local reference if needed (optional, but let's keep allProducts updated)
-      const allRes = await fetch(`http://localhost:5000/api/products?limit=1000`, { headers: authHeaders });
+      const allRes = await fetch(`${API_URL}/api/products?limit=1000`, { headers: authHeaders });
       if (allRes.ok) {
         const allJson = await allRes.json();
         setAllProducts(allJson.data || []);
@@ -318,7 +319,7 @@ export default function ProductsPage() {
 
   const fetchSuppliers = useCallback(async () => {
     try {
-      const res = await fetch(`http://localhost:5000/api/suppliers?limit=1000`, { headers: authHeaders });
+      const res = await fetch(`${API_URL}/api/suppliers?limit=1000`, { headers: authHeaders });
       if (res.ok) {
         const json = await res.json();
         setSuppliers(json.data || []);
@@ -330,7 +331,7 @@ export default function ProductsPage() {
 
   const fetchFakturs = useCallback(async (productId: number) => {
     try {
-      const res = await fetch(`http://localhost:5000/api/inventory/batches/${productId}`, {
+      const res = await fetch(`${API_URL}/api/inventory/batches/${productId}`, {
         headers: authHeaders
       });
       if (res.ok) {
@@ -363,7 +364,7 @@ export default function ProductsPage() {
   const fetchGlobalPendingFakturs = useCallback(async () => {
     setIsFetchingPending(true);
     try {
-      const res = await fetch('http://localhost:5000/api/inventory/pending-batches', {
+      const res = await fetch(`${API_URL}/api/inventory/pending-batches`, {
         headers: authHeaders
       });
       if (res.ok) {
@@ -466,7 +467,7 @@ export default function ProductsPage() {
     setFakturImageFiles([]); setFakturImagePreviews([]);
     if (faktur.image_url) {
       const urls = getImageUrls(faktur.image_url);
-      setFakturImagePreviews(urls.map(u => `http://localhost:5000${u}`));
+      setFakturImagePreviews(urls.map(u => `${API_URL}${u}`));
     }
   };
 
@@ -515,7 +516,7 @@ export default function ProductsPage() {
     }
 
     try {
-      const res = await fetch(`http://localhost:5000/api/inventory/batches/${selectedFaktur.id}/dp-payments`, {
+      const res = await fetch(`${API_URL}/api/inventory/batches/${selectedFaktur.id}/dp-payments`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -560,7 +561,7 @@ export default function ProductsPage() {
       onConfirm: async () => {
         setConfirmModal(prev => ({ ...prev, isOpen: false }));
         try {
-          const res = await fetch(`http://localhost:5000/api/inventory/batches/${selectedFaktur.id}/dp-payments/${paymentId}`, {
+          const res = await fetch(`${API_URL}/api/inventory/batches/${selectedFaktur.id}/dp-payments/${paymentId}`, {
             method: 'DELETE',
             headers: authHeaders
           });
@@ -582,7 +583,7 @@ export default function ProductsPage() {
 
   // const handleApproveFaktur = async (fakturId: number) => {
   //   try {
-  //     const res = await fetch(`http://localhost:5000/api/inventory/batches/${fakturId}/approve`, {
+  //     const res = await fetch(`${API_URL}/api/inventory/batches/${fakturId}/approve`, {
   //       method: 'PUT',
   //       headers: authHeaders
   //     });
@@ -602,7 +603,7 @@ export default function ProductsPage() {
 
   // const handleRejectFaktur = async (fakturId: number) => {
   //   try {
-  //     const res = await fetch(`http://localhost:5000/api/inventory/batches/${fakturId}/reject`, {
+  //     const res = await fetch(`${API_URL}/api/inventory/batches/${fakturId}/reject`, {
   //       method: 'PUT',
   //       headers: authHeaders
   //     });
@@ -621,7 +622,7 @@ export default function ProductsPage() {
 
   // const handleRequestRevision = async (fakturId: number) => {
   //   try {
-  //     const res = await fetch(`http://localhost:5000/api/inventory/batches/${fakturId}/revision`, {
+  //     const res = await fetch(`${API_URL}/api/inventory/batches/${fakturId}/revision`, {
   //       method: 'PUT',
   //       headers: authHeaders
   //     });
@@ -651,7 +652,7 @@ export default function ProductsPage() {
       };
 
       // First, update the product's details
-      const productUpdateRes = await fetch(`http://localhost:5000/api/products/${selectedProduct.id}`, {
+      const productUpdateRes = await fetch(`${API_URL}/api/products/${selectedProduct.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -679,8 +680,8 @@ export default function ProductsPage() {
 
       // Then, save the batch/faktur
       const url = fakturModalMode === 'add'
-        ? 'http://localhost:5000/api/inventory/batches'
-        : `http://localhost:5000/api/inventory/batches/${selectedFaktur?.id}`;
+        ? `${API_URL}/api/inventory/batches`
+        : `${API_URL}/api/inventory/batches/${selectedFaktur?.id}`;
       const method = fakturModalMode === 'add' ? 'POST' : 'PUT';
 
       // Convert from purchase unit (box) to base unit (tablet)
@@ -773,7 +774,7 @@ export default function ProductsPage() {
       variant: 'danger',
       onConfirm: async () => {
         try {
-          const res = await fetch(`http://localhost:5000/api/inventory/batches/${faktur.id}`, {
+          const res = await fetch(`${API_URL}/api/inventory/batches/${faktur.id}`, {
             method: 'DELETE',
             headers: authHeaders
           });
@@ -807,7 +808,7 @@ export default function ProductsPage() {
       variant: 'danger',
       onConfirm: async () => {
         try {
-          const res = await fetch(`http://localhost:5000/api/inventory/batches/${faktur.id}/expire`, {
+          const res = await fetch(`${API_URL}/api/inventory/batches/${faktur.id}/expire`, {
             method: 'PUT',
             headers: authHeaders
           });
@@ -854,7 +855,7 @@ export default function ProductsPage() {
       variant: 'warning',
       onConfirm: async () => {
         try {
-          const res = await fetch(`http://localhost:5000/api/inventory/batches/${faktur.id}/archive`, {
+          const res = await fetch(`${API_URL}/api/inventory/batches/${faktur.id}/archive`, {
             method: 'PUT',
             headers: {
               ...authHeaders,
@@ -1143,7 +1144,7 @@ export default function ProductsPage() {
     if (existsInLocal) { setInvoiceNumberError('No. Faktur sudah digunakan'); return; }
 
     try {
-      const res = await fetch(`http://localhost:5000/api/inventory/batches/check-invoice/${encodeURIComponent(trimmed)}`, {
+      const res = await fetch(`${API_URL}/api/inventory/batches/check-invoice/${encodeURIComponent(trimmed)}`, {
         headers: authHeaders
       });
       if (res.ok) {
@@ -1178,7 +1179,7 @@ export default function ProductsPage() {
 
         // Auto-fill description from AI
         if (value.trim().length >= 2) {
-          fetch(`http://localhost:5000/api/knowledge/ai-description`, {
+          fetch(`${API_URL}/api/knowledge/ai-description`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', ...authHeaders },
             body: JSON.stringify({ name: value.trim() })
@@ -1257,7 +1258,7 @@ export default function ProductsPage() {
           product_category: formData.product_category,
           description: formData.description || null
         };
-        const res = await fetch(`http://localhost:5000/api/products/${selectedProduct.id}`, {
+        const res = await fetch(`${API_URL}/api/products/${selectedProduct.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json', ...authHeaders },
           body: JSON.stringify(payload)
@@ -1304,7 +1305,7 @@ export default function ProductsPage() {
               product_category: item.product_category,
               description: item.description || existingProduct.description || null
             };
-            await fetch(`http://localhost:5000/api/products/${productId}`, {
+            await fetch(`${API_URL}/api/products/${productId}`, {
               method: 'PUT',
               headers: { 'Content-Type': 'application/json', ...authHeaders },
               body: JSON.stringify(payload)
@@ -1330,7 +1331,7 @@ export default function ProductsPage() {
               product_category: item.product_category,
               description: item.description || null
             };
-            const res = await fetch(`http://localhost:5000/api/products`, {
+            const res = await fetch(`${API_URL}/api/products`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json', ...authHeaders },
               body: JSON.stringify(payload)
@@ -1361,7 +1362,7 @@ export default function ProductsPage() {
             const existingBatchId = (item as any).id ? perbaikanBatchIds[(item as any).id] : undefined;
             const isUpdate = !!existingBatchId;
 
-            const res = await fetch(`http://localhost:5000/api/inventory/batches${isUpdate ? `/${existingBatchId}` : ''}`, {
+            const res = await fetch(`${API_URL}/api/inventory/batches${isUpdate ? `/${existingBatchId}` : ''}`, {
               method: isUpdate ? 'PUT' : 'POST',
               headers: {
                 ...authHeaders
@@ -1408,7 +1409,7 @@ export default function ProductsPage() {
               batchFormData.append('has_purchase_unit', Number(formData.unit_multiplier) > 1 ? '1' : '0');
               (item.imageFiles || []).forEach(f => batchFormData.append('images', f));
 
-              const batchRes = await fetch(`http://localhost:5000/api/inventory/batches/${existingBatchId}`, {
+              const batchRes = await fetch(`${API_URL}/api/inventory/batches/${existingBatchId}`, {
                 method: 'PUT', headers: { ...authHeaders }, body: batchFormData
               });
               if (!batchRes.ok) {
@@ -1421,7 +1422,7 @@ export default function ProductsPage() {
               if (prodId) {
                 let prodData = allProducts.find((p: any) => p.id === prodId);
                 if (!prodData) {
-                  const refreshRes = await fetch(`http://localhost:5000/api/products?limit=1000`, { headers: authHeaders });
+                  const refreshRes = await fetch(`${API_URL}/api/products?limit=1000`, { headers: authHeaders });
                   if (refreshRes.ok) {
                     const refreshJson = await refreshRes.json();
                     setAllProducts(refreshJson.data || []);
@@ -1442,7 +1443,7 @@ export default function ProductsPage() {
                   unit_multiplier: Number(item.unit_multiplier) || prodData?.unit_multiplier || 1,
                   description: item.description || (prodData as any)?.description || null
                 };
-                await fetch(`http://localhost:5000/api/products/${prodId}`, {
+                await fetch(`${API_URL}/api/products/${prodId}`, {
                   method: 'PUT',
                   headers: { 'Content-Type': 'application/json', ...authHeaders },
                   body: JSON.stringify(payload)
@@ -1473,7 +1474,7 @@ export default function ProductsPage() {
             batchFormData.append('has_purchase_unit', Number(formData.unit_multiplier) > 1 ? '1' : '0');
             [...productFormImageFiles, ...fakturImageFiles].forEach(f => batchFormData.append('images', f));
 
-            const res = await fetch(`http://localhost:5000/api/inventory/batches/${singleBatchId}`, {
+            const res = await fetch(`${API_URL}/api/inventory/batches/${singleBatchId}`, {
               method: 'PUT', headers: { ...authHeaders }, body: batchFormData
             });
             if (!res.ok) {
@@ -1486,7 +1487,7 @@ export default function ProductsPage() {
             if (productId) {
               let prodData = allProducts.find(p => p.id === productId);
               if (!prodData) {
-                const refreshRes = await fetch(`http://localhost:5000/api/products?limit=1000`, { headers: authHeaders });
+                const refreshRes = await fetch(`${API_URL}/api/products?limit=1000`, { headers: authHeaders });
                 if (refreshRes.ok) {
                   const refreshJson = await refreshRes.json();
                   setAllProducts(refreshJson.data || []);
@@ -1508,7 +1509,7 @@ export default function ProductsPage() {
                 description: formData.description || (prodData as any)?.description || null
               };
               console.log('[Submit Perbaikan] SENDING product PUT for productId:', productId, 'payload:', payload);
-              const prodRes = await fetch(`http://localhost:5000/api/products/${productId}`, {
+              const prodRes = await fetch(`${API_URL}/api/products/${productId}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json', ...authHeaders },
                 body: JSON.stringify(payload)
@@ -1561,7 +1562,7 @@ export default function ProductsPage() {
     }
 
     try {
-      const res = await fetch(`http://localhost:5000/api/products/${product.id}`, {
+      const res = await fetch(`${API_URL}/api/products/${product.id}`, {
         method: 'DELETE',
         headers: authHeaders
       });
@@ -3517,7 +3518,7 @@ export default function ProductsPage() {
                                   <button
                                     onClick={() => {
                                       const firstWithImage = items.find(i => i.image_url)!;
-                                      const urls = getImageUrls(firstWithImage.image_url).map(u => `http://localhost:5000${u}`);
+                                      const urls = getImageUrls(firstWithImage.image_url).map(u => `${API_URL}${u}`);
                                       if (urls.length > 0) openImagePreview(urls[0], urls);
                                     }}
                                     className="flex items-center gap-2 px-4 py-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-all text-xs font-bold border border-blue-200"
@@ -3562,7 +3563,7 @@ export default function ProductsPage() {
                                           batch_number: firstRev.batch_number || '',
                                         });
                                         if (firstRev.image_url) {
-                                          const urls = getImageUrls(firstRev.image_url).map(u => `http://localhost:5000${u}`);
+                                          const urls = getImageUrls(firstRev.image_url).map(u => `${API_URL}${u}`);
                                           setProductFormImagePreviews(urls);
                                         }
                                         setIsPerbaikanMultiMode(false);
@@ -3628,7 +3629,7 @@ export default function ProductsPage() {
                                           batch_number: '',
                                         });
                                         if (firstRev.image_url) {
-                                          const urls = getImageUrls(firstRev.image_url).map(u => `http://localhost:5000${u}`);
+                                          const urls = getImageUrls(firstRev.image_url).map(u => `${API_URL}${u}`);
                                           setProductFormImagePreviews(urls);
                                         }
                                         setIsPerbaikanMultiMode(true);
@@ -3965,7 +3966,7 @@ export default function ProductsPage() {
                   <h4 className="text-sm font-bold text-gray-700 mb-2">Bukti Faktur ({getImageUrls(detailFaktur.image_url).length})</h4>
                   <div className="flex flex-wrap gap-3">
                     {(() => {
-                      const urls = getImageUrls(detailFaktur.image_url).map((u: string) => `http://localhost:5000${u}`);
+                      const urls = getImageUrls(detailFaktur.image_url).map((u: string) => `${API_URL}${u}`);
                       return urls.map((fullUrl: string, idx: number) => (
                       <div key={idx} className="relative inline-block group">
                         <img 

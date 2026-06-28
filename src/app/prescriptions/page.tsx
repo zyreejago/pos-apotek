@@ -1,5 +1,6 @@
 'use client';
 
+import { API_URL } from '@/lib/api-config';
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Search, Plus, Edit, Trash2, Image as ImageIcon, ShoppingCart, Minus, X, UploadCloud, Camera, FileText, CreditCard } from 'lucide-react';
@@ -122,7 +123,7 @@ export default function PrescriptionsPage() {
   const fetchPrescriptions = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`http://localhost:5000/api/inventory/prescriptions`, {
+      const res = await fetch(`${API_URL}/api/inventory/prescriptions`, {
         headers: authHeaders
       });
 
@@ -146,8 +147,8 @@ export default function PrescriptionsPage() {
   const fetchProductsAndSettings = useCallback(async () => {
     try {
       const [prodRes, settingsRes] = await Promise.all([
-        fetch('http://localhost:5000/api/products?limit=100', { headers: authHeaders }),
-        fetch(`http://localhost:5000/api/settings?t=${Date.now()}`, { headers: authHeaders })
+        fetch(`${API_URL}/api/products?limit=100`, { headers: authHeaders }),
+        fetch(`${API_URL}/api/settings?t=${Date.now()}`, { headers: authHeaders })
       ]);
 
       if (prodRes.status === 401 || settingsRes.status === 401) {
@@ -344,7 +345,7 @@ export default function PrescriptionsPage() {
     // Set save option: if already has transaction, default to save_only, otherwise save_and_pay
     setSaveOption(prescription.transaction_id ? 'save_only' : 'save_and_pay');
     
-    setImagePreview(prescription.image_url ? `http://localhost:5000${prescription.image_url}` : null);
+    setImagePreview(prescription.image_url ? `${API_URL}${prescription.image_url}` : null);
     setIsOffCanvasOpen(true);
   };
 
@@ -477,7 +478,7 @@ export default function PrescriptionsPage() {
           payment_method: paymentMethod
         };
 
-        const transactionRes = await fetch('http://localhost:5000/api/transactions', {
+        const transactionRes = await fetch(`${API_URL}/api/transactions`, {
           method: 'POST',
           headers: { 
             'Content-Type': 'application/json', 
@@ -556,7 +557,7 @@ export default function PrescriptionsPage() {
         formDataToSend.append('items', JSON.stringify(prescriptionItems));
       }
 
-      const res = await fetch(`http://localhost:5000/api/inventory/prescriptions/${selectedPrescription.id}`, {
+      const res = await fetch(`${API_URL}/api/inventory/prescriptions/${selectedPrescription.id}`, {
         method: 'PUT',
         headers: authHeaders,
         body: formDataToSend
@@ -627,7 +628,7 @@ export default function PrescriptionsPage() {
           payment_method: paymentMethod
         };
 
-        const transactionRes = await fetch('http://localhost:5000/api/transactions', {
+        const transactionRes = await fetch(`${API_URL}/api/transactions`, {
           method: 'POST',
           headers: { 
             'Content-Type': 'application/json', 
@@ -709,7 +710,7 @@ export default function PrescriptionsPage() {
         prescriptionFormData.append('items', JSON.stringify(prescriptionItems));
       }
 
-      const prescriptionRes = await fetch('http://localhost:5000/api/inventory/prescriptions', {
+      const prescriptionRes = await fetch(`${API_URL}/api/inventory/prescriptions`, {
         method: 'POST',
         headers: authHeaders,
         body: prescriptionFormData
@@ -744,7 +745,7 @@ export default function PrescriptionsPage() {
     }
 
     try {
-      const res = await fetch(`http://localhost:5000/api/inventory/prescriptions/${prescription.id}`, {
+      const res = await fetch(`${API_URL}/api/inventory/prescriptions/${prescription.id}`, {
         method: 'DELETE',
         headers: authHeaders
       });
@@ -850,7 +851,7 @@ export default function PrescriptionsPage() {
                         {prescription.image_url ? (
                           <button
                             type="button"
-                            onClick={() => setPreviewImageUrl(`http://localhost:5000${prescription.image_url}`)}
+                            onClick={() => setPreviewImageUrl(`${API_URL}${prescription.image_url}`)}
                             className="text-blue-600 hover:text-blue-700 flex items-center gap-1 cursor-pointer"
                           >
                             <ImageIcon size={16} />

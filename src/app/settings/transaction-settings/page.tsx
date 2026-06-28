@@ -1,5 +1,6 @@
 "use client";
 
+import { API_URL } from '@/lib/api-config';
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { goeyToast } from "@/components/ui/goey-toaster";
@@ -29,7 +30,7 @@ export default function Page() {
           return;
         }
 
-        const res = await fetch(`http://localhost:5000/api/settings?t=${Date.now()}`, {
+        const res = await fetch(`${API_URL}/api/settings?t=${Date.now()}`, {
           headers: { 'Authorization': `Bearer ${token}` },
           cache: 'no-store'
         });
@@ -70,7 +71,7 @@ export default function Page() {
 
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch('http://localhost:5000/api/settings', {
+      const res = await fetch(`${API_URL}/api/settings`, {
         method: 'PUT',
         headers: { 
             'Content-Type': 'application/json',
