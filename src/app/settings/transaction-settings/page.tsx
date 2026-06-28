@@ -119,7 +119,7 @@ export default function Page() {
       <div className="flex-1 flex flex-col overflow-hidden">
         <PageHeader title="Transactions Settings" />
         
-        <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50 p-6">
+        <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50 p-4 sm:p-6">
           <div className="max-w-full sm:max-w-2xl mx-auto bg-white rounded-lg shadow p-6">
             <h2 className="text-lg font-semibold mb-6 text-gray-800">Transactions Settings</h2>
             
@@ -169,7 +169,7 @@ export default function Page() {
                   <button
                     onClick={handleSave}
                     disabled={saving}
-                    className={`px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors ${saving ? 'opacity-70 cursor-not-allowed' : ''}`}
+                    className={`px-6 py-2 min-h-[44px] bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors ${saving ? 'opacity-70 cursor-not-allowed' : ''}`}
                   >
                     {saving ? 'Saving...' : 'Save Changes'}
                   </button>

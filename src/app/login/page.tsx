@@ -60,10 +60,10 @@ export default function LoginPage() {
       backgroundRepeat: 'no-repeat',
       backgroundColor: '#F8F9FA'
     }}>
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 w-full max-w-[480px] p-8 md:p-10">
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 w-full max-w-[480px] p-4 sm:p-8 md:p-10">
         {/* Header */}
         <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Sign in</h1>
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">Sign in</h1>
           <p className="text-sm text-gray-500">
             Need an account?{' '}
             <Link href="/register" className="text-blue-500 hover:text-blue-600 font-medium">

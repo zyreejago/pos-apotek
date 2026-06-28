@@ -145,7 +145,7 @@ export default function Dashboard() {
         
         {/* Card 1: Rekomendasi Stock Harian */}
         <div 
-          className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 cursor-pointer hover:shadow-md transition-shadow"
+          className="bg-white p-4 sm:p-6 rounded-xl shadow-sm border border-gray-100 cursor-pointer hover:shadow-md transition-shadow"
           onClick={() => router.push('/recommendations')}
         >
           <div className="flex justify-between items-center mb-6">
@@ -175,7 +175,7 @@ export default function Dashboard() {
         </div>
 
         {/* Card 2: Earnings Chart */}
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+        <div className="bg-white p-4 sm:p-6 rounded-xl shadow-sm border border-gray-100">
           <div className="flex justify-between items-center mb-6">
             <h3 className="font-semibold text-gray-800">Earnings</h3>
             <button className="text-gray-400 text-sm flex items-center gap-1 hover:text-gray-600">
@@ -185,7 +185,7 @@ export default function Dashboard() {
 
           <div className="h-[250px] w-full relative">
             {/* Overlay Tooltip Mockup */}
-            <div className="absolute top-10 left-1/2 transform -translate-x-1/2 bg-white p-3 rounded-lg shadow-lg border border-gray-100 z-10 hidden md:block">
+            <div className="absolute top-10 left-1/2 transform -translate-x-1/2 bg-white p-3 rounded-lg shadow-lg border border-gray-100 z-10 block">
                 <p className="text-xs text-gray-500 mb-1">Current Sales</p>
                 <div className="flex items-center gap-2">
                     <span className="font-bold text-lg">Rp. {currentSales.toLocaleString('id-ID')}</span>
@@ -224,7 +224,7 @@ export default function Dashboard() {
         </div>
 
         {/* Card 3: Casier Table */}
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 lg:col-span-2">
+        <div className="bg-white p-4 sm:p-6 rounded-xl shadow-sm border border-gray-100 lg:col-span-2">
           <div className="flex justify-between items-center mb-6">
             <h3 className="font-semibold text-gray-800">Cashier</h3>
             <div className="relative">
@@ -233,7 +233,7 @@ export default function Dashboard() {
                     ref={searchRef}
                     type="text" 
                     placeholder="Search Cashier" 
-                    className="pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-64"
+                    className="pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-full md:w-64"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                 />
@@ -244,7 +244,7 @@ export default function Dashboard() {
             <table className="w-full">
                 <thead>
                     <tr className="border-b border-gray-100 text-left">
-                        <th className="py-3 px-4 text-xs font-medium text-gray-400 uppercase tracking-wider">
+                        <th className="py-2 px-2 sm:py-3 sm:px-4 text-xs font-medium text-gray-400 uppercase tracking-wider">
                             Cashier <ChevronDown size={12} className="inline ml-1" />
                         </th>
                     </tr>
@@ -252,7 +252,7 @@ export default function Dashboard() {
                 <tbody className="divide-y divide-gray-50">
                     {paginatedCashiers.map((item, index) => (
                         <tr key={index} className="hover:bg-gray-50">
-                            <td className="py-4 px-4">
+                            <td className="py-2 px-2 sm:py-4 sm:px-4">
                                 <div className="flex items-center gap-2">
                                      <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-xs text-slate-500">
                                          👤
@@ -270,7 +270,7 @@ export default function Dashboard() {
           </div>
           
           {filteredCashiers.length > itemsPerPage && (
-            <div className="flex justify-between items-center mt-6 text-sm text-gray-500">
+            <div className="flex flex-col sm:flex-row justify-between items-center mt-6 text-sm text-gray-500 gap-3">
                <div className="flex items-center gap-2">
                   <span>Show</span>
                   <select 

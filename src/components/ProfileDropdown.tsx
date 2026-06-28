@@ -42,10 +42,10 @@ export default function ProfileDropdown() {
     <div className="relative" ref={dropdownRef}>
       <button 
         onClick={() => setIsOpen(!isOpen)}
-        className="w-10 h-10 rounded-full bg-gray-200 overflow-hidden border border-gray-200 focus:outline-none hover:ring-2 hover:ring-blue-500/50 transition-all"
+        className="w-7 h-7 sm:w-10 sm:h-10 rounded-full bg-gray-200 overflow-hidden border border-gray-200 focus:outline-none hover:ring-2 hover:ring-blue-500/50 transition-all"
       >
         <div className="w-full h-full bg-slate-300 flex items-center justify-center text-slate-500">
-          <User size={20} />
+          <User size={14} />
         </div>
       </button>
 

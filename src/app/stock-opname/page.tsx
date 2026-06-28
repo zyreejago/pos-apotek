@@ -387,15 +387,15 @@ export default function StockOpnamePage() {
               <>
                 <button
                   onClick={openHistoryModal}
-                  className="bg-white border border-gray-200 text-gray-600 hover:bg-gray-50 px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+                  className="bg-white border border-gray-200 text-gray-600 hover:bg-gray-50 px-1.5 sm:px-3 py-0.5 sm:py-2 rounded-lg text-[10px] sm:text-sm font-medium transition-colors flex items-center gap-1 sm:gap-2"
                 >
-                  <Eye size={16} />
+                  <Eye className="w-3 sm:w-4 h-3 sm:h-4" />
                   Riwayat
                 </button>
                 {(checkActionPermission('create') || checkActionPermission('edit')) && (
                 <button 
                   onClick={handleStartOpname}
-                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm"
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-1.5 sm:px-4 py-0.5 sm:py-2 rounded-lg text-[10px] sm:text-sm font-medium transition-colors shadow-sm"
                 >
                   Mulai Stock Opname
                 </button>
@@ -405,17 +405,17 @@ export default function StockOpnamePage() {
               <div className="flex gap-2">
                 <button 
                   onClick={handleCancelOpname}
-                  className="bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                  className="bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 px-1.5 sm:px-4 py-0.5 sm:py-2 rounded-lg text-[10px] sm:text-sm font-medium transition-colors"
                   disabled={isSubmitting}
                 >
                   Cancel
                 </button>
                 <button 
                   onClick={handleSubmitOpname}
-                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm flex items-center gap-2"
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-1.5 sm:px-4 py-0.5 sm:py-2 rounded-lg text-[10px] sm:text-sm font-medium transition-colors shadow-sm flex items-center gap-1 sm:gap-2"
                   disabled={isSubmitting}
                 >
-                  <Save size={16} />
+                  <Save className="w-3 sm:w-4 h-3 sm:h-4" />
                   {isSubmitting ? 'Saving...' : 'Submit Opname'}
                 </button>
               </div>
@@ -479,27 +479,27 @@ export default function StockOpnamePage() {
 
         {/* Table */}
         <div className="overflow-x-auto">
-          <table className="w-full">
+          <table className="w-full text-xs sm:text-sm">
             <thead className="bg-gray-50 text-gray-500 font-medium text-sm">
               <tr>
-                <th className="px-6 py-4 text-left">Name</th>
-                <th className="px-6 py-4 text-left">Stock Sistem</th>
-                <th className="px-6 py-4 text-left">Stock Faktual</th>
-                <th className="px-6 py-4 text-left">Selisih</th>
-                <th className="px-6 py-4 text-right">Unit</th>
-                <th className="px-6 py-4 text-center">Aksi</th>
+                <th className="px-3 sm:px-6 py-2 sm:py-4 text-left">Name</th>
+                <th className="px-3 sm:px-6 py-2 sm:py-4 text-left">Stock Sistem</th>
+                <th className="px-3 sm:px-6 py-2 sm:py-4 text-left">Stock Faktual</th>
+                <th className="px-3 sm:px-6 py-2 sm:py-4 text-left">Selisih</th>
+                <th className="px-3 sm:px-6 py-2 sm:py-4 text-right">Unit</th>
+                <th className="px-3 sm:px-6 py-2 sm:py-4 text-center">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {loading ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
+                  <td colSpan={6} className="px-3 sm:px-6 py-4 sm:py-8 text-center text-gray-500">
                     Loading products...
                   </td>
                 </tr>
               ) : products.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
+                  <td colSpan={6} className="px-3 sm:px-6 py-4 sm:py-8 text-center text-gray-500">
                     No products found
                   </td>
                 </tr>
@@ -513,11 +513,11 @@ export default function StockOpnamePage() {
 
                   return (
                     <tr key={product.id} className="hover:bg-gray-50 transition-colors">
-                        <td className="px-3 sm:px-6 py-4">
+                        <td className="px-3 sm:px-6 py-2 sm:py-4">
                         <div className="font-medium text-gray-900">{product.name}</div>
                         </td>
-                        <td className="px-6 py-4 text-gray-600 font-medium">{product.stock}</td>
-                        <td className="px-3 sm:px-6 py-4">
+                        <td className="px-3 sm:px-6 py-2 sm:py-4 text-gray-600 font-medium">{product.stock}</td>
+                        <td className="px-3 sm:px-6 py-2 sm:py-4">
                         {isOpnameActive ? (
                             <input 
                             type="number" 
@@ -531,7 +531,7 @@ export default function StockOpnamePage() {
                             <span className="text-gray-400">-</span>
                         )}
                         </td>
-                        <td className="px-3 sm:px-6 py-4">
+                        <td className="px-3 sm:px-6 py-2 sm:py-4">
                         {hasEntry ? (
                             <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getDifferenceColor(difference)}`}>
                             {difference > 0 ? '+' : ''}{difference}
@@ -540,13 +540,13 @@ export default function StockOpnamePage() {
                             <span className="text-gray-400">-</span>
                         )}
                         </td>
-                        <td className="px-6 py-4 text-right text-gray-500 text-sm">
+                        <td className="px-3 sm:px-6 py-2 sm:py-4 text-right text-gray-500 text-sm">
                             {product.unit}
                         </td>
-                        <td className="px-6 py-4 text-center">
+                        <td className="px-3 sm:px-6 py-2 sm:py-4 text-center">
                             <button
                               onClick={() => fetchProductOpnameHistory(product.id)}
-                              className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                              className="p-1 sm:p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                               title="Lihat Riwayat Opname"
                             >
                               <Eye size={16} />
@@ -580,7 +580,7 @@ export default function StockOpnamePage() {
                 <span>
                     {(pagination.page - 1) * pagination.limit + 1}-{Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total}
                 </span>
-                <div className="flex gap-1">
+                <div className="flex gap-1 overflow-x-auto max-w-[200px] sm:max-w-none">
                     <button 
                     onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
                     disabled={currentPage === 1}
@@ -636,26 +636,26 @@ export default function StockOpnamePage() {
                   {detailLoading ? (
                     <div className="text-center py-8 text-gray-500">Loading detail...</div>
                   ) : (
-                    <table className="w-full text-sm">
+                    <table className="w-full text-xs sm:text-sm">
                       <thead>
                         <tr className="border-b border-gray-200 text-gray-500">
-                          <th className="text-left py-2 px-2">Produk</th>
-                          <th className="text-right py-2 px-2">Stok Sistem</th>
-                          <th className="text-right py-2 px-2">Stok Aktual</th>
-                          <th className="text-right py-2 px-2">Selisih</th>
-                          <th className="text-right py-2 px-2">Unit</th>
+                          <th className="text-left py-1 sm:py-2 px-1 sm:px-2">Produk</th>
+                          <th className="text-right py-1 sm:py-2 px-1 sm:px-2">Stok Sistem</th>
+                          <th className="text-right py-1 sm:py-2 px-1 sm:px-2">Stok Aktual</th>
+                          <th className="text-right py-1 sm:py-2 px-1 sm:px-2">Selisih</th>
+                          <th className="text-right py-1 sm:py-2 px-1 sm:px-2">Unit</th>
                         </tr>
                       </thead>
                       <tbody>
                         {sessionDetail.map((item) => (
                           <tr key={item.id} className="border-b border-gray-100">
-                            <td className="py-2 px-2 font-medium text-gray-900">{item.product_name}</td>
-                            <td className="py-2 px-2 text-right text-gray-600">{item.previous_stock}</td>
-                            <td className="py-2 px-2 text-right text-gray-600">{item.new_stock}</td>
-                            <td className={`py-2 px-2 text-right font-medium ${item.quantity_change > 0 ? 'text-green-600' : item.quantity_change < 0 ? 'text-red-600' : 'text-gray-600'}`}>
+                            <td className="py-1 sm:py-2 px-1 sm:px-2 font-medium text-gray-900">{item.product_name}</td>
+                            <td className="py-1 sm:py-2 px-1 sm:px-2 text-right text-gray-600">{item.previous_stock}</td>
+                            <td className="py-1 sm:py-2 px-1 sm:px-2 text-right text-gray-600">{item.new_stock}</td>
+                            <td className={`py-1 sm:py-2 px-1 sm:px-2 text-right font-medium ${item.quantity_change > 0 ? 'text-green-600' : item.quantity_change < 0 ? 'text-red-600' : 'text-gray-600'}`}>
                               {item.quantity_change > 0 ? '+' : ''}{item.quantity_change}
                             </td>
-                            <td className="py-2 px-2 text-right text-gray-500">{item.unit}</td>
+                            <td className="py-1 sm:py-2 px-1 sm:px-2 text-right text-gray-500">{item.unit}</td>
                           </tr>
                         ))}
                       </tbody>

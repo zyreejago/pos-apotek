@@ -987,13 +987,13 @@ export default function ProductsPage() {
   };
 
   const SortableHeader = ({ field, label }: { field: keyof Product | 'name', label: string }) => (
-    <th 
-      className="px-6 py-4 cursor-pointer hover:bg-gray-100 transition-colors select-none"
-      onClick={() => handleSort(field)}
-    >
-      <div className="flex items-center gap-2">
-        <span>{label}</span>
-        <ArrowUpDown size={14} className={`text-gray-400 ${sortField === field ? 'text-blue-500' : ''}`} />
+      <th 
+          className="px-3 sm:px-6 py-2 sm:py-4 text-xs sm:text-sm cursor-pointer hover:bg-gray-100 transition-colors select-none"
+          onClick={() => handleSort(field)}
+        >
+          <div className="flex items-center gap-2">
+            <span>{label}</span>
+            <ArrowUpDown size={14} className={`text-gray-400 ${sortField === field ? 'text-blue-500' : ''}`} />
       </div>
     </th>
   );
@@ -1153,7 +1153,7 @@ export default function ProductsPage() {
     } catch { setInvoiceNumberError(''); }
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData(prev => {
       let updated = { ...prev, [name]: value };
@@ -1588,9 +1588,9 @@ export default function ProductsPage() {
           checkPermission('create') && (
             <button 
               onClick={handleOpenAddOffCanvas}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium transition-colors"
+              className="bg-blue-600 hover:bg-blue-700 text-white px-2 sm:px-4 py-1 sm:py-2 rounded-lg flex items-center gap-2 text-xs sm:text-sm font-medium transition-colors"
             >
-              <Plus size={16} />
+              <Plus className="w-3.5 sm:w-4 h-3.5 sm:h-4" />
               Add Products
             </button>
           )
@@ -1626,7 +1626,7 @@ export default function ProductsPage() {
 
         {/* Table */}
         <div className="overflow-x-auto">
-          <table className="w-full text-sm text-left">
+          <table className="w-full text-xs sm:text-sm text-left">
             <thead className="bg-gray-50 text-gray-500 font-medium">
               <tr>
                 {/* <th className="px-6 py-4 cursor-pointer hover:text-gray-700">ID ↕</th> */}
@@ -1639,19 +1639,19 @@ export default function ProductsPage() {
                 <SortableHeader field="selling_price" label="Harga Jual" />
                 <SortableHeader field="expired_date" label="Kadaluarsa" />
                 <SortableHeader field="stock" label="Stock" />
-                <th className="px-6 py-4 text-right">Actions</th>
+                <th className="px-3 sm:px-6 py-2 sm:py-4 text-xs sm:text-sm text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="">
               {loading ? (
                 <tr>
-                  <td colSpan={10} className="px-6 py-8 text-center text-gray-500">
+                  <td colSpan={10} className="px-3 sm:px-6 py-4 sm:py-8 text-center text-gray-500">
                     Loading products...
                   </td>
                 </tr>
               ) : filteredAndSortedProducts.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="px-6 py-8 text-center text-gray-500">
+                  <td colSpan={10} className="px-3 sm:px-6 py-4 sm:py-8 text-center text-gray-500">
                     No products found.
                   </td>
                 </tr>
@@ -1661,8 +1661,8 @@ export default function ProductsPage() {
                   .map((product) => (
                   <tr key={product.id} className="hover:bg-gray-50 transition-colors group">
                     {/* <td className="px-6 py-4 text-gray-500">#{product.id}</td> */}
-                    <td className="px-6 py-4 font-medium text-gray-900">{product.name}</td>
-                    <td className="px-6 py-4 text-gray-600">
+                    <td className="px-3 sm:px-6 py-2 sm:py-4 font-medium text-gray-900">{product.name}</td>
+                    <td className="px-3 sm:px-6 py-2 sm:py-4 text-gray-600">
                       <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold ${
                         product.product_category === 'NON_OBAT' 
                           ? 'bg-amber-100 text-amber-800' 
@@ -1671,9 +1671,9 @@ export default function ProductsPage() {
                         {product.product_category === 'NON_OBAT' ? 'Non-Obat' : 'Obat'}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-gray-600 font-medium">{product.location_code || '-'}</td>
-                    <td className="px-6 py-4 text-gray-600">{product.supplier_name || '-'}</td>
-                    <td className="px-3 sm:px-6 py-4">
+                    <td className="px-3 sm:px-6 py-2 sm:py-4 text-gray-600 font-medium">{product.location_code || '-'}</td>
+                    <td className="px-3 sm:px-6 py-2 sm:py-4 text-gray-600">{product.supplier_name || '-'}</td>
+                    <td className="px-3 sm:px-6 py-2 sm:py-4">
                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                         product.stock_type === 'lunas' 
                           ? 'bg-green-100 text-green-700 border border-green-200'
@@ -1694,18 +1694,18 @@ export default function ProductsPage() {
                          product.stock_type === 'retur' ? 'Retur' : '-'}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-gray-600">{formatCurrency(product.cost_price)}</td>
-                    <td className="px-6 py-4 text-gray-600">{formatCurrency(product.selling_price)}</td>
-                    <td className="px-3 sm:px-6 py-4">
+                    <td className="px-3 sm:px-6 py-2 sm:py-4 text-gray-600">{formatCurrency(product.cost_price)}</td>
+                    <td className="px-3 sm:px-6 py-2 sm:py-4 text-gray-600">{formatCurrency(product.selling_price)}</td>
+                    <td className="px-3 sm:px-6 py-2 sm:py-4">
                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getExpiredStatusColor(product.nearest_expired || product.expired_date)}`}>
                         {formatDate(product.nearest_expired || product.expired_date)}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-gray-600">
+                    <td className="px-3 sm:px-6 py-2 sm:py-4 text-gray-600">
                       {formatStock(product.stock, product.unit_multiplier || 1, product.purchase_unit || 'Box', product.unit || 'Tablet')}
                     </td>
-                    <td className="px-6 py-4 text-right">
-                      <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <td className="px-3 sm:px-6 py-2 sm:py-4 text-right">
+                      <div className="flex justify-end gap-2 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                         <button 
                           onClick={() => setDetailProduct(product)}
                           className="p-1 text-gray-500 hover:bg-gray-100 rounded"
@@ -1895,7 +1895,7 @@ export default function ProductsPage() {
                   <div className="flex flex-col gap-4 items-start">
                     {/* Image Input UI */}
                     <div className="w-full flex flex-col gap-3">
-                      <div className="flex gap-2">
+                      <div className="flex flex-col sm:flex-row gap-2">
                         <button
                           type="button"
                           onClick={() => productFileInputRef.current?.click()}
@@ -2256,7 +2256,7 @@ export default function ProductsPage() {
               <div className="space-y-4">
                 <div className="border border-gray-200 rounded-lg p-4">
                   <h3 className="font-medium text-gray-700 mb-3">Tambahkan Produk</h3>
-                  <div className="grid grid-cols-2 gap-4 mb-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-3">
                     <div>
                       <label className="block text-xs text-gray-600 mb-1">Nama Produk <span className="text-red-500">*</span></label>
                       <input
@@ -2594,17 +2594,17 @@ export default function ProductsPage() {
             )}
           </div>
           
-          <div className="flex justify-end gap-3 mt-8">
+          <div className="flex flex-col sm:flex-row justify-end gap-3 mt-8">
             <button
               type="button"
               onClick={handleCloseProductOffCanvas}
-              className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium transition-colors"
+              className="w-full sm:w-auto px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium transition-colors"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-4 py-2 text-white bg-blue-600 hover:bg-blue-700 rounded-lg text-sm font-medium transition-colors"
+              className="w-full sm:w-auto px-4 py-2 text-white bg-blue-600 hover:bg-blue-700 rounded-lg text-sm font-medium transition-colors"
             >
               {productOffCanvasMode === 'add' ? 'Create Product' : 'Save Changes'}
             </button>
@@ -2664,22 +2664,22 @@ export default function ProductsPage() {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-sm text-left">
+              <table className="w-full text-xs sm:text-sm text-left">
                 <thead className="bg-gray-50 text-gray-500 font-medium">
                   <tr>
-                    <th className="px-4 py-3">No. Faktur</th>
-                    <th className="px-4 py-3">Supplier</th>
-                    <th className="px-4 py-3">Tipe Stok</th>
-                    <th className="px-4 py-3">Tgl Pembelian</th>
-                    <th className="px-4 py-3">Status</th>
-                    <th className="px-4 py-3">Qty Awal</th>
-                    <th className="px-4 py-3">Qty Tersisa</th>
-                    <th className="px-4 py-3">Qty Terjual</th>
-                    <th className="px-4 py-3">Qty Retur</th>
-                    <th className="px-4 py-3">Expired Date</th>
-                    <th className="px-4 py-3">Harga Beli</th>
-                    <th className="px-4 py-3">Total</th>
-                    <th className="px-4 py-3 text-right">Aksi</th>
+                    <th className="px-2 sm:px-4 py-1.5 sm:py-3">No. Faktur</th>
+                    <th className="px-2 sm:px-4 py-1.5 sm:py-3">Supplier</th>
+                    <th className="px-2 sm:px-4 py-1.5 sm:py-3">Tipe Stok</th>
+                    <th className="px-2 sm:px-4 py-1.5 sm:py-3">Tgl Pembelian</th>
+                    <th className="px-2 sm:px-4 py-1.5 sm:py-3">Status</th>
+                    <th className="px-2 sm:px-4 py-1.5 sm:py-3">Qty Awal</th>
+                    <th className="px-2 sm:px-4 py-1.5 sm:py-3">Qty Tersisa</th>
+                    <th className="px-2 sm:px-4 py-1.5 sm:py-3">Qty Terjual</th>
+                    <th className="px-2 sm:px-4 py-1.5 sm:py-3">Qty Retur</th>
+                    <th className="px-2 sm:px-4 py-1.5 sm:py-3">Expired Date</th>
+                    <th className="px-2 sm:px-4 py-1.5 sm:py-3">Harga Beli</th>
+                    <th className="px-2 sm:px-4 py-1.5 sm:py-3">Total</th>
+                    <th className="px-2 sm:px-4 py-1.5 sm:py-3 text-right">Aksi</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -2721,7 +2721,7 @@ export default function ProductsPage() {
 
                     return (
                       <tr key={faktur.id} className="border-b border-gray-100 hover:bg-gray-50">
-                        <td className="px-4 py-3 font-medium">
+                        <td className="px-2 sm:px-4 py-1.5 sm:py-3 font-medium">
                           {faktur.invoice_number}
                           {faktur.notes === 'Expired' && (
                             <div className="mt-1">
@@ -2731,8 +2731,8 @@ export default function ProductsPage() {
                             </div>
                           )}
                         </td>
-                        <td className="px-4 py-3">{faktur.supplier_name || '-'}</td>
-                        <td className="px-4 py-3">
+                        <td className="px-2 sm:px-4 py-1.5 sm:py-3">{faktur.supplier_name || '-'}</td>
+                        <td className="px-2 sm:px-4 py-1.5 sm:py-3">
                           <span className={`px-2 py-1 rounded-full text-xs font-medium ${
                             statusText === 'Lunas'
                               ? 'bg-green-100 text-green-700'
@@ -2745,8 +2745,8 @@ export default function ProductsPage() {
                             {statusText}
                           </span>
                         </td>
-                        <td className="px-4 py-3">{faktur.purchase_date ? new Date(faktur.purchase_date).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }) : '-'}</td>
-                        <td className="px-4 py-3">
+                        <td className="px-2 sm:px-4 py-1.5 sm:py-3">{faktur.purchase_date ? new Date(faktur.purchase_date).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }) : '-'}</td>
+                        <td className="px-2 sm:px-4 py-1.5 sm:py-3">
                           <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
                             faktur.status === 'approved' 
                               ? 'bg-green-100 text-green-700' 
@@ -2761,39 +2761,39 @@ export default function ProductsPage() {
                              faktur.status === 'revision' ? 'Menunggu Perbaikan' : 'Approved'}
                           </span>
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="px-2 sm:px-4 py-1.5 sm:py-3">
                           <span>{initialQty} {selectedProduct?.unit || 'Tablet'}</span>
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="px-2 sm:px-4 py-1.5 sm:py-3">
                           <span>{remainingQty} {selectedProduct?.unit || 'Tablet'}</span>
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="px-2 sm:px-4 py-1.5 sm:py-3">
                           <span className={soldQty > 0 ? 'text-blue-600' : ''}>{soldQty} {selectedProduct?.unit || 'Tablet'}</span>
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="px-2 sm:px-4 py-1.5 sm:py-3">
                           {(faktur.qty_returned ?? 0) > 0 ? (
                             <span className="text-red-600 font-medium">{faktur.qty_returned ?? 0} {selectedProduct?.unit || 'Tablet'}</span>
                           ) : (
                             <span className="text-gray-300">0</span>
                           )}
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="px-2 sm:px-4 py-1.5 sm:py-3">
                           {faktur.expired_date ? new Date(faktur.expired_date).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }) : '-'}
                         </td>
-                        <td className="px-4 py-3">{formatCurrency(faktur.cost_price)}</td>
-                        <td className="px-4 py-3 font-medium">{formatCurrency(totalAmount)}</td>
-                        <td className="px-4 py-3 text-right">
+                        <td className="px-2 sm:px-4 py-1.5 sm:py-3">{formatCurrency(faktur.cost_price)}</td>
+                        <td className="px-2 sm:px-4 py-1.5 sm:py-3 font-medium">{formatCurrency(totalAmount)}</td>
+                        <td className="px-2 sm:px-4 py-1.5 sm:py-3 text-right">
                           <div className="flex justify-end gap-2">
                             <button
                               onClick={() => setDetailFaktur(faktur)}
-                              className="p-1 text-gray-500 hover:bg-gray-100 rounded"
+                              className="p-0.5 sm:p-1 text-gray-500 hover:bg-gray-100 rounded"
                               title="Detail Faktur"
                             >
                               <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
                             </button>
                             <button
                               onClick={() => handleOpenEditFakturModal(faktur)}
-                              className={`p-1 rounded ${faktur.status === 'revision' || faktur.status === 'rejected' ? 'text-orange-600 bg-orange-50 border border-orange-200' : 'text-blue-600 hover:bg-blue-50'}`}
+                              className={`p-0.5 sm:p-1 rounded ${faktur.status === 'revision' || faktur.status === 'rejected' ? 'text-orange-600 bg-orange-50 border border-orange-200' : 'text-blue-600 hover:bg-blue-50'}`}
                               title={faktur.status === 'revision' || faktur.status === 'rejected' ? 'Perbaiki' : 'Edit'}
                             >
                               <Edit size={14} />
@@ -2801,7 +2801,7 @@ export default function ProductsPage() {
                             {faktur.status === 'approved' && faktur.notes !== 'Expired' && (
                               <button
                                 onClick={() => handleExpireBatch(faktur)}
-                                className="p-1 text-amber-600 hover:bg-amber-50 rounded"
+                                className="p-0.5 sm:p-1 text-amber-600 hover:bg-amber-50 rounded"
                                 title="Tandai Kadaluarsa"
                               >
                                 <AlertTriangle size={14} />
@@ -2810,7 +2810,7 @@ export default function ProductsPage() {
                             {(canArchive || faktur.notes === 'Expired') && (
                               <button
                                 onClick={() => handleArchiveFaktur(faktur)}
-                                className="p-1 text-gray-500 hover:bg-gray-100 rounded"
+                                className="p-0.5 sm:p-1 text-gray-500 hover:bg-gray-100 rounded"
                                 title="Arsipkan Faktur"
                               >
                                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="21 8 21 21 3 21 3 8"></polyline><rect x="1" y="3" width="22" height="5"></rect><line x1="10" y1="12" x2="14" y2="12"></line></svg>
@@ -2828,7 +2828,7 @@ export default function ProductsPage() {
 
           {/* Faktur Pagination */}
           {fakturs.length > fakturPerPage && (
-            <div className="px-4 py-3 flex items-center justify-between text-sm text-gray-500 border-t border-gray-100">
+            <div className="px-4 py-3 flex flex-col sm:flex-row items-center justify-between gap-2 text-sm text-gray-500 border-t border-gray-100">
               <span>
                 {(fakturPage - 1) * fakturPerPage + 1}-{Math.min(fakturPage * fakturPerPage, fakturs.length)} of {fakturs.length}
               </span>
@@ -2857,7 +2857,7 @@ export default function ProductsPage() {
               <h3 className="font-semibold text-gray-700 mb-4">
                 {fakturModalMode === 'add' ? 'Tambah Faktur Baru' : 'Edit Faktur'}
               </h3>
-              <div className="grid grid-cols-2 md:grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">No. Faktur <span className="text-red-500">*</span></label>
                   <input
@@ -3178,7 +3178,7 @@ export default function ProductsPage() {
                       </button>
                     ) : (
                       <div className="mt-3 space-y-3">
-                        <div className="grid grid-cols-2 gap-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">Jumlah DP</label>
                             <input
@@ -3210,7 +3210,7 @@ export default function ProductsPage() {
                             </select>
                           </div>
                         </div>
-                        <div className="flex gap-2">
+              <div className="flex flex-col sm:flex-row gap-2">
                           <button
                             type="button"
                             onClick={() => { setShowAddDPForm(false); setNewDPAmount(''); setNewDPPaymentMethod('cash'); }}
@@ -3245,7 +3245,7 @@ export default function ProductsPage() {
                   <div className="flex flex-col gap-4 items-start">
                     {/* Image Input UI */}
                     <div className="w-full flex flex-col gap-3">
-                      <div className="flex gap-2">
+                      <div className="flex flex-col sm:flex-row gap-2">
                         <button
                           type="button"
                           onClick={() => fakturFileInputRef.current?.click()}
@@ -3303,7 +3303,7 @@ export default function ProductsPage() {
                   </div>
                 </div>
               </div>
-              <div className="flex justify-end gap-3 mt-6">
+              <div className="flex flex-col sm:flex-row justify-end gap-3 mt-6">
                 <button
                   type="button"
                   onClick={() => {
@@ -3320,23 +3320,23 @@ export default function ProductsPage() {
                       unit_multiplier: '1',
                       stock_type: 'belum_bayar',
                       dp_amount: '',
-      dp_awal: '',
+              dp_awal: '',
                       due_date: '',
-      expired_date: '',
+              expired_date: '',
                       notes: ''
                     });
                     setSelectedFaktur(null);
                     setFakturModalMode('add');
                     setShowFakturForm(false);
                   }}
-                  className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium transition-colors"
+                  className="w-full sm:w-auto px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium transition-colors"
                 >
                   Batal
                 </button>
                 <button
                   type="button"
                   onClick={handleSaveFaktur}
-                  className="px-4 py-2 text-white bg-blue-600 hover:bg-blue-700 rounded-lg text-sm font-medium transition-colors"
+                  className="w-full sm:w-auto px-4 py-2 text-white bg-blue-600 hover:bg-blue-700 rounded-lg text-sm font-medium transition-colors"
                 >
                   {fakturModalMode === 'add' ? 'Tambah Faktur' : 'Simpan Faktur'}
                 </button>
@@ -3366,23 +3366,23 @@ export default function ProductsPage() {
             className="bg-white rounded-2xl shadow-2xl w-full max-w-full sm:max-w-5xl max-h-[85vh] sm:max-h-[90vh] flex flex-col overflow-hidden" 
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex justify-between items-center px-6 py-4 border-b border-gray-100 bg-gray-50/50 shrink-0">
-              <div>
-                <h3 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-                  <CheckCircle className="text-yellow-600" size={24} />
-                  Approval Faktur Pembelian
+            <div className="flex justify-between items-center px-4 sm:px-6 py-4 border-b border-gray-100 bg-gray-50/50 shrink-0">
+              <div className="min-w-0">
+                <h3 className="text-lg sm:text-xl font-bold text-gray-800 flex items-center gap-2">
+                  <CheckCircle className="text-yellow-600 shrink-0" size={24} />
+                  <span className="truncate">Approval Faktur Pembelian</span>
                 </h3>
                 <p className="text-sm text-gray-500 mt-1">Daftar faktur yang memerlukan persetujuan</p>
               </div>
               <button 
                 onClick={() => setIsApprovalModalOpen(false)} 
-                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-white rounded-full transition-all border border-transparent hover:border-gray-200"
+                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-white rounded-full transition-all border border-transparent hover:border-gray-200 shrink-0"
               >
                 <X size={20} />
               </button>
             </div>
 
-            <div className="p-6 flex-1 overflow-auto custom-scrollbar">
+            <div className="p-4 sm:p-6 flex-1 overflow-auto custom-scrollbar">
               {isFetchingPending ? (
                 <div className="flex flex-col items-center justify-center py-20 gap-4">
                   <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
@@ -3426,7 +3426,7 @@ export default function ProductsPage() {
                             </button>
                           )}
                           <div className="p-5">
-                            <div className="flex flex-row justify-between items-start gap-5">
+                            <div className="flex flex-col sm:flex-row justify-between items-start gap-5">
                               <div className="flex-1 space-y-3">
                                 <div className="flex items-start gap-4">
                                   <div className="bg-blue-50 p-2.5 rounded-xl text-blue-600 shrink-0 group-hover:bg-blue-100 transition-colors">
@@ -3500,7 +3500,7 @@ export default function ProductsPage() {
                               </div>
 
                               {/* Financial Info */}
-                              <div className="w-56 bg-blue-50/50 p-4 rounded-xl border border-blue-100/50 flex flex-col justify-center gap-1.5 shrink-0">
+                              <div className="w-full sm:w-56 bg-blue-50/50 p-4 rounded-xl border border-blue-100/50 flex flex-col justify-center gap-1.5 shrink-0">
                                 <div className="flex justify-between text-[13px]">
                                   <span className="text-gray-500">Total Qty:</span>
                                   <span className="font-bold text-gray-900">{totalQty} {first.product_unit}</span>
@@ -3657,18 +3657,18 @@ export default function ProductsPage() {
               )}
             </div>
             
-            <div className="px-6 py-4 border-t border-gray-100 bg-gray-50/50 shrink-0 flex justify-between items-center">
-              <p className="text-xs text-gray-400 italic font-medium">*Approval hanya dapat dilakukan di halaman khusus Approval Faktur.</p>
-              <div className="flex gap-3">
+            <div className="px-4 sm:px-6 py-4 border-t border-gray-100 bg-gray-50/50 shrink-0 flex flex-col sm:flex-row justify-between items-center gap-3">
+              <p className="text-xs text-gray-400 italic font-medium text-center sm:text-left">*Approval hanya dapat dilakukan di halaman khusus Approval Faktur.</p>
+              <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
                 <Link 
                   href="/approvals"
-                  className="px-6 py-2 bg-blue-600 text-white rounded-xl text-sm font-bold hover:bg-blue-700 transition-all shadow-sm"
+                  className="w-full sm:w-auto text-center px-6 py-2 bg-blue-600 text-white rounded-xl text-sm font-bold hover:bg-blue-700 transition-all shadow-sm"
                 >
                   Ke Halaman Approval
                 </Link>
                 <button 
                   onClick={() => setIsApprovalModalOpen(false)}
-                  className="px-6 py-2 bg-white border border-gray-300 rounded-xl text-sm font-bold text-gray-700 hover:bg-gray-50 transition-all shadow-sm"
+                  className="w-full sm:w-auto text-center px-6 py-2 bg-white border border-gray-300 rounded-xl text-sm font-bold text-gray-700 hover:bg-gray-50 transition-all shadow-sm"
                 >
                   Tutup
                 </button>
@@ -3688,7 +3688,7 @@ export default function ProductsPage() {
             className="bg-white rounded-2xl shadow-2xl w-full max-w-full sm:max-w-lg max-h-[85vh] sm:max-h-[90vh] overflow-y-auto" 
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex justify-between items-center px-6 py-4 border-b border-gray-100 bg-gray-50/50 sticky top-0 bg-white">
+            <div className="flex justify-between items-center px-4 sm:px-6 py-4 border-b border-gray-100 bg-gray-50/50 sticky top-0 bg-white">
               <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
                 Detail Produk
@@ -3701,7 +3701,7 @@ export default function ProductsPage() {
               </button>
             </div>
 
-            <div className="p-6 space-y-4">
+            <div className="p-4 sm:p-6 space-y-4">
               {/* Nama & Kategori */}
               <div className="bg-blue-50 p-4 rounded-xl">
                 <p className="text-xs text-blue-500 font-medium uppercase tracking-wider">Nama Produk</p>
@@ -3720,7 +3720,7 @@ export default function ProductsPage() {
               )}
 
               {/* Info Grid */}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="bg-gray-50 p-3 rounded-xl">
                   <p className="text-xs text-gray-500 font-medium uppercase tracking-wider">Harga Beli</p>
                   <p className="text-sm font-bold text-gray-900 mt-1">{formatCurrency(detailProduct.cost_price)}</p>
@@ -3773,10 +3773,10 @@ export default function ProductsPage() {
               )}
             </div>
 
-            <div className="px-6 py-4 border-t border-gray-100 flex justify-end">
+            <div className="px-4 sm:px-6 py-4 border-t border-gray-100 flex justify-end">
               <button
                 onClick={() => setDetailProduct(null)}
-                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors"
+                className="w-full sm:w-auto px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors"
               >
                 Tutup
               </button>
@@ -3795,7 +3795,7 @@ export default function ProductsPage() {
             className="bg-white rounded-2xl shadow-2xl w-full max-w-full sm:max-w-2xl max-h-[85vh] sm:max-h-[90vh] overflow-y-auto" 
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex justify-between items-center px-6 py-4 border-b border-gray-100 bg-gray-50/50 sticky top-0 bg-white">
+            <div className="flex justify-between items-center px-4 sm:px-6 py-4 border-b border-gray-100 bg-gray-50/50 sticky top-0 bg-white">
               <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
                 Detail Faktur
@@ -3808,7 +3808,7 @@ export default function ProductsPage() {
               </button>
             </div>
 
-            <div className="p-6 space-y-5">
+            <div className="p-4 sm:p-6 space-y-5">
               {/* Info Umum */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="bg-gray-50 p-3 rounded-xl">
@@ -3906,7 +3906,7 @@ export default function ProductsPage() {
               {detailFaktur.stock_type === 'dp' && (
                 <div>
                   {/* Ringkasan DP */}
-                  <div className="grid grid-cols-3 gap-3 mb-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
                     <div className="bg-blue-50 p-3 rounded-xl">
                       <p className="text-xs text-blue-600 font-medium uppercase tracking-wider">Total Hutang</p>
                       <p className="text-sm font-bold text-blue-800 mt-1">
@@ -4005,10 +4005,10 @@ export default function ProductsPage() {
               )}
             </div>
 
-            <div className="px-6 py-4 border-t border-gray-100 flex justify-end">
+            <div className="px-4 sm:px-6 py-4 border-t border-gray-100 flex justify-end">
               <button
                 onClick={() => setDetailFaktur(null)}
-                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors"
+                className="w-full sm:w-auto px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors"
               >
                 Tutup
               </button>
@@ -4027,7 +4027,7 @@ export default function ProductsPage() {
             className="bg-white rounded-2xl shadow-2xl w-full max-w-full sm:max-w-4xl max-h-full overflow-hidden flex flex-col" 
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex justify-between items-center px-6 py-4 border-b border-gray-100 shrink-0">
+            <div className="flex justify-between items-center px-4 sm:px-6 py-4 border-b border-gray-100 shrink-0">
               <h3 className="text-lg font-semibold text-gray-800">Bukti Faktur {previewImageList.length > 1 ? `(${previewImageIndex + 1}/${previewImageList.length})` : ''}</h3>
               <button 
                  onClick={() => { setPreviewImageUrl(null); setPreviewImageList([]); }} 

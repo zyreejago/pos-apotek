@@ -245,44 +245,44 @@ export default function TransactionReportPage() {
         subtitle="Sales Report"
         breadcrumbs={[{ label: 'Sales Report' }, { label: 'Laporan Transaksi' }]}
         rightContent={
-          <div className="flex items-center gap-3">
-            <div className="flex items-center bg-white border border-gray-200 rounded-lg px-3 py-1.5 shadow-sm">
-               <Calendar size={16} className="text-gray-500 mr-2" />
-               <input 
-                 type="date" 
-                 value={startDate}
-                 onChange={(e) => setStartDate(e.target.value)}
-                 className="text-sm text-gray-700 focus:outline-none border-r border-gray-200 pr-2 mr-2"
-               />
-               <span className="text-gray-400 mx-1">-</span>
-               <input 
-                 type="date" 
-                 value={endDate}
-                 onChange={(e) => setEndDate(e.target.value)}
-                 className="text-sm text-gray-700 focus:outline-none pl-2"
-               />
-            </div>
-            
-            <button 
-              onClick={handleFilter}
-              className="bg-blue-600 hover:bg-blue-700 text-white p-2 rounded-lg transition-colors shadow-sm"
-              title="Filter Data"
-            >
-              <Search size={18} />
-            </button>
+           <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+              <div className="flex items-center bg-white border border-gray-200 rounded-lg px-1 sm:px-3 py-0.5 sm:py-1.5 shadow-sm">
+                 <Calendar size={12} className="text-gray-500 mr-1 sm:mr-2" />
+                 <input 
+                   type="date" 
+                   value={startDate}
+                   onChange={(e) => setStartDate(e.target.value)}
+                   className="text-[10px] sm:text-sm text-gray-700 focus:outline-none border-r border-gray-200 pr-1 sm:pr-2 mr-1 sm:mr-2"
+                 />
+                 <span className="text-gray-400 mx-0.5 sm:mx-1">-</span>
+                 <input 
+                   type="date" 
+                   value={endDate}
+                   onChange={(e) => setEndDate(e.target.value)}
+                   className="text-[10px] sm:text-sm text-gray-700 focus:outline-none pl-1 sm:pl-2"
+                />
+             </div>
+             
+             <button 
+               onClick={handleFilter}
+               className="bg-blue-600 hover:bg-blue-700 text-white p-1 sm:p-2 rounded-lg transition-colors shadow-sm"
+               title="Filter Data"
+             >
+               <Search size={14} />
+             </button>
 
-            <button 
-              onClick={handleDownloadPDF}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm flex items-center gap-2"
+             <button 
+               onClick={handleDownloadPDF}
+               className="bg-emerald-600 hover:bg-emerald-700 text-white px-1.5 sm:px-4 py-0.5 sm:py-2 rounded-lg text-[10px] sm:text-sm font-medium transition-colors shadow-sm flex items-center gap-1 sm:gap-2"
             >
-              <Download size={18} />
+              <Download size={12} />
               Download PDF
             </button>
           </div>
         }
       />
 
-      <div className="p-6 max-w-7xl mx-auto space-y-6" ref={reportRef}>
+       <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-6" ref={reportRef}>
         
         {/* Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -349,32 +349,32 @@ export default function TransactionReportPage() {
             </div>
             
             <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm">
+                <table className="w-full text-left text-xs sm:text-sm">
                     <thead>
                         <tr className="bg-gray-50 text-gray-500 font-medium border-b border-gray-100">
-                            <th className="px-3 sm:px-6 py-4">ID Transaksi</th>
-                            <th className="px-3 sm:px-6 py-4">Waktu</th>
-                            <th className="px-3 sm:px-6 py-4">Kasir</th>
-                            <th className="px-3 sm:px-6 py-4">Detail Item</th>
-                            <th className="px-6 py-4 text-right">Total</th>
+                            <th className="px-3 sm:px-6 py-1.5 sm:py-3">ID Transaksi</th>
+                            <th className="px-3 sm:px-6 py-1.5 sm:py-3">Waktu</th>
+                            <th className="px-3 sm:px-6 py-1.5 sm:py-3">Kasir</th>
+                            <th className="px-3 sm:px-6 py-1.5 sm:py-3">Detail Item</th>
+                            <th className="px-2 sm:px-6 py-1.5 sm:py-4 text-right">Total</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
                         {loading ? (
                             <tr>
-                                <td colSpan={5} className="px-6 py-8 text-center text-gray-500">Loading data...</td>
+                                <td colSpan={5} className="px-2 sm:px-6 py-3 sm:py-8 text-center text-gray-500">Loading data...</td>
                             </tr>
                         ) : data.transactions.length === 0 ? (
                             <tr>
-                                <td colSpan={5} className="px-6 py-8 text-center text-gray-500">Tidak ada transaksi pada periode ini</td>
+                                <td colSpan={5} className="px-2 sm:px-6 py-3 sm:py-8 text-center text-gray-500">Tidak ada transaksi pada periode ini</td>
                             </tr>
                         ) : (
                             data.transactions.map((t) => (
                                 <tr key={t.id} className="hover:bg-gray-50 transition-colors">
-                                    <td className="px-6 py-4 text-gray-600 align-top whitespace-nowrap font-medium">{t.id}</td>
-                                    <td className="px-6 py-4 text-gray-600 align-top whitespace-nowrap">{formatDate(t.transaction_date)}</td>
-                                    <td className="px-6 py-4 text-gray-600 align-top">{t.cashier_name || '-'}</td>
-                                    <td className="px-6 py-4 text-gray-600 align-top">
+                                    <td className="px-2 sm:px-6 py-1 sm:py-3 text-gray-600 align-top whitespace-nowrap font-medium">{t.id}</td>
+                                    <td className="px-2 sm:px-6 py-1 sm:py-3 text-gray-600 align-top whitespace-nowrap">{formatDate(t.transaction_date)}</td>
+                                    <td className="px-2 sm:px-6 py-1 sm:py-3 text-gray-600 align-top">{t.cashier_name || '-'}</td>
+                                    <td className="px-2 sm:px-6 py-1 sm:py-3 text-gray-600 align-top">
                                       <ul className="list-disc list-inside space-y-1">
                                         {t.items.map((item, idx: number) => (
                                           <li key={idx} className="text-sm">
@@ -385,7 +385,7 @@ export default function TransactionReportPage() {
                                         ))}
                                       </ul>
                                     </td>
-                                    <td className="px-6 py-4 text-right font-bold text-gray-900 align-top">{formatCurrency(t.total_amount)}</td>
+                                    <td className="px-2 sm:px-6 py-1 sm:py-3 text-right font-bold text-gray-900 align-top">{formatCurrency(t.total_amount)}</td>
                                 </tr>
                             ))
                         )}

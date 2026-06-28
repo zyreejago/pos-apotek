@@ -218,34 +218,34 @@ export default function BalanceSheetAccountingPage() {
         subtitle="Laporan Keuangan"
         breadcrumbs={[{ label: 'Sales Report' }, { label: 'Neraca Keuangan' }]}
         rightContent={
-          <div className="flex items-center gap-3">
-             <div className="flex items-center bg-white border border-gray-200 rounded-lg px-3 py-1.5 shadow-sm">
-               <Calendar size={16} className="text-gray-500 mr-2" />
-               <select 
-                 value={month} 
-                 onChange={(e) => setMonth(parseInt(e.target.value))}
-                 className="text-sm border-none focus:ring-0 text-gray-700 bg-transparent cursor-pointer outline-none"
-               >
-                 {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
-                   <option key={m} value={m}>{getMonthName(m)}</option>
-                 ))}
-               </select>
-               <span className="text-gray-300 mx-2">|</span>
-               <select 
-                 value={year} 
-                 onChange={(e) => setYear(parseInt(e.target.value))}
-                 className="text-sm border-none focus:ring-0 text-gray-700 bg-transparent cursor-pointer outline-none"
-               >
-                 {Array.from({ length: 5 }, (_, i) => currentDate.getFullYear() - i).map((y) => (
-                   <option key={y} value={y}>{y}</option>
-                 ))}
-               </select>
-             </div>
-             <button 
-               onClick={handleDownloadPDF}
-               className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors shadow-sm"
-             >
-               <Download size={16} />
+           <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+               <div className="flex items-center bg-white border border-gray-200 rounded-lg px-1 sm:px-3 py-0.5 sm:py-1.5 shadow-sm">
+                 <Calendar size={12} className="text-gray-500 mr-1 sm:mr-2" />
+                 <select 
+                   value={month} 
+                   onChange={(e) => setMonth(parseInt(e.target.value))}
+                   className="text-xs sm:text-sm border-none focus:ring-0 text-gray-700 bg-transparent cursor-pointer outline-none"
+                >
+                  {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+                    <option key={m} value={m}>{getMonthName(m)}</option>
+                  ))}
+                </select>
+                <span className="text-gray-300 mx-2">|</span>
+                 <select 
+                   value={year} 
+                   onChange={(e) => setYear(parseInt(e.target.value))}
+                   className="text-xs sm:text-sm border-none focus:ring-0 text-gray-700 bg-transparent cursor-pointer outline-none"
+                >
+                  {Array.from({ length: 5 }, (_, i) => currentDate.getFullYear() - i).map((y) => (
+                    <option key={y} value={y}>{y}</option>
+                  ))}
+                </select>
+              </div>
+              <button 
+                onClick={handleDownloadPDF}
+                className="flex items-center gap-1 sm:gap-2 bg-blue-600 text-white px-1.5 sm:px-4 py-0.5 sm:py-2 rounded-lg text-[10px] sm:text-sm font-semibold hover:bg-blue-700 transition-colors shadow-sm"
+              >
+                <Download size={12} />
                Download PDF
              </button>
           </div>
@@ -267,30 +267,30 @@ export default function BalanceSheetAccountingPage() {
               </div>
               
               <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm">
+                <table className="w-full text-left text-xs sm:text-sm">
                   <thead>
                     <tr className="bg-gray-50 text-gray-500 font-medium border-b border-gray-100">
-                      <th className="px-3 sm:px-6 py-4">Keterangan</th>
-                      <th className="px-6 py-4 text-right">Debit</th>
-                      <th className="px-6 py-4 text-right">Kredit</th>
+                      <th className="px-3 sm:px-6 py-1.5 sm:py-3">Keterangan</th>
+                      <th className="px-2 sm:px-6 py-1.5 sm:py-4 text-right">Debit</th>
+                      <th className="px-2 sm:px-6 py-1.5 sm:py-4 text-right">Kredit</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50">
                     {assetAccounts.map((a) => (
                       <tr key={a.id} className="hover:bg-gray-50 transition-colors">
-                        <td className="px-6 py-3 text-gray-600">{a.name}</td>
-                        <td className="px-6 py-3 text-right text-gray-600">
+                        <td className="px-2 sm:px-6 py-1 sm:py-3 text-gray-600">{a.name}</td>
+                        <td className="px-2 sm:px-6 py-1 sm:py-3 text-right text-gray-600">
                           {a.normal_balance === 'debit' ? formatCurrency(getAccountBalance(a)) : ''}
                         </td>
-                        <td className="px-6 py-3 text-right text-gray-600">
+                        <td className="px-2 sm:px-6 py-1 sm:py-3 text-right text-gray-600">
                           {a.normal_balance === 'kredit' ? formatCurrency(getAccountBalance(a)) : ''}
                         </td>
                       </tr>
                     ))}
                     <tr className="font-bold bg-gray-100">
-                      <td className="px-6 py-4 text-gray-900">Total Aktiva</td>
-                      <td className="px-6 py-4 text-right text-gray-900">{formatCurrency(totalAssets)}</td>
-                      <td className="px-6 py-4 text-right text-gray-900"></td>
+                      <td className="px-2 sm:px-6 py-1.5 sm:py-4 text-gray-900">Total Aktiva</td>
+                      <td className="px-2 sm:px-6 py-1.5 sm:py-4 text-right text-gray-900">{formatCurrency(totalAssets)}</td>
+                      <td className="px-2 sm:px-6 py-1.5 sm:py-4 text-right text-gray-900"></td>
                     </tr>
                   </tbody>
                 </table>
@@ -306,30 +306,30 @@ export default function BalanceSheetAccountingPage() {
                 </div>
                 
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left text-sm">
+                  <table className="w-full text-left text-xs sm:text-sm">
                     <thead>
                       <tr className="bg-gray-50 text-gray-500 font-medium border-b border-gray-100">
-                        <th className="px-3 sm:px-6 py-4">Keterangan</th>
-                        <th className="px-6 py-4 text-right">Debit</th>
-                        <th className="px-6 py-4 text-right">Kredit</th>
+                        <th className="px-3 sm:px-6 py-1.5 sm:py-3">Keterangan</th>
+                        <th className="px-2 sm:px-6 py-1.5 sm:py-4 text-right">Debit</th>
+                        <th className="px-2 sm:px-6 py-1.5 sm:py-4 text-right">Kredit</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
                       {liabilityAccounts.map((a) => (
                         <tr key={a.id} className="hover:bg-gray-50 transition-colors">
-                          <td className="px-6 py-3 text-gray-600">{a.name}</td>
-                          <td className="px-6 py-3 text-right text-gray-600">
+                          <td className="px-2 sm:px-6 py-1 sm:py-3 text-gray-600">{a.name}</td>
+                          <td className="px-2 sm:px-6 py-1 sm:py-3 text-right text-gray-600">
                             {a.normal_balance === 'debit' ? formatCurrency(getAccountBalance(a)) : ''}
                           </td>
-                          <td className="px-6 py-3 text-right text-gray-600">
+                          <td className="px-2 sm:px-6 py-1 sm:py-3 text-right text-gray-600">
                             {a.normal_balance === 'kredit' ? formatCurrency(getAccountBalance(a)) : ''}
                           </td>
                         </tr>
                       ))}
                       <tr className="font-bold bg-gray-100">
-                        <td className="px-6 py-4 text-gray-900">Total Pasiva</td>
-                        <td className="px-6 py-4 text-right text-gray-900"></td>
-                        <td className="px-6 py-4 text-right text-gray-900">{formatCurrency(totalLiabilities)}</td>
+                        <td className="px-2 sm:px-6 py-1.5 sm:py-4 text-gray-900">Total Pasiva</td>
+                        <td className="px-2 sm:px-6 py-1.5 sm:py-4 text-right text-gray-900"></td>
+                        <td className="px-2 sm:px-6 py-1.5 sm:py-4 text-right text-gray-900">{formatCurrency(totalLiabilities)}</td>
                       </tr>
                     </tbody>
                   </table>
@@ -343,35 +343,35 @@ export default function BalanceSheetAccountingPage() {
                 </div>
                 
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left text-sm">
+                  <table className="w-full text-left text-xs sm:text-sm">
                     <thead>
                       <tr className="bg-gray-50 text-gray-500 font-medium border-b border-gray-100">
-                        <th className="px-3 sm:px-6 py-4">Keterangan</th>
-                        <th className="px-6 py-4 text-right">Debit</th>
-                        <th className="px-6 py-4 text-right">Kredit</th>
+                        <th className="px-3 sm:px-6 py-1.5 sm:py-3">Keterangan</th>
+                        <th className="px-2 sm:px-6 py-1.5 sm:py-4 text-right">Debit</th>
+                        <th className="px-2 sm:px-6 py-1.5 sm:py-4 text-right">Kredit</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
                       {equityAccounts.map((a) => (
                         <tr key={a.id} className="hover:bg-gray-50 transition-colors">
-                          <td className="px-6 py-3 text-gray-600">{a.name}</td>
-                          <td className="px-6 py-3 text-right text-gray-600">
+                          <td className="px-2 sm:px-6 py-1 sm:py-3 text-gray-600">{a.name}</td>
+                          <td className="px-2 sm:px-6 py-1 sm:py-3 text-right text-gray-600">
                             {a.normal_balance === 'debit' ? formatCurrency(getAccountBalance(a)) : ''}
                           </td>
-                          <td className="px-6 py-3 text-right text-gray-600">
+                          <td className="px-2 sm:px-6 py-1 sm:py-3 text-right text-gray-600">
                             {a.normal_balance === 'kredit' ? formatCurrency(getAccountBalance(a)) : ''}
                           </td>
                         </tr>
                       ))}
                       <tr className="font-bold bg-gray-100">
-                        <td className="px-6 py-4 text-gray-900">Total Modal</td>
-                        <td className="px-6 py-4 text-right text-gray-900"></td>
-                        <td className="px-6 py-4 text-right text-gray-900">{formatCurrency(totalEquity)}</td>
+                        <td className="px-2 sm:px-6 py-1.5 sm:py-4 text-gray-900">Total Modal</td>
+                        <td className="px-2 sm:px-6 py-1.5 sm:py-4 text-right text-gray-900"></td>
+                        <td className="px-2 sm:px-6 py-1.5 sm:py-4 text-right text-gray-900">{formatCurrency(totalEquity)}</td>
                       </tr>
                       <tr className="font-bold bg-blue-100 border-t-2 border-blue-200">
-                        <td className="px-6 py-4 text-gray-900">Total Pasiva & Modal</td>
-                        <td className="px-6 py-4 text-right text-gray-900"></td>
-                        <td className="px-6 py-4 text-right text-gray-900">{formatCurrency(totalLiabilitiesEquity)}</td>
+                        <td className="px-2 sm:px-6 py-1.5 sm:py-4 text-gray-900">Total Pasiva & Modal</td>
+                        <td className="px-2 sm:px-6 py-1.5 sm:py-4 text-right text-gray-900"></td>
+                        <td className="px-2 sm:px-6 py-1.5 sm:py-4 text-right text-gray-900">{formatCurrency(totalLiabilitiesEquity)}</td>
                       </tr>
                     </tbody>
                   </table>

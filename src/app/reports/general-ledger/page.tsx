@@ -207,46 +207,46 @@ export default function GeneralLedgerPage() {
         subtitle="Laporan Keuangan"
         breadcrumbs={[{ label: 'Sales Report' }, { label: 'Buku Besar' }]}
         rightContent={
-          <div className="flex items-center gap-3">
-             <div className="flex items-center bg-white border border-gray-200 rounded-lg px-3 py-1.5 shadow-sm gap-2">
-               <select 
-                 value={selectedAccountId} 
-                 onChange={(e) => setSelectedAccountId(e.target.value)}
-                 className="text-sm border-none focus:ring-0 text-gray-700 bg-transparent cursor-pointer outline-none"
-               >
-                 <option value="">Semua Akun</option>
-                 {accounts.map(acc => (
-                   <option key={acc.id} value={acc.id}>{acc.code} - {acc.name}</option>
-                 ))}
-               </select>
-             </div>
-             <div className="flex items-center bg-white border border-gray-200 rounded-lg px-3 py-1.5 shadow-sm">
-               <Calendar size={16} className="text-gray-500 mr-2" />
-               <select 
-                 value={month} 
-                 onChange={(e) => setMonth(parseInt(e.target.value))}
-                 className="text-sm border-none focus:ring-0 text-gray-700 bg-transparent cursor-pointer outline-none"
-               >
-                 {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
-                   <option key={m} value={m}>{getMonthName(m)}</option>
-                 ))}
-               </select>
-               <span className="text-gray-300 mx-2">|</span>
-               <select 
-                 value={year} 
-                 onChange={(e) => setYear(parseInt(e.target.value))}
-                 className="text-sm border-none focus:ring-0 text-gray-700 bg-transparent cursor-pointer outline-none"
-               >
-                 {Array.from({ length: 5 }, (_, i) => currentDate.getFullYear() - i).map(y => (
-                   <option key={y} value={y}>{y}</option>
-                 ))}
-               </select>
-             </div>
-             <button 
-               onClick={handleDownloadPDF}
-               className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors shadow-sm"
-             >
-               <Download size={16} />
+           <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+               <div className="flex items-center bg-white border border-gray-200 rounded-lg px-1 sm:px-3 py-0.5 sm:py-1.5 shadow-sm gap-1 sm:gap-2">
+                  <select 
+                    value={selectedAccountId} 
+                    onChange={(e) => setSelectedAccountId(e.target.value)}
+                    className="text-xs sm:text-sm border-none focus:ring-0 text-gray-700 bg-transparent cursor-pointer outline-none"
+                 >
+                   <option value="">Semua Akun</option>
+                   {accounts.map(acc => (
+                     <option key={acc.id} value={acc.id}>{acc.code} - {acc.name}</option>
+                   ))}
+                 </select>
+               </div>
+               <div className="flex items-center bg-white border border-gray-200 rounded-lg px-1 sm:px-3 py-0.5 sm:py-1.5 shadow-sm">
+                 <Calendar size={12} className="text-gray-500 mr-1 sm:mr-2" />
+                <select 
+                  value={month} 
+                  onChange={(e) => setMonth(parseInt(e.target.value))}
+                  className="text-xs sm:text-sm border-none focus:ring-0 text-gray-700 bg-transparent cursor-pointer outline-none"
+                >
+                  {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
+                    <option key={m} value={m}>{getMonthName(m)}</option>
+                  ))}
+                </select>
+                <span className="text-gray-300 mx-2">|</span>
+                <select 
+                  value={year} 
+                  onChange={(e) => setYear(parseInt(e.target.value))}
+                  className="text-xs sm:text-sm border-none focus:ring-0 text-gray-700 bg-transparent cursor-pointer outline-none"
+                >
+                  {Array.from({ length: 5 }, (_, i) => currentDate.getFullYear() - i).map(y => (
+                    <option key={y} value={y}>{y}</option>
+                  ))}
+                </select>
+              </div>
+              <button 
+                onClick={handleDownloadPDF}
+                className="flex items-center gap-1 sm:gap-2 bg-blue-600 text-white px-1.5 sm:px-4 py-0.5 sm:py-2 rounded-lg text-[10px] sm:text-sm font-semibold hover:bg-blue-700 transition-colors shadow-sm"
+              >
+                <Download size={12} />
                Download PDF
              </button>
           </div>
@@ -262,31 +262,31 @@ export default function GeneralLedgerPage() {
         ) : (
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
+              <table className="w-full text-left text-xs sm:text-sm">
                   <thead>
                     <tr className="bg-gray-50 text-gray-500 font-medium border-b border-gray-100">
-                      <th className="px-3 sm:px-6 py-4">Tanggal</th>
-                      <th className="px-3 sm:px-6 py-4">Keterangan</th>
-                      <th className="px-6 py-4 text-right">Debit</th>
-                      <th className="px-6 py-4 text-right">Kredit</th>
-                      <th className="px-6 py-4 text-right">Saldo</th>
+                      <th className="px-3 sm:px-6 py-1.5 sm:py-3">Tanggal</th>
+                      <th className="px-3 sm:px-6 py-1.5 sm:py-3">Keterangan</th>
+                      <th className="px-2 sm:px-6 py-1.5 sm:py-4 text-right">Debit</th>
+                      <th className="px-2 sm:px-6 py-1.5 sm:py-4 text-right">Kredit</th>
+                      <th className="px-2 sm:px-6 py-1.5 sm:py-4 text-right">Saldo</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50">
                     {ledgerWithBalance().map((item, index) => (
                       <tr key={`${item.id}-${index}`} className="hover:bg-gray-50 transition-colors">
-                        <td className="px-6 py-4 text-gray-600 whitespace-nowrap">{formatDate(item.date)}</td>
-                        <td className="px-6 py-4 text-gray-600">{item.description}</td>
-                        <td className="px-6 py-4 text-right text-gray-600">{item.debit > 0 ? formatCurrency(item.debit) : '-'}</td>
-                        <td className="px-6 py-4 text-right text-gray-600">{item.credit > 0 ? formatCurrency(item.credit) : '-'}</td>
-                        <td className={`px-6 py-4 text-right font-medium ${item.balance >= 0 ? (item.normal_balance === 'debit' ? 'text-blue-600' : 'text-green-600') : (item.normal_balance === 'debit' ? 'text-red-600' : 'text-orange-600')}`}>
+                        <td className="px-2 sm:px-6 py-1 sm:py-3 text-gray-600 whitespace-nowrap">{formatDate(item.date)}</td>
+                        <td className="px-2 sm:px-6 py-1 sm:py-3 text-gray-600">{item.description}</td>
+                        <td className="px-2 sm:px-6 py-1 sm:py-3 text-right text-gray-600">{item.debit > 0 ? formatCurrency(item.debit) : '-'}</td>
+                        <td className="px-2 sm:px-6 py-1 sm:py-3 text-right text-gray-600">{item.credit > 0 ? formatCurrency(item.credit) : '-'}</td>
+                        <td className={`px-2 sm:px-6 py-1 sm:py-3 text-right font-medium ${item.balance >= 0 ? (item.normal_balance === 'debit' ? 'text-blue-600' : 'text-green-600') : (item.normal_balance === 'debit' ? 'text-red-600' : 'text-orange-600')}`}>
                           {formatCurrency(Math.abs(item.balance))} {item.balance >= 0 ? (item.normal_balance === 'debit' ? 'Dr' : 'Cr') : (item.normal_balance === 'debit' ? 'Cr' : 'Dr')}
                         </td>
                       </tr>
                     ))}
                   {ledgerData.length === 0 && (
                     <tr>
-                      <td colSpan={5} className="px-6 py-8 text-center text-gray-500">Tidak ada transaksi pada periode ini</td>
+                      <td colSpan={5} className="px-2 sm:px-6 py-3 sm:py-8 text-center text-gray-500">Tidak ada transaksi pada periode ini</td>
                     </tr>
                   )}
                 </tbody>

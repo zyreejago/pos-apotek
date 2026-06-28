@@ -372,9 +372,9 @@ export default function UsersPage() {
           checkActionPermission('create') && (
             <button 
               onClick={handleOpenAddOffCanvas}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium transition-colors"
+              className="bg-blue-600 hover:bg-blue-700 text-white px-2 sm:px-4 py-1 sm:py-2 rounded-lg flex items-center gap-2 text-xs sm:text-sm font-medium transition-colors"
             >
-              <Plus size={16} />
+              <Plus className="w-3.5 sm:w-4 h-3.5 sm:h-4" />
               Add Pengguna
             </button>
           )
@@ -400,39 +400,39 @@ export default function UsersPage() {
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full text-sm text-left">
+            <table className="w-full text-xs sm:text-sm text-left">
               <thead className="text-xs text-gray-500 uppercase bg-gray-50 border-b border-gray-100">
                 <tr>
-                  <th className="px-4 py-3">Pengguna</th>
-                  <th className="px-4 py-3">Email</th>
-                  <th className="px-4 py-3">Role</th>
-                  <th className="px-4 py-3">Status</th>
-                  <th className="px-4 py-3">Aksi</th>
+                  <th className="px-2 sm:px-4 py-1.5 sm:py-3">Pengguna</th>
+                  <th className="px-2 sm:px-4 py-1.5 sm:py-3">Email</th>
+                  <th className="px-2 sm:px-4 py-1.5 sm:py-3">Role</th>
+                  <th className="px-2 sm:px-4 py-1.5 sm:py-3">Status</th>
+                  <th className="px-2 sm:px-4 py-1.5 sm:py-3">Aksi</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {loading ? (
-                  <tr><td colSpan={5} className="px-4 py-8 text-center text-gray-500">Loading users...</td></tr>
+                  <tr><td colSpan={5} className="px-2 sm:px-4 py-4 sm:py-8 text-center text-gray-500">Loading users...</td></tr>
                 ) : users.length === 0 ? (
-                  <tr><td colSpan={5} className="px-4 py-8 text-center text-gray-500">No users found.</td></tr>
+                  <tr><td colSpan={5} className="px-2 sm:px-4 py-4 sm:py-8 text-center text-gray-500">No users found.</td></tr>
                 ) : (
                   users.map((user) => {
                     const isActive = user.status !== 'inactive';
                     return (
                       <tr key={user.id} className="hover:bg-gray-50 transition-colors">
-                        <td className="px-4 py-3">
+                        <td className="px-2 sm:px-4 py-1.5 sm:py-3">
                           <div className="flex items-center gap-3">
-                            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0 ${getAvatarColor(user.username)}`}>
+                            <div className={`w-6 h-6 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0 ${getAvatarColor(user.username)}`}>
                               {getInitials(user.username)}
                             </div>
                             <span className="font-medium text-gray-900">{user.username}</span>
                           </div>
                         </td>
-                        <td className="px-4 py-3 text-gray-600">{user.email}</td>
-                        <td className="px-4 py-3">
+                        <td className="px-2 sm:px-4 py-1.5 sm:py-3 text-gray-600">{user.email}</td>
+                        <td className="px-2 sm:px-4 py-1.5 sm:py-3">
                           <span className="capitalize text-gray-700 font-medium">{user.role}</span>
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="px-2 sm:px-4 py-1.5 sm:py-3">
                           <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold rounded-full ${
                             isActive ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
                           }`}>
@@ -440,17 +440,17 @@ export default function UsersPage() {
                             {isActive ? 'Active' : 'Inactive'}
                           </span>
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="px-2 sm:px-4 py-1.5 sm:py-3">
                           <div className="flex items-center gap-1">
                             {checkActionPermission('edit') && (
                               <button onClick={() => handleOpenEditOffCanvas(user)}
-                                className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Edit">
+                                className="p-1 sm:p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Edit">
                                 <Edit size={14} />
                               </button>
                             )}
                             {checkActionPermission('delete') && (!currentUser || currentUser.id !== user.id) && (
                               <button onClick={() => handleDelete(user)}
-                                className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Hapus">
+                                className="p-1 sm:p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Hapus">
                                 <Trash2 size={14} />
                               </button>
                             )}
@@ -486,7 +486,7 @@ export default function UsersPage() {
               <span>
                 {(pagination.total === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1)}-{(pagination.total === 0 ? 0 : Math.min(currentPage * itemsPerPage, pagination.total))} of {pagination.total}
               </span>
-              <div className="flex gap-1">
+              <div className="flex gap-1 overflow-x-auto max-w-[200px] sm:max-w-none">
                 <button
                   className={`w-8 h-8 flex items-center justify-center rounded border ${currentPage === 1 ? 'text-gray-300 border-gray-200 cursor-not-allowed' : 'text-gray-600 border-gray-300 hover:bg-gray-50'}`}
                   onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
@@ -494,7 +494,7 @@ export default function UsersPage() {
                 >
                   ←
                 </button>
-                <span className="w-8 h-8 flex items-center justify-center rounded bg-blue-600 text-white font-medium">
+                <span className="w-8 h-8 flex items-center justify-center rounded bg-blue-600 text-white font-medium shrink-0">
                   {currentPage}
                 </span>
                 <button

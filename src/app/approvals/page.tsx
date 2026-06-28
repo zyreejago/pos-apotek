@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Check, X, AlertCircle, FileText, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Search, Check, X, AlertCircle, FileText, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { goeyToast } from "@/components/ui/goey-toaster";
 import PageHeader from '@/components/PageHeader';
 import { useRequirePermission } from '@/hooks/useRequirePermission';
@@ -42,6 +42,7 @@ export default function ApprovalsPage() {
   const [previewImageList, setPreviewImageList] = useState<string[]>([]);
   const [previewImageIndex, setPreviewImageIndex] = useState(0);
   const [expandedInvoice, setExpandedInvoice] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Confirm Modal States
   const [confirmModal, setConfirmModal] = useState<{ isOpen: boolean; title: string; message: string; onConfirm: () => void }>({ isOpen: false, title: '', message: '', onConfirm: () => {} });
@@ -218,24 +219,54 @@ export default function ApprovalsPage() {
             <p className="text-gray-500">Tidak ada faktur yang menunggu persetujuan saat ini.</p>
           </div>
         ) : (
+          <>
+          {searchQuery && pendingFakturs.filter(f => (f.invoice_number || f.batch_number || '').toLowerCase().includes(searchQuery.toLowerCase())).length === 0 ? (
+            <div className="bg-white rounded-xl p-10 sm:p-20 text-center shadow-sm">
+              <div className="bg-gray-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Search className="text-gray-500" size={32} />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-800">Faktur Tidak Ditemukan</h3>
+              <p className="text-gray-500 mt-1">Tidak ada faktur dengan nomor "{searchQuery}"</p>
+              <button onClick={() => setSearchQuery('')} className="mt-4 text-sm text-blue-600 hover:text-blue-700 font-medium">Reset Pencarian</button>
+            </div>
+          ) : (
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+            <div className="p-3 sm:p-4 border-b border-gray-100">
+              <div className="relative w-full sm:w-72">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Cari no. faktur..."
+                  className="w-full pl-8 pr-3 py-1.5 sm:py-2 border border-gray-200 rounded-lg text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                />
+              </div>
+            </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm text-left">
                 <thead className="text-xs text-gray-500 uppercase bg-gray-50 border-b border-gray-100">
                   <tr>
-                    <th className="px-4 py-3">No. Faktur</th>
-                    <th className="px-4 py-3">Supplier</th>
-                    <th className="px-4 py-3">Tanggal</th>
-                    <th className="px-4 py-3">Qty</th>
-                    <th className="px-4 py-3">Total</th>
-                    <th className="px-4 py-3">Status</th>
-                    <th className="px-4 py-3">Aksi</th>
+                    <th className="px-2 sm:px-4 py-1 sm:py-3">No. Faktur</th>
+                    <th className="px-2 sm:px-4 py-1 sm:py-3">Supplier</th>
+                    <th className="px-2 sm:px-4 py-1 sm:py-3">Tanggal</th>
+                    <th className="px-2 sm:px-4 py-1 sm:py-3">Qty</th>
+                    <th className="px-2 sm:px-4 py-1 sm:py-3">Total</th>
+                    <th className="px-2 sm:px-4 py-1 sm:py-3">Status</th>
+                    <th className="px-2 sm:px-4 py-1 sm:py-3">Aksi</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {(() => {
+                    const filtered = searchQuery
+                      ? pendingFakturs.filter(f => {
+                          const invoice = f.invoice_number || f.batch_number || '';
+                          return invoice.toLowerCase().includes(searchQuery.toLowerCase());
+                        })
+                      : pendingFakturs;
+
                     const grouped: Record<string, PendingFaktur[]> = {};
-                    for (const f of pendingFakturs) {
+                    for (const f of filtered) {
                       const key = f.invoice_number || `__BATCH_${f.batch_number || f.id}`;
                       if (!grouped[key]) grouped[key] = [];
                       grouped[key].push(f);
@@ -257,23 +288,23 @@ export default function ApprovalsPage() {
                       return (
                         <React.Fragment key={invoiceKey}>
                           <tr className="hover:bg-purple-50 transition-colors cursor-pointer" onClick={() => setExpandedInvoice(isExpanded ? null : invoiceKey)}>
-                            <td className="px-4 py-3">
+                            <td className="px-2 sm:px-4 py-1 sm:py-3">
                               <div className="flex items-center gap-2">
                                 <svg className={`w-3 h-3 text-gray-400 transition-transform ${isExpanded ? 'rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
                                 <span className="font-semibold text-gray-900">{invoiceLabel}</span>
                               </div>
                               <div className="text-xs text-gray-400 mt-0.5 ml-5">{items.length} produk</div>
                             </td>
-                            <td className="px-4 py-3 text-gray-600">{first.supplier_name || '-'}</td>
-                            <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{first.purchase_date ? formatDate(first.purchase_date) : '-'}</td>
-                            <td className="px-4 py-3 whitespace-nowrap">
+                            <td className="px-2 sm:px-4 py-1 sm:py-3 text-gray-600">{first.supplier_name || '-'}</td>
+                            <td className="px-2 sm:px-4 py-1 sm:py-3 text-gray-600 whitespace-nowrap">{first.purchase_date ? formatDate(first.purchase_date) : '-'}</td>
+                            <td className="px-2 sm:px-4 py-1 sm:py-3 whitespace-nowrap">
                               <span className="font-medium">{totalQty}</span>
                               <span className="text-gray-400 ml-1">{first.product_unit}</span>
                             </td>
-                            <td className="px-4 py-3">
+                            <td className="px-2 sm:px-4 py-1 sm:py-3">
                               <span className="font-bold text-blue-600">{formatIDR(totalCost)}</span>
                             </td>
-                            <td className="px-4 py-3">
+                            <td className="px-2 sm:px-4 py-1 sm:py-3">
                               <span className={`inline-block px-2 py-0.5 text-[10px] font-bold rounded-full border ${
                                 displayStatus === 'pending' 
                                   ? 'bg-yellow-100 text-yellow-700 border-yellow-200' 
@@ -284,7 +315,7 @@ export default function ApprovalsPage() {
                                 {displayStatus === 'pending' ? 'Pending' : displayStatus === 'rejected' ? 'Ditolak' : 'Revisi'}
                               </span>
                             </td>
-                            <td className="px-4 py-3">
+                            <td className="px-2 sm:px-4 py-1 sm:py-3">
                               <div className="flex items-center gap-1.5">
                                 {items.some(i => i.image_url) && (
                                   <button onClick={(e) => { e.stopPropagation(); const urls = getImageUrls(items.find(i => i.image_url)!.image_url).map(u => `http://localhost:5000${u}`); openImagePreview(urls); }}
@@ -295,15 +326,15 @@ export default function ApprovalsPage() {
                                 {displayStatus === 'pending' ? (
                                   <>
                                     <button onClick={(e) => { e.stopPropagation(); handleApprove(items); }}
-                                      className="px-2.5 py-1 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs font-bold transition-colors">
+                                      className="px-2 sm:px-2.5 py-0.5 sm:py-1 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs font-bold transition-colors">
                                       <Check size={14} className="inline mr-0.5" />Setujui
                                     </button>
                                     <button onClick={(e) => { e.stopPropagation(); handleRevision(invoiceKey); }}
-                                      className="px-2.5 py-1 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-xs font-bold transition-colors">
+                                      className="px-2 sm:px-2.5 py-0.5 sm:py-1 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-xs font-bold transition-colors">
                                       <AlertCircle size={14} className="inline mr-0.5" />Perbaiki
                                     </button>
                                     <button onClick={(e) => { e.stopPropagation(); handleReject(items); }}
-                                      className="px-2.5 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-bold transition-colors">
+                                      className="px-2 sm:px-2.5 py-0.5 sm:py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-bold transition-colors">
                                       <X size={14} className="inline mr-0.5" />Tolak
                                     </button>
                                   </>
@@ -321,8 +352,8 @@ export default function ApprovalsPage() {
                           </tr>
                           {isExpanded && items.map(item => (
                             <tr key={item.id} className="bg-gray-50 text-xs text-gray-600">
-                              <td colSpan={7} className="px-4 py-2">
-                                <div className="ml-5 flex items-center gap-4">
+                              <td colSpan={7} className="px-2 sm:px-4 py-1 sm:py-2">
+                                <div className="ml-5 flex flex-wrap items-center gap-2 sm:gap-4">
                                   <span className="font-medium text-gray-800 min-w-[150px]">{item.product_name}</span>
                                   {Number(item.has_purchase_unit) || item.product_unit_multiplier > 1 ? (
                                     <span>{item.initial_quantity / item.product_unit_multiplier} {item.product_purchase_unit} (@ isi {item.product_unit_multiplier}) = {item.initial_quantity} {item.product_unit}</span>
@@ -356,6 +387,8 @@ export default function ApprovalsPage() {
               </table>
             </div>
           </div>
+          )}
+          </>
         )}
       </div>
 
@@ -429,13 +462,13 @@ export default function ApprovalsPage() {
             <div className="px-6 py-4 bg-gray-50 flex gap-3">
               <button
                 onClick={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
-                className="flex-1 px-4 py-2 bg-white border border-gray-300 rounded-xl text-sm font-bold text-gray-700 hover:bg-gray-100 transition-all"
+                className="flex-1 px-3 sm:px-4 py-1.5 sm:py-2 bg-white border border-gray-300 rounded-xl text-sm font-bold text-gray-700 hover:bg-gray-100 transition-all"
               >
                 Batal
               </button>
               <button
                 onClick={confirmModal.onConfirm}
-                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-bold hover:bg-blue-700 transition-all"
+                className="flex-1 px-3 sm:px-4 py-1.5 sm:py-2 bg-blue-600 text-white rounded-xl text-sm font-bold hover:bg-blue-700 transition-all"
               >
                 Konfirmasi
               </button>
@@ -464,7 +497,7 @@ export default function ApprovalsPage() {
               <textarea
                 value={revisionNotes}
                 onChange={(e) => setRevisionNotes(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 text-sm"
+                className="w-full px-2 sm:px-4 py-1 sm:py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 text-sm"
                 placeholder="Contoh: Harga beli salah, tolong cek kembali fakturnya..."
                 rows={4}
                 autoFocus
@@ -473,14 +506,14 @@ export default function ApprovalsPage() {
             <div className="px-6 py-4 bg-gray-50 flex gap-3">
               <button
                 onClick={() => setIsRevisionModalOpen(false)}
-                className="flex-1 px-4 py-2 bg-white border border-gray-300 rounded-xl text-sm font-bold text-gray-700 hover:bg-gray-100 transition-all"
+                className="flex-1 px-3 sm:px-4 py-1.5 sm:py-2 bg-white border border-gray-300 rounded-xl text-sm font-bold text-gray-700 hover:bg-gray-100 transition-all"
               >
                 Batal
               </button>
               <button
                 onClick={submitRevision}
                 disabled={isSubmittingRevision || !revisionNotes.trim()}
-                className="flex-1 px-4 py-2 bg-orange-500 text-white rounded-xl text-sm font-bold hover:bg-orange-600 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                className="flex-1 px-3 sm:px-4 py-1.5 sm:py-2 bg-orange-500 text-white rounded-xl text-sm font-bold hover:bg-orange-600 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {isSubmittingRevision ? (
                   <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>

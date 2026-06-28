@@ -230,7 +230,7 @@ export default function FinancialTransactionsPage() {
   };
 
   return (
-    <div className="bg-gray-50 min-h-screen p-8 relative">
+    <div className="bg-gray-50 min-h-screen p-4 sm:p-8 relative">
       <PageHeader
         title="Pencatatan Transaksi Keuangan"
         subtitle="Wizard transaksi otomatis untuk mencatat pengeluaran operasional, permodalan, dan pembelian aset tanpa entri manual jurnal debit/kredit."
@@ -274,7 +274,7 @@ export default function FinancialTransactionsPage() {
       </div>
 
       {/* Tab Panels */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8 max-w-full sm:max-w-2xl mx-auto">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 sm:p-8 max-w-full sm:max-w-2xl mx-auto">
         {activeTab === 'expense' && (
           <form onSubmit={handleExpenseSubmit} className="space-y-6">
             <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2 border-b border-gray-100 pb-3">

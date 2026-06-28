@@ -142,7 +142,7 @@ export default function ProfilePage() {
         <div className="max-w-full sm:max-w-4xl mx-auto space-y-6 pb-10">
           
           {/* Profile Details Section */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6">
             <div className="flex items-center gap-3 mb-6">
               <div className="p-2 bg-blue-50 rounded-lg text-blue-600">
                 <User size={20} />
@@ -178,7 +178,7 @@ export default function ProfilePage() {
                 <button
                   type="submit"
                   disabled={savingProfile}
-                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium text-sm"
+                  className="flex items-center gap-2 px-4 py-2 min-h-[44px] bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium text-sm"
                 >
                   {savingProfile ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
                   Save Changes
@@ -188,7 +188,7 @@ export default function ProfilePage() {
           </div>
 
           {/* Password Section */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6">
             <div className="flex items-center gap-3 mb-6">
               <div className="p-2 bg-yellow-50 rounded-lg text-yellow-600">
                 <Key size={20} />
@@ -240,7 +240,7 @@ export default function ProfilePage() {
                 <button
                   type="submit"
                   disabled={savingPassword}
-                  className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium text-sm"
+                  className="flex items-center gap-2 px-4 py-2 min-h-[44px] bg-gray-900 text-white rounded-lg hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium text-sm"
                 >
                   {savingPassword ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
                   Update Password

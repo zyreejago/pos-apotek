@@ -67,7 +67,7 @@ export default function RegisterPage() {
       backgroundRepeat: 'no-repeat',
       backgroundColor: '#F8F9FA'
     }}>
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 w-full max-w-[480px] p-8 md:p-10">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 w-full max-w-[480px] p-4 sm:p-8 md:p-10">
         {/* Header */}
         <div className="text-center mb-8">
           <h1 className="text-xl font-bold text-gray-900 mb-2">Sign up</h1>
@@ -133,7 +133,7 @@ export default function RegisterPage() {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="block w-full px-3 py-2.5 border border-gray-200 rounded-md text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-sm"
+              className="block w-full px-3 py-3 sm:py-2.5 border border-gray-200 rounded-md text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-sm"
               placeholder="email@email.com"
               required
             />
@@ -146,7 +146,7 @@ export default function RegisterPage() {
                 type={showPassword ? "text" : "password"}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="block w-full px-3 py-2.5 border border-gray-200 rounded-md text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-sm pr-10"
+                className="block w-full px-3 py-3 sm:py-2.5 border border-gray-200 rounded-md text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-sm pr-10"
                 placeholder="Enter Password"
                 required
               />
@@ -167,7 +167,7 @@ export default function RegisterPage() {
                 type={showConfirmPassword ? "text" : "password"}
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                className="block w-full px-3 py-2.5 border border-gray-200 rounded-md text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-sm pr-10"
+                className="block w-full px-3 py-3 sm:py-2.5 border border-gray-200 rounded-md text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-sm pr-10"
                 placeholder="Re-enter Password"
                 required
               />

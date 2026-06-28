@@ -213,13 +213,20 @@ export default function Sidebar() {
 
   const isActive = (path: string) => pathname === path;
 
+  // Auto-close sidebar on mobile when navigating
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.innerWidth < 1024) {
+      setIsCollapsed(true);
+    }
+  }, [pathname, setIsCollapsed]);
+
   return (
     <>
     {/* Mobile overlay */}
     {!isCollapsed && (
       <div className="fixed inset-0 bg-black/40 z-30 lg:hidden" onClick={() => { toggleSidebar(); }} />
     )}
-    <div className={`${isCollapsed ? 'w-20 max-sm:w-16' : 'w-72 max-sm:w-64'} h-screen bg-white border-r border-gray-200 flex flex-col font-sans shrink-0 sticky top-0 transition-all duration-300 z-40 ${!isCollapsed ? 'max-sm:fixed max-sm:left-0 max-sm:top-0 max-sm:shadow-xl' : ''}`}>
+    <div className={`${isCollapsed ? 'w-20 max-sm:w-16' : 'w-72 max-sm:w-[85vw] max-sm:max-w-[320px]'} h-screen bg-white border-r border-gray-200 flex flex-col font-sans shrink-0 sticky top-0 transition-all duration-300 z-40 ${!isCollapsed ? 'max-sm:fixed max-sm:left-0 max-sm:top-0 max-sm:shadow-xl' : ''}`}>
       {/* Header */}
       <div className={`relative flex items-center ${isCollapsed ? 'flex-col justify-center pt-3 pb-1 gap-2' : 'justify-center pt-0 pb-0 -mb-7'}`}>
         <div className="shrink-0">

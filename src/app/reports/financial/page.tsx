@@ -182,23 +182,23 @@ export default function ProfitLossAccountingPage() {
         subtitle="Laporan Keuangan"
         breadcrumbs={[{ label: 'Sales Report' }, { label: 'Laporan Laba Rugi' }]}
         rightContent={
-          <div className="flex items-center gap-3">
-             <div className="flex items-center bg-white border border-gray-200 rounded-lg px-3 py-1.5 shadow-sm">
-               <Calendar size={16} className="text-gray-500 mr-2" />
-               <select 
-                 value={month} 
-                 onChange={(e) => setMonth(parseInt(e.target.value))}
-                 className="text-sm border-none focus:ring-0 text-gray-700 bg-transparent cursor-pointer outline-none"
+           <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+              <div className="flex items-center bg-white border border-gray-200 rounded-lg px-1 sm:px-3 py-0.5 sm:py-1.5 shadow-sm">
+                <Calendar size={12} className="text-gray-500 mr-1 sm:mr-2" />
+                <select 
+                  value={month} 
+                  onChange={(e) => setMonth(parseInt(e.target.value))}
+                  className="text-xs sm:text-sm border-none focus:ring-0 text-gray-700 bg-transparent cursor-pointer outline-none"
                >
                  {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
                    <option key={m} value={m}>{getMonthName(m)}</option>
                  ))}
                </select>
-               <span className="text-gray-300 mx-2">|</span>
-               <select 
-                 value={year} 
-                 onChange={(e) => setYear(parseInt(e.target.value))}
-                 className="text-sm border-none focus:ring-0 text-gray-700 bg-transparent cursor-pointer outline-none"
+                <span className="text-gray-300 mx-2">|</span>
+                <select 
+                  value={year} 
+                  onChange={(e) => setYear(parseInt(e.target.value))}
+                  className="text-xs sm:text-sm border-none focus:ring-0 text-gray-700 bg-transparent cursor-pointer outline-none"
                >
                  {Array.from({ length: 5 }, (_, i) => currentDate.getFullYear() - i).map((y) => (
                    <option key={y} value={y}>{y}</option>
@@ -207,16 +207,16 @@ export default function ProfitLossAccountingPage() {
              </div>
              <button 
                onClick={handleDownloadPDF}
-               className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors shadow-sm"
-             >
-               <Download size={16} />
+                 className="flex items-center gap-1 sm:gap-2 bg-blue-600 text-white px-1.5 sm:px-4 py-0.5 sm:py-2 rounded-lg text-[10px] sm:text-sm font-semibold hover:bg-blue-700 transition-colors shadow-sm"
+              >
+                <Download size={12} />
                Download PDF
              </button>
           </div>
         }
       />
       
-      <div className="p-8 pt-0 flex justify-center">
+       <div className="p-4 sm:p-8 pt-0 flex justify-center">
         {loading ? (
           <div className="flex flex-col items-center justify-center py-20">
             <Loader2 className="animate-spin text-blue-500 mb-2" size={32} />
@@ -230,57 +230,57 @@ export default function ProfitLossAccountingPage() {
             </div>
             
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
+              <table className="w-full text-left text-xs sm:text-sm">
                 <thead>
                   <tr className="bg-gray-50 text-gray-500 font-medium border-b border-gray-100">
-                    <th className="px-3 sm:px-6 py-4">No</th>
-                    <th className="px-3 sm:px-6 py-4">Keterangan</th>
-                    <th className="px-6 py-4 text-right">Debit</th>
-                    <th className="px-6 py-4 text-right">Kredit</th>
+                    <th className="px-3 sm:px-6 py-1.5 sm:py-3">No</th>
+                    <th className="px-3 sm:px-6 py-1.5 sm:py-3">Keterangan</th>
+                    <th className="px-2 sm:px-6 py-1.5 sm:py-4 text-right">Debit</th>
+                    <th className="px-2 sm:px-6 py-1.5 sm:py-4 text-right">Kredit</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
                   {/* Revenue Section */}
                   <tr className="bg-blue-50">
-                    <td colSpan={4} className="px-6 py-4 font-bold text-blue-700">PENDAPATAN</td>
+                    <td colSpan={4} className="px-2 sm:px-6 py-1.5 sm:py-4 font-bold text-blue-700">PENDAPATAN</td>
                   </tr>
                   {revenueAccounts.map((a, index) => (
                     <tr key={a.code} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-6 py-3 text-gray-600">{index + 1}</td>
-                      <td className="px-6 py-3 text-gray-600">{a.name}</td>
-                      <td className="px-6 py-3 text-right text-gray-600">{formatCurrency(a.total_debit)}</td>
-                      <td className="px-6 py-3 text-right text-gray-600">{formatCurrency(a.total_credit)}</td>
+                      <td className="px-2 sm:px-6 py-1 sm:py-3 text-gray-600">{index + 1}</td>
+                      <td className="px-2 sm:px-6 py-1 sm:py-3 text-gray-600">{a.name}</td>
+                      <td className="px-2 sm:px-6 py-1 sm:py-3 text-right text-gray-600">{formatCurrency(a.total_debit)}</td>
+                      <td className="px-2 sm:px-6 py-1 sm:py-3 text-right text-gray-600">{formatCurrency(a.total_credit)}</td>
                     </tr>
                   ))}
                   <tr className="font-bold bg-gray-50">
-                    <td colSpan={2} className="px-6 py-4 text-gray-900">Total Pendapatan</td>
-                    <td className="px-6 py-4 text-right text-gray-900"></td>
-                    <td className="px-6 py-4 text-right text-gray-900">{formatCurrency(totalRevenue)}</td>
+                    <td colSpan={2} className="px-2 sm:px-6 py-1.5 sm:py-4 text-gray-900">Total Pendapatan</td>
+                    <td className="px-2 sm:px-6 py-1.5 sm:py-4 text-right text-gray-900"></td>
+                    <td className="px-2 sm:px-6 py-1.5 sm:py-4 text-right text-gray-900">{formatCurrency(totalRevenue)}</td>
                   </tr>
 
                   {/* Expense Section */}
                   <tr className="bg-orange-50">
-                    <td colSpan={4} className="px-6 py-4 font-bold text-orange-700">BEBAN</td>
+                    <td colSpan={4} className="px-2 sm:px-6 py-1.5 sm:py-4 font-bold text-orange-700">BEBAN</td>
                   </tr>
                   {expenseAccounts.map((a, index) => (
                     <tr key={a.code} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-6 py-3 text-gray-600">{revenueAccounts.length + index + 1}</td>
-                      <td className="px-6 py-3 text-gray-600">{a.name}</td>
-                      <td className="px-6 py-3 text-right text-gray-600">{formatCurrency(a.total_debit)}</td>
-                      <td className="px-6 py-3 text-right text-gray-600">{formatCurrency(a.total_credit)}</td>
+                      <td className="px-2 sm:px-6 py-1 sm:py-3 text-gray-600">{revenueAccounts.length + index + 1}</td>
+                      <td className="px-2 sm:px-6 py-1 sm:py-3 text-gray-600">{a.name}</td>
+                      <td className="px-2 sm:px-6 py-1 sm:py-3 text-right text-gray-600">{formatCurrency(a.total_debit)}</td>
+                      <td className="px-2 sm:px-6 py-1 sm:py-3 text-right text-gray-600">{formatCurrency(a.total_credit)}</td>
                     </tr>
                   ))}
                   <tr className="font-bold bg-gray-50">
-                    <td colSpan={2} className="px-6 py-4 text-gray-900">Total Beban</td>
-                    <td className="px-6 py-4 text-right text-gray-900">{formatCurrency(totalExpenses)}</td>
-                    <td className="px-6 py-4 text-right text-gray-900"></td>
+                    <td colSpan={2} className="px-2 sm:px-6 py-1.5 sm:py-4 text-gray-900">Total Beban</td>
+                    <td className="px-2 sm:px-6 py-1.5 sm:py-4 text-right text-gray-900">{formatCurrency(totalExpenses)}</td>
+                    <td className="px-2 sm:px-6 py-1.5 sm:py-4 text-right text-gray-900"></td>
                   </tr>
 
                   {/* Net Profit */}
                   <tr className="font-bold bg-gray-100">
-                    <td colSpan={2} className="px-6 py-4 text-gray-900 text-lg">LABA BERSIH</td>
-                    <td className="px-6 py-4 text-right text-gray-900 text-lg">{netProfit < 0 ? formatCurrency(Math.abs(netProfit)) : ''}</td>
-                    <td className="px-6 py-4 text-right text-gray-900 text-lg">{netProfit >= 0 ? formatCurrency(netProfit) : ''}</td>
+                    <td colSpan={2} className="px-2 sm:px-6 py-1.5 sm:py-4 text-gray-900 text-lg">LABA BERSIH</td>
+                    <td className="px-2 sm:px-6 py-1.5 sm:py-4 text-right text-gray-900 text-lg">{netProfit < 0 ? formatCurrency(Math.abs(netProfit)) : ''}</td>
+                    <td className="px-2 sm:px-6 py-1.5 sm:py-4 text-right text-gray-900 text-lg">{netProfit >= 0 ? formatCurrency(netProfit) : ''}</td>
                   </tr>
                 </tbody>
               </table>

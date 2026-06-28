@@ -319,7 +319,7 @@ export default function Page() {
         breadcrumbs={[{ label: 'Settings' }, { label: 'Role Permissions' }]}
         rightContent={
           canManage && (
-            <button onClick={() => setShowAdd(true)} className="px-4 py-2 rounded-lg bg-blue-500 text-white text-sm font-semibold hover:bg-blue-600 transition-colors">
+            <button onClick={() => setShowAdd(true)} className="px-3 sm:px-4 py-1.5 sm:py-2 min-h-[44px] rounded-lg bg-blue-500 text-white text-xs sm:text-sm font-semibold hover:bg-blue-600 transition-colors">
               Add Role & Permissions
             </button>
           )
@@ -342,8 +342,8 @@ export default function Page() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="text-gray-500">
-                    <th className="text-left font-medium px-3 py-2">Name</th>
-                    <th className="text-right font-medium px-3 py-2">Action</th>
+                    <th className="text-left font-medium px-2 sm:px-3 py-1 sm:py-2">Name</th>
+                    <th className="text-right font-medium px-2 sm:px-3 py-1 sm:py-2">Action</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -357,10 +357,10 @@ export default function Page() {
                       role="button"
                       tabIndex={0}
                     >
-                      <td className="px-3 py-3">
+                      <td className="px-2 sm:px-3 py-1 sm:py-3">
                         <div className="font-medium text-gray-800">{r.name}</div>
                       </td>
-                      <td className="px-3 py-3 text-right">
+                      <td className="px-2 sm:px-3 py-1 sm:py-3 text-right">
                         <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                           {canManage ? (
                             <button
@@ -408,7 +408,7 @@ export default function Page() {
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Cari module"
-                className="w-full md:w-64 px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                className="w-full md:w-64 px-2 sm:px-3 py-1 sm:py-2 border border-gray-200 rounded-lg text-sm"
                 disabled={!selectedRole}
               />
             </div>
@@ -430,9 +430,9 @@ export default function Page() {
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="text-gray-500 bg-gray-50">
-                        <th className="text-left font-medium px-3 py-2">Module</th>
+                        <th className="text-left font-medium px-2 sm:px-3 py-1 sm:py-2">Module</th>
                         {usedActions.map(a => (
-                          <th key={a} className="font-medium px-3 py-2 text-center capitalize">{a}</th>
+                          <th key={a} className="font-medium px-2 sm:px-3 py-1 sm:py-2 text-center capitalize">{a}</th>
                         ))}
                       </tr>
                     </thead>
@@ -446,20 +446,20 @@ export default function Page() {
                       ) : (
                         filteredPerms.map((row) => (
                           <tr key={row.module} className="border-t border-gray-100">
-                            <td className="px-3 py-3 text-gray-800">{row.module}</td>
+                            <td className="px-2 sm:px-3 py-1 sm:py-3 text-gray-800">{row.module}</td>
                             {usedActions.map((a) => {
                               const isAllowed = MODULE_CONFIG[row.module]
                                 ? MODULE_CONFIG[row.module].includes(a)
                                 : true;
                               if (!isAllowed) {
                                 return (
-                                  <td key={a} className="px-3 py-3 text-center text-gray-300">
+                                  <td key={a} className="px-2 sm:px-3 py-1 sm:py-3 text-center text-gray-300">
                                     -
                                   </td>
                                 );
                               }
                               return (
-                                <td key={a} className="px-3 py-3 text-center">
+                                <td key={a} className="px-2 sm:px-3 py-1 sm:py-3 text-center">
                                   <label className="inline-flex items-center cursor-pointer">
                                     <input
                                       type="checkbox"
@@ -491,7 +491,7 @@ export default function Page() {
                     <button
                       onClick={handleSavePermissions}
                       disabled={!hasChanges || isSaving}
-                      className={`px-6 py-2 rounded-lg font-medium transition-colors ${
+                      className={`px-4 sm:px-6 py-1.5 sm:py-2 rounded-lg font-medium transition-colors ${
                         hasChanges && !isSaving
                           ? "bg-blue-600 text-white hover:bg-blue-700 shadow-sm"
                           : "bg-gray-100 text-gray-400 cursor-not-allowed"
@@ -517,19 +517,19 @@ export default function Page() {
           value={newRole} 
           onChange={e => setNewRole(e.target.value)} 
           placeholder="Role name" 
-          className="w-full px-3 py-2 border border-gray-200 rounded-lg mb-6" 
+          className="w-full px-2 sm:px-3 py-1 sm:py-2 border border-gray-200 rounded-lg mb-6" 
         />
         <div className="flex justify-end gap-3">
           <button 
             onClick={() => setShowAdd(false)} 
-            className="px-4 py-2 rounded-lg border border-gray-200 text-gray-700" 
+            className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg border border-gray-200 text-gray-700" 
             disabled={isSaving}
           >
             Cancel
           </button>
           <button 
             onClick={addRole} 
-            className="px-4 py-2 rounded-lg bg-blue-600 text-white disabled:bg-blue-300 disabled:cursor-not-allowed"
+            className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg bg-blue-600 text-white disabled:bg-blue-300 disabled:cursor-not-allowed"
             disabled={isSaving || !newRole.trim()}
           >
             {isSaving ? "Saving..." : "Save"}

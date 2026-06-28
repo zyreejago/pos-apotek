@@ -148,7 +148,7 @@ export default function ForgotPasswordPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-[#F8F9FA] w-full">
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 w-full max-w-[520px] p-8 md:p-10">
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 w-full max-w-[520px] p-4 sm:p-8 md:p-10">
         <button
           type="button"
           onClick={() => router.push("/login")}
@@ -159,7 +159,7 @@ export default function ForgotPasswordPage() {
         </button>
 
         <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Lupa Password</h1>
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">Lupa Password</h1>
           <p className="text-sm text-gray-500">
             {step === "request" && "Masukkan email terdaftar untuk menerima kode verifikasi."}
             {step === "verify" && "Masukkan kode 6 digit yang dikirim ke email Anda."}

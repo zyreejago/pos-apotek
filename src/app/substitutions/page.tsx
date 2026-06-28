@@ -51,16 +51,16 @@ export default function Page() {
 
       <div className="p-3 sm:p-4 md:p-8 pt-0">
       <div className="bg-white border border-gray-100 rounded-xl p-4 md:p-6">
-        <div className="flex items-center justify-between mb-4">
-          <div className="text-gray-600">Showing {Math.min(pageSize, total)} of {total} Products</div>
-          <div className="flex items-center gap-3">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
+          <div className="text-sm text-gray-600 shrink-0">Showing {Math.min(pageSize, total)} of {total} Products</div>
+          <div className="flex items-center gap-3 w-full sm:w-auto">
             <input
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder="Input Keluhan"
-              className="w-64 px-3 py-2 border border-gray-200 rounded-lg text-sm"
+              className="flex-1 sm:w-64 px-2 sm:px-3 py-1 sm:py-2 border border-gray-200 rounded-lg text-sm"
             />
-            <button onClick={search} disabled={loading || !input.trim()} className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm disabled:opacity-50">
+            <button onClick={search} disabled={loading || !input.trim()} className="shrink-0 px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg bg-blue-600 text-white text-sm disabled:opacity-50">
               {loading ? "Mencari..." : "Cari"}
             </button>
           </div>
@@ -68,13 +68,13 @@ export default function Page() {
 
         {error && <div className="text-red-600 mb-4 text-sm">{error}</div>}
 
-        <div className="overflow-hidden border border-gray-100 rounded-lg">
+        <div className="overflow-x-auto border border-gray-100 rounded-lg">
           <table className="w-full text-sm">
             <thead>
               <tr className="text-gray-500">
-                <th className="text-left font-medium px-3 py-2">Name</th>
-                <th className="font-medium px-3 py-2">Sumber</th>
-                <th className="font-medium px-3 py-2">Status</th>
+                <th className="text-left font-medium px-2 sm:px-3 py-1 sm:py-2">Name</th>
+                <th className="font-medium px-2 sm:px-3 py-1 sm:py-2">Sumber</th>
+                <th className="font-medium px-2 sm:px-3 py-1 sm:py-2">Status</th>
               </tr>
             </thead>
             <tbody>
@@ -83,11 +83,11 @@ export default function Page() {
                 const src = r.source ? (() => { try { return new URL(r.source).hostname; } catch { return r.source; } })() : "-";
                 return (
                   <tr key={`${r.name}-${i}`} className="border-t border-gray-100">
-                    <td className="px-3 py-3 text-gray-800">{r.name}</td>
-                    <td className="px-3 py-3 text-gray-600">
+                    <td className="px-2 sm:px-3 py-1 sm:py-3 text-gray-800">{r.name}</td>
+                    <td className="px-2 sm:px-3 py-1 sm:py-3 text-gray-600">
                       {r.source ? <a href={r.source} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">{src}</a> : "-"}
                     </td>
-                    <td className="px-3 py-3">
+                    <td className="px-2 sm:px-3 py-1 sm:py-3">
                       <span className={`inline-flex items-center gap-2 px-2.5 py-1 rounded-full text-xs font-medium ${isOnDb ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
                         <span className={`w-1.5 h-1.5 rounded-full ${isOnDb ? 'bg-green-600' : 'bg-red-600'}`}></span>
                         {isOnDb ? 'On Database' : 'Tidak Terdaftar'}
@@ -103,7 +103,7 @@ export default function Page() {
           </table>
         </div>
 
-        <div className="flex items-center justify-between mt-4 text-xs text-gray-500">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 mt-4 text-xs text-gray-500">
           <div className="flex items-center gap-2">
             <span>Show</span>
             <select className="border border-gray-200 rounded px-2 py-1" value={pageSize} onChange={(e) => { setPageSize(parseInt(e.target.value)); setPage(1); }}>
@@ -113,10 +113,10 @@ export default function Page() {
             <span>per page</span>
           </div>
           <div className="flex items-center gap-2">
-            <span>{(page-1)*pageSize+1}-{Math.min(page*pageSize, total)} of {total}</span>
-            <button className="px-2 py-1 border rounded" onClick={() => setPage(Math.max(1, page-1))} disabled={page===1}>{"<"}</button>
-            <span>{page}</span>
-            <button className="px-2 py-1 border rounded" onClick={() => setPage(Math.min(totalPages, page+1))} disabled={page===totalPages}>{">"}</button>
+            <span className="whitespace-nowrap">{(page-1)*pageSize+1}-{Math.min(page*pageSize, total)} of {total}</span>
+            <button className="px-2 sm:px-3 py-1 sm:py-1.5 border rounded min-w-[32px]" onClick={() => setPage(Math.max(1, page-1))} disabled={page===1}>{"<"}</button>
+            <span className="min-w-[20px] text-center">{page}</span>
+            <button className="px-2 sm:px-3 py-1 sm:py-1.5 border rounded min-w-[32px]" onClick={() => setPage(Math.min(totalPages, page+1))} disabled={page===totalPages}>{">"}</button>
           </div>
         </div>
       </div>

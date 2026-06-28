@@ -313,36 +313,36 @@ export default function SuppliersPage() {
 
         {/* Table */}
         <div className="overflow-x-auto">
-          <table className="w-full">
+          <table className="w-full text-xs sm:text-sm">
             <thead className="bg-gray-50 text-gray-500 font-medium text-sm">
               <tr>
-                <th className="px-6 py-4 text-left">Name</th>
-                <th className="px-6 py-4 text-left">Phone</th>
-                <th className="px-6 py-4 text-right">Actions</th>
+                <th className="px-3 sm:px-6 py-2 sm:py-4 text-left">Name</th>
+                <th className="px-3 sm:px-6 py-2 sm:py-4 text-left">Phone</th>
+                <th className="px-3 sm:px-6 py-2 sm:py-4 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {loading ? (
                 <tr>
-                  <td colSpan={4} className="px-6 py-8 text-center text-gray-500">
+                  <td colSpan={4} className="px-3 sm:px-6 py-4 sm:py-8 text-center text-gray-500">
                     Loading suppliers...
                   </td>
                 </tr>
               ) : suppliers.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="px-6 py-8 text-center text-gray-500">
+                  <td colSpan={4} className="px-3 sm:px-6 py-4 sm:py-8 text-center text-gray-500">
                     No suppliers found
                   </td>
                 </tr>
               ) : (
                 suppliers.map((supplier) => (
                   <tr key={supplier.id} className="hover:bg-gray-50 transition-colors group">
-                    <td className="px-3 sm:px-6 py-4">
+                    <td className="px-3 sm:px-6 py-2 sm:py-4">
                       <div className="font-medium text-gray-900">{supplier.name}</div>
                     </td>
-                    <td className="px-6 py-4 text-gray-600">{supplier.phone || '-'}</td>
-                    <td className="px-6 py-4 text-right">
-                      <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <td className="px-3 sm:px-6 py-2 sm:py-4 text-gray-600">{supplier.phone || '-'}</td>
+                    <td className="px-3 sm:px-6 py-2 sm:py-4 text-right">
+                      <div className="flex justify-end gap-2 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                         <button 
                           onClick={() => openViewOffCanvas(supplier)}
                           className="p-1 text-gray-600 hover:bg-gray-50 rounded"
@@ -397,7 +397,7 @@ export default function SuppliersPage() {
                 <span>
                     {(pagination.page - 1) * pagination.limit + 1}-{Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total}
                 </span>
-                <div className="flex gap-1">
+                <div className="flex gap-1 overflow-x-auto max-w-[200px] sm:max-w-none">
                     <button 
                     onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
                     disabled={currentPage === 1}

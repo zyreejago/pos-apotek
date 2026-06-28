@@ -131,19 +131,19 @@ export default function Page() {
       <div className="p-3 sm:p-4 md:p-8 pt-0">
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-              <div className="w-full lg:max-w-full sm:max-w-md">
+              <div className="w-full">
                 <label className="block text-sm font-medium text-gray-700 mb-2">Cari Produk</label>
                 <input
                   type="text"
                   placeholder="Ketik nama produk..."
-                  className="w-full px-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                  className="w-full px-3 py-1.5 sm:px-4 sm:py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
                 />
               </div>
 
-              <div className="flex items-center gap-3">
-                <div className="text-sm text-gray-600">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 w-full lg:w-auto">
+                <div className="text-xs sm:text-sm text-gray-600">
                   {lastUpdated ? `Terakhir diperbarui: ${lastUpdated.toLocaleString()}` : 'Belum ada hasil peramalan'}
                 </div>
                
@@ -161,7 +161,7 @@ export default function Page() {
                   return (
                     <div
                       key={r.id}
-                      className="bg-white border border-gray-100 rounded-xl shadow-sm p-5 flex flex-col gap-4 hover:shadow-md transition-shadow"
+                      className="bg-white border border-gray-100 rounded-xl shadow-sm p-3 sm:p-5 flex flex-col gap-3 sm:gap-4 hover:shadow-md transition-shadow"
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0 flex-1">
@@ -170,13 +170,13 @@ export default function Page() {
                       </div>
 
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div className="rounded-xl border border-gray-100 bg-gray-50 p-4">
+                        <div className="rounded-xl border border-gray-100 bg-gray-50 p-2 sm:p-4">
                           <div className="text-xs text-gray-500 mb-1.5">Stok Saat Ini</div>
                           <div className="font-bold text-gray-900 text-lg">
                             {formatInt(Number(r.stock || 0))} <span className="text-sm font-normal">{r.unit}</span>
                           </div>
                         </div>
-                        <div className="rounded-xl border border-blue-100 bg-blue-50 p-4">
+                        <div className="rounded-xl border border-blue-100 bg-blue-50 p-2 sm:p-4">
                           <div className="text-xs text-blue-600 mb-1.5">Tambahan Stok</div>
                           <div className="font-bold text-blue-700 text-lg">
                             {r.tambahan_stok === null ? '-' : (

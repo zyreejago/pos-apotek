@@ -161,9 +161,9 @@ export default function AuditTrailsPage() {
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
               </div>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <select
-                  className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
+                  className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500 w-full sm:w-auto"
                   value={filterModule}
                   onChange={(e) => {
                     setFilterModule(e.target.value);
@@ -175,11 +175,11 @@ export default function AuditTrailsPage() {
                     <option key={m} value={m}>{m}</option>
                   ))}
                 </select>
-                <div className="flex items-center gap-1">
-                  <Calendar size={16} className="text-gray-400" />
+                <div className="flex items-center gap-1 flex-wrap w-full sm:w-auto">
+                  <Calendar size={16} className="text-gray-400 shrink-0" />
                   <input
                     type="date"
-                    className="border border-gray-200 rounded-lg px-2 py-2 text-sm focus:outline-none focus:border-blue-500"
+                    className="border border-gray-200 rounded-lg px-2 py-2 text-sm focus:outline-none focus:border-blue-500 w-full sm:w-auto"
                     value={filterStartDate}
                     onChange={(e) => {
                       setFilterStartDate(e.target.value);
@@ -189,7 +189,7 @@ export default function AuditTrailsPage() {
                   <span className="text-gray-400">s/d</span>
                   <input
                     type="date"
-                    className="border border-gray-200 rounded-lg px-2 py-2 text-sm focus:outline-none focus:border-blue-500"
+                    className="border border-gray-200 rounded-lg px-2 py-2 text-sm focus:outline-none focus:border-blue-500 w-full sm:w-auto"
                     value={filterEndDate}
                     onChange={(e) => {
                       setFilterEndDate(e.target.value);
@@ -203,7 +203,7 @@ export default function AuditTrailsPage() {
               {(filterModule || filterStartDate || filterEndDate) && (
                 <button
                   onClick={handleResetFilters}
-                  className="px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+                  className="px-2 sm:px-3 py-1 sm:py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors"
                 >
                   Reset Filter
                 </button>
@@ -216,11 +216,11 @@ export default function AuditTrailsPage() {
             <table className="w-full text-sm text-left">
               <thead className="bg-gray-50 text-gray-500 font-medium">
                 <tr>
-                  <th className="px-3 sm:px-6 py-4">Waktu</th>
-                  <th className="px-3 sm:px-6 py-4">Pengguna</th>
-                  <th className="px-3 sm:px-6 py-4">Modul</th>
-                  <th className="px-3 sm:px-6 py-4">Aksi</th>
-                  <th className="px-3 sm:px-6 py-4">Deskripsi</th>
+                  <th className="px-2 sm:px-6 py-1 sm:py-4">Waktu</th>
+                  <th className="px-2 sm:px-6 py-1 sm:py-4">Pengguna</th>
+                  <th className="px-2 sm:px-6 py-1 sm:py-4">Modul</th>
+                  <th className="px-2 sm:px-6 py-1 sm:py-4">Aksi</th>
+                  <th className="px-2 sm:px-6 py-1 sm:py-4">Deskripsi</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -239,13 +239,13 @@ export default function AuditTrailsPage() {
                 ) : (
                   auditTrails.map((trail) => (
                     <tr key={trail.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-3 sm:px-6 py-4">
+                      <td className="px-2 sm:px-6 py-1 sm:py-4">
                         <div className="flex items-center gap-2 text-gray-600">
                           <Clock size={14} />
                           {formatDateTime(trail.created_at)}
                         </div>
                       </td>
-                      <td className="px-3 sm:px-6 py-4">
+                      <td className="px-2 sm:px-6 py-1 sm:py-4">
                         <div className="flex items-center gap-2">
                           <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
                             <User size={16} className="text-blue-600" />
@@ -256,18 +256,18 @@ export default function AuditTrailsPage() {
                           </div>
                         </div>
                       </td>
-                      <td className="px-3 sm:px-6 py-4">
+                      <td className="px-2 sm:px-6 py-1 sm:py-4">
                         <div className="flex items-center gap-2">
                           <Activity size={14} className="text-gray-400" />
                           <span className="font-medium text-gray-900">{trail.module}</span>
                         </div>
                       </td>
-                      <td className="px-3 sm:px-6 py-4">
+                      <td className="px-2 sm:px-6 py-1 sm:py-4">
                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getActionBadgeColor(trail.action)}`}>
                           {trail.action}
                         </span>
                       </td>
-                      <td className="px-6 py-4 text-gray-600 max-w-full sm:max-w-md truncate">
+                      <td className="px-2 sm:px-6 py-1 sm:py-4 text-gray-600 max-w-full sm:max-w-md truncate">
                         {trail.description}
                       </td>
                      

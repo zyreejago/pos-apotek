@@ -203,26 +203,26 @@ export default function Page() {
       <div className="p-3 sm:p-4 md:p-8 pt-0">
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-              <div className="w-full lg:max-w-full sm:max-w-md">
+              <div className="w-full">
                 <label className="block text-sm font-medium text-gray-700 mb-2">Cari Produk</label>
                 <input
                   type="text"
                   placeholder="Ketik nama produk..."
-                  className="w-full px-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                  className="w-full px-3 py-1.5 sm:px-4 sm:py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
                 />
               </div>
 
-              <div className="flex items-center gap-3">
-                <div className="text-sm text-gray-600">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 w-full lg:w-auto">
+                <div className="text-xs sm:text-sm text-gray-600">
                   {lastUpdated ? `Terakhir diperbarui: ${lastUpdated.toLocaleString()}` : 'Belum ada hasil peramalan'}
                 </div>
                 <button
                   type="button"
                   onClick={handleRefresh}
                   disabled={refreshLoading}
-                  className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                  className="w-full sm:w-auto px-3 py-1.5 sm:px-4 sm:py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
                 >
                   {refreshLoading ? (
                     <>
@@ -267,7 +267,7 @@ export default function Page() {
                   return (
                     <div
                       key={r.id}
-                      className="bg-white border border-gray-100 rounded-xl shadow-sm p-4 flex flex-col gap-3 hover:shadow-md transition-shadow"
+                      className="bg-white border border-gray-100 rounded-xl shadow-sm p-3 sm:p-4 flex flex-col gap-3 hover:shadow-md transition-shadow"
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
@@ -280,25 +280,25 @@ export default function Page() {
                       </div>
 
                       <div className="grid grid-cols-2 gap-3 text-sm">
-                        <div className="rounded-lg border border-gray-100 bg-gray-50 p-3">
+                        <div className="rounded-lg border border-gray-100 bg-gray-50 p-2 sm:p-3">
                           <div className="text-xs text-gray-500">Stok saat ini</div>
                           <div className="font-semibold text-gray-900">
                             {formatInt(Number(r.stock || 0))} {r.unit}
                           </div>
                         </div>
-                        <div className="rounded-lg border border-gray-100 bg-gray-50 p-3">
+                        <div className="rounded-lg border border-gray-100 bg-gray-50 p-2 sm:p-3">
                           <div className="text-xs text-gray-500">Tambahan</div>
                           <div className="font-semibold text-blue-700">
                             {r.tambahan_stok === null ? '-' : `${formatInt(r.tambahan_stok)} ${r.unit}`}
                           </div>
                         </div>
-                        <div className="rounded-lg border border-gray-100 bg-gray-50 p-3">
+                        <div className="rounded-lg border border-gray-100 bg-gray-50 p-2 sm:p-3">
                           <div className="text-xs text-gray-500">Kebutuhan 7 hari</div>
                           <div className="font-semibold text-gray-900">
                             {r.kebutuhan_7_hari === null ? '-' : `${formatInt(r.kebutuhan_7_hari)} ${r.unit}`}
                           </div>
                         </div>
-                        <div className="rounded-lg border border-gray-100 bg-gray-50 p-3">
+                        <div className="rounded-lg border border-gray-100 bg-gray-50 p-2 sm:p-3">
                           <div className="text-xs text-gray-500">Per hari</div>
                           <div className="font-semibold text-gray-900">
                             {formatInt(Math.round(Number(r.perkiraan_penjualan_per_hari ?? 0)))} {r.unit}
@@ -310,14 +310,14 @@ export default function Page() {
                         <button
                           type="button"
                           onClick={() => setOpenNoteId(prev => (prev === r.id ? null : r.id))}
-                          className="flex-1 text-left text-xs font-medium text-gray-700 border border-gray-100 rounded-lg px-3 py-2 bg-white hover:bg-gray-50 transition-colors"
+                          className="flex-1 text-left text-xs font-medium text-gray-700 border border-gray-100 rounded-lg px-2 py-1 sm:px-3 sm:py-2 bg-white hover:bg-gray-50 transition-colors"
                         >
                           {isNoteOpen ? 'Sembunyikan catatan' : 'Lihat catatan'}
                         </button>
                         <button
                           type="button"
                           onClick={() => handleViewDetail(r)}
-                          className="text-xs font-medium text-blue-700 border border-blue-200 rounded-lg px-3 py-2 bg-blue-50 hover:bg-blue-100 transition-colors"
+                          className="text-xs font-medium text-blue-700 border border-blue-200 rounded-lg px-2 py-1 sm:px-3 sm:py-2 bg-blue-50 hover:bg-blue-100 transition-colors"
                         >
                           Debug
                         </button>
@@ -340,7 +340,7 @@ export default function Page() {
       {selectedProduct && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[80vh] overflow-hidden">
-            <div className="p-6 border-b border-gray-100 flex items-center justify-between">
+            <div className="p-4 sm:p-6 border-b border-gray-100 flex items-center justify-between">
               <h3 className="text-lg font-semibold text-gray-900">Debug - {selectedProduct.name}</h3>
               <button
                 onClick={() => {
@@ -354,7 +354,7 @@ export default function Page() {
                 </svg>
               </button>
             </div>
-            <div className="p-6 overflow-y-auto max-h-[calc(80vh-120px)]">
+            <div className="p-4 sm:p-6 overflow-y-auto max-h-[calc(80vh-120px)]">
               {detailLoading ? (
                 <div className="text-center py-8 text-gray-500">Memuat...</div>
               ) : forecastDetail ? (

@@ -220,7 +220,7 @@ export default function SaleReturnsPage() {
     <div className="bg-gray-50 min-h-screen">
       <PageHeader title="Retur Penjualan" subtitle="Retur barang dari pelanggan" breadcrumbs={[{ label: 'Retur Penjualan' }]} />
 
-      <div className="p-8 pt-0 max-w-full sm:max-w-5xl mx-auto">
+      <div className="p-3 sm:p-4 md:p-8 pt-0 max-w-full sm:max-w-5xl mx-auto">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
           <div className="bg-white rounded-xl shadow-sm p-4">
             <div className="flex items-center gap-3">
@@ -277,8 +277,8 @@ export default function SaleReturnsPage() {
         </div>
 
         {/* Lookup Section */}
-        <div className="bg-white rounded-xl shadow-sm mb-6 relative overflow-hidden">
-          <div className="p-6">
+          <div className="bg-white rounded-xl shadow-sm mb-6 relative overflow-hidden">
+          <div className="p-4 sm:p-6">
             <div className="flex items-start justify-between mb-4">
               <h2 className="text-lg font-semibold flex items-center gap-2">
                 <div className="w-8 h-8 bg-emerald-50 rounded-lg flex items-center justify-center">
@@ -287,7 +287,7 @@ export default function SaleReturnsPage() {
                 Cari Transaksi Penjualan
               </h2>
             </div>
-            <div className="flex gap-3">
+            <div className="flex flex-col sm:flex-row gap-3">
               <div className="relative flex-1">
                 <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                 <input
@@ -302,7 +302,7 @@ export default function SaleReturnsPage() {
               <button
                 onClick={handleLookup}
                 disabled={loading}
-                className="px-6 py-2.5 bg-emerald-600 text-white rounded-lg font-medium hover:bg-emerald-700 disabled:opacity-50 flex items-center gap-2 transition-all"
+                className="w-full sm:w-auto px-4 sm:px-6 py-1.5 sm:py-2.5 bg-emerald-600 text-white rounded-lg font-medium hover:bg-emerald-700 disabled:opacity-50 flex items-center justify-center gap-2 transition-all"
               >
                 {loading ? (
                   <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Mencari...</>
@@ -314,7 +314,7 @@ export default function SaleReturnsPage() {
 
         {!searched && !lookupResult && (
           <div className="bg-white rounded-xl shadow-sm mb-6 overflow-hidden">
-            <div className="p-10 text-center">
+            <div className="p-6 sm:p-10 text-center">
               <div className="w-20 h-20 bg-emerald-50 rounded-2xl flex items-center justify-center mx-auto mb-5 shadow-sm">
                 <ShoppingCart size={36} className="text-emerald-400" />
               </div>
@@ -354,15 +354,15 @@ export default function SaleReturnsPage() {
         {lookupResult && (
           <>
             <div className="bg-white rounded-xl shadow-sm mb-6 overflow-hidden">
-              <div className="p-6">
-                <div className="flex justify-between items-start mb-4">
-                  <div className="flex items-start gap-3">
-                    <div className="w-12 h-12 bg-emerald-50 rounded-xl flex items-center justify-center">
+              <div className="p-4 sm:p-6">
+                <div className="flex flex-col sm:flex-row justify-between items-start gap-3 mb-4">
+                  <div className="flex items-start gap-3 w-full sm:w-auto">
+                    <div className="w-12 h-12 bg-emerald-50 rounded-xl flex items-center justify-center shrink-0">
                       <ShoppingCart size={24} className="text-emerald-600" />
                     </div>
-                    <div>
-                      <h3 className="text-lg font-semibold">Transaksi #{lookupResult.sale.id}</h3>
-                      <p className="text-sm text-gray-500 mt-0.5">
+                    <div className="min-w-0 flex-1">
+                      <h3 className="text-lg font-semibold truncate">Transaksi #{lookupResult.sale.id}</h3>
+                      <p className="text-sm text-gray-500 mt-0.5 flex flex-wrap items-center gap-1">
                         {new Date(lookupResult.sale.date).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
                         <span className="mx-2">&middot;</span>
                         <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
@@ -373,7 +373,7 @@ export default function SaleReturnsPage() {
                       </p>
                     </div>
                   </div>
-                  <div className="text-right bg-gray-50 rounded-xl px-4 py-2">
+                  <div className="text-right bg-gray-50 rounded-xl px-4 py-2 w-full sm:w-auto">
                     <p className="text-xs text-gray-500">Total Transaksi</p>
                     <p className="text-lg font-bold text-gray-800">{new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format(lookupResult.sale.total)}</p>
                   </div>
@@ -383,13 +383,13 @@ export default function SaleReturnsPage() {
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="bg-gray-50">
-                        <th className="px-4 py-3 text-left font-medium text-gray-600">Produk</th>
-                        <th className="px-4 py-3 text-center font-medium text-gray-600">Terjual</th>
-                        <th className="px-4 py-3 text-center font-medium text-gray-600">Harga</th>
-                        <th className="px-4 py-3 text-center font-medium text-gray-600">Sudah Retur</th>
-                        <th className="px-4 py-3 text-center font-medium text-gray-600">Bisa Retur</th>
-                        <th className="px-4 py-3 text-center font-medium text-gray-600">Qty Retur</th>
-                        <th className="px-4 py-3 text-center font-medium text-gray-600">Kondisi</th>
+                        <th className="px-2 sm:px-4 py-1 sm:py-3 text-left font-medium text-gray-600">Produk</th>
+                        <th className="px-2 sm:px-4 py-1 sm:py-3 text-center font-medium text-gray-600">Terjual</th>
+                        <th className="px-2 sm:px-4 py-1 sm:py-3 text-center font-medium text-gray-600">Harga</th>
+                        <th className="px-2 sm:px-4 py-1 sm:py-3 text-center font-medium text-gray-600">Sudah Retur</th>
+                        <th className="px-2 sm:px-4 py-1 sm:py-3 text-center font-medium text-gray-600">Bisa Retur</th>
+                        <th className="px-2 sm:px-4 py-1 sm:py-3 text-center font-medium text-gray-600">Qty Retur</th>
+                        <th className="px-2 sm:px-4 py-1 sm:py-3 text-center font-medium text-gray-600">Kondisi</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
@@ -397,23 +397,23 @@ export default function SaleReturnsPage() {
                         const disabled = item.qty_returnable <= 0;
                         return (
                           <tr key={item.product_id} className={`hover:bg-gray-50/50 transition-colors ${disabled ? 'opacity-40' : ''}`}>
-                            <td className="px-4 py-3 font-medium">{item.product_name}</td>
-                            <td className="px-4 py-3 text-center">{item.quantity}</td>
-                            <td className="px-4 py-3 text-center">
+                            <td className="px-2 sm:px-4 py-1 sm:py-3 font-medium">{item.product_name}</td>
+                            <td className="px-2 sm:px-4 py-1 sm:py-3 text-center">{item.quantity}</td>
+                            <td className="px-2 sm:px-4 py-1 sm:py-3 text-center">
                               {new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format(item.price)}
                             </td>
-                            <td className="px-4 py-3 text-center">
+                            <td className="px-2 sm:px-4 py-1 sm:py-3 text-center">
                               {item.qty_already_returned > 0 ? (
                                 <span className="text-orange-600 font-medium">{item.qty_already_returned}</span>
                               ) : (
                                 <span className="text-gray-300">0</span>
                               )}
                             </td>
-                            <td className="px-4 py-3 text-center font-semibold">{item.qty_returnable}</td>
-                            {/* <td className="px-4 py-3 text-center text-xs">
+                            <td className="px-2 sm:px-4 py-1 sm:py-3 text-center font-semibold">{item.qty_returnable}</td>
+                            {/* <td className="px-2 sm:px-4 py-1 sm:py-3 text-center text-xs">
                               {item.expired_date ? new Date(item.expired_date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) : '-'}
                             </td> */}
-                            <td className="px-4 py-3 text-center">
+                            <td className="px-2 sm:px-4 py-1 sm:py-3 text-center">
                               <input
                                 type="number"
                                 min={0}
@@ -424,7 +424,7 @@ export default function SaleReturnsPage() {
                                 onChange={e => handleQtyChange(item.product_id, e.target.value)}
                               />
                             </td>
-                            <td className="px-4 py-3 text-center">
+                            <td className="px-2 sm:px-4 py-1 sm:py-3 text-center">
                               {disabled ? (
                                 <span className="text-gray-300">-</span>
                               ) : (
@@ -449,7 +449,7 @@ export default function SaleReturnsPage() {
 
             {/* Submit Section */}
             <div className="bg-white rounded-xl shadow-sm mb-6 overflow-hidden">
-              <div className="p-6">
+              <div className="p-4 sm:p-6">
                 <h3 className="font-semibold text-gray-800 mb-4 flex items-center gap-2">
                   <RotateCcw size={18} className="text-emerald-600" />
                   Konfirmasi Retur
@@ -458,7 +458,7 @@ export default function SaleReturnsPage() {
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1.5">Alasan Retur</label>
                     <textarea
-                      className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all resize-none"
+                      className="w-full px-3 sm:px-4 py-1.5 sm:py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all resize-none"
                       rows={3}
                       value={reason}
                       onChange={e => setReason(e.target.value)}
@@ -468,7 +468,7 @@ export default function SaleReturnsPage() {
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1.5">Metode Refund</label>
                     <select
-                      className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all"
+                      className="w-full px-3 sm:px-4 py-1.5 sm:py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all"
                       value={refundMethod}
                       onChange={e => setRefundMethod(e.target.value as any)}
                     >
@@ -485,17 +485,17 @@ export default function SaleReturnsPage() {
                   </div>
                 </div>
 
-                <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
+                <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-4 border-t border-gray-100">
                   <button
                     onClick={() => { setLookupResult(null); setSearched(false); }}
-                    className="px-5 py-2.5 bg-gray-100 text-gray-700 font-medium rounded-xl hover:bg-gray-200 flex items-center gap-2 transition-all"
+                    className="w-full sm:w-auto px-3 sm:px-5 py-1.5 sm:py-2.5 bg-gray-100 text-gray-700 font-medium rounded-xl hover:bg-gray-200 flex items-center justify-center gap-2 transition-all"
                   >
                     <ArrowLeft size={16} /> Batal
                   </button>
                   <button
                     onClick={handleSubmit}
                     disabled={submitting || totalRefund <= 0}
-                    className="px-6 py-2.5 bg-emerald-600 text-white font-medium rounded-xl hover:bg-emerald-700 disabled:opacity-50 flex items-center gap-2 transition-all"
+                    className="w-full sm:w-auto px-4 sm:px-6 py-1.5 sm:py-2.5 bg-emerald-600 text-white font-medium rounded-xl hover:bg-emerald-700 disabled:opacity-50 flex items-center justify-center gap-2 transition-all"
                   >
                     {submitting ? (
                       <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Memproses...</>
@@ -511,7 +511,7 @@ export default function SaleReturnsPage() {
 
         {searched && !lookupResult && !loading && (
           <div className="bg-white rounded-xl shadow-sm mb-6 overflow-hidden">
-            <div className="p-12 text-center">
+            <div className="p-6 sm:p-12 text-center">
               <div className="w-16 h-16 bg-orange-50 rounded-full flex items-center justify-center mx-auto mb-4">
                 <AlertCircle size={32} className="text-orange-300" />
               </div>
@@ -553,7 +553,7 @@ export default function SaleReturnsPage() {
           {showHistory && (
             <div className="mt-3 space-y-3">
               {historyList.length === 0 && !historyLoading && (
-                <div className="bg-white rounded-xl shadow-sm p-10 text-center">
+                <div className="bg-white rounded-xl shadow-sm p-6 sm:p-10 text-center">
                   <div className="w-14 h-14 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-3">
                     <History size={28} className="text-gray-300" />
                   </div>
@@ -658,14 +658,14 @@ export default function SaleReturnsPage() {
               <div className="flex gap-3">
                 <button
                   onClick={() => setShowConfirm(false)}
-                  className="flex-1 px-4 py-2.5 bg-gray-100 text-gray-700 font-medium rounded-xl hover:bg-gray-200 transition-all"
+                  className="flex-1 px-3 sm:px-4 py-1.5 sm:py-2.5 bg-gray-100 text-gray-700 font-medium rounded-xl hover:bg-gray-200 transition-all"
                 >
                   Batal
                 </button>
                 <button
                   onClick={handleConfirmSubmit}
                   disabled={submitting}
-                  className="flex-1 px-4 py-2.5 bg-emerald-600 text-white font-medium rounded-xl hover:bg-emerald-700 disabled:opacity-50 transition-all"
+                  className="flex-1 px-3 sm:px-4 py-1.5 sm:py-2.5 bg-emerald-600 text-white font-medium rounded-xl hover:bg-emerald-700 disabled:opacity-50 transition-all"
                 >
                   {submitting ? 'Memproses...' : 'Ya, Proses'}
                 </button>

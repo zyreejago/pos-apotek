@@ -206,16 +206,16 @@ export default function GeneralJournalPage() {
   };
 
   return (
-    <div className="bg-gray-50 min-h-screen relative p-8">
+    <div className="bg-gray-50 min-h-screen relative p-4 sm:p-8">
       <PageHeader
         title="Jurnal Umum (General Journal)"
         subtitle="Pencatatan transaksi manual dan daftar seluruh ayat jurnal sistem"
         rightContent={
           <button
             onClick={() => setIsOffCanvasOpen(true)}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium transition-colors shadow-sm"
+            className="bg-blue-600 hover:bg-blue-700 text-white px-1.5 sm:px-4 py-0.5 sm:py-2 rounded-lg flex items-center gap-1 sm:gap-2 text-[10px] sm:text-sm font-medium transition-colors shadow-sm"
           >
-            <Plus size={18} />
+            <Plus size={14} />
             Buat Jurnal Manual
           </button>
         }
@@ -243,7 +243,7 @@ export default function GeneralJournalPage() {
         </div>
         <button
           onClick={fetchJournalEntries}
-          className="px-6 py-2 bg-gray-800 hover:bg-gray-900 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
+          className="px-2 sm:px-6 py-1 sm:py-2 bg-gray-800 hover:bg-gray-900 text-white rounded-lg text-xs sm:text-sm font-medium transition-colors flex items-center justify-center gap-2"
         >
           Filter Laporan
         </button>
@@ -261,13 +261,13 @@ export default function GeneralJournalPage() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm text-left border-collapse">
+            <table className="w-full text-xs sm:text-sm text-left border-collapse">
               <thead className="bg-gray-50 text-gray-500 font-medium uppercase text-xs border-b border-gray-100">
                 <tr>
-                  <th className="px-3 sm:px-6 py-4">Tanggal & Deskripsi</th>
-                  <th className="px-3 sm:px-6 py-4">Akun</th>
-                  <th className="px-6 py-4 text-right">Debit</th>
-                  <th className="px-6 py-4 text-right">Kredit</th>
+                  <th className="px-3 sm:px-6 py-1.5 sm:py-3">Tanggal & Deskripsi</th>
+                  <th className="px-3 sm:px-6 py-1.5 sm:py-3">Akun</th>
+                  <th className="px-2 sm:px-6 py-1.5 sm:py-4 text-right">Debit</th>
+                  <th className="px-2 sm:px-6 py-1.5 sm:py-4 text-right">Kredit</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -275,7 +275,7 @@ export default function GeneralJournalPage() {
                   <React.Fragment key={entry.id}>
                     {/* Header Row of the entry */}
                     <tr className="bg-gray-50/50">
-                      <td colSpan={4} className="px-6 py-3 font-semibold text-gray-800 border-t border-gray-200">
+                      <td colSpan={4} className="px-2 sm:px-6 py-1 sm:py-3 font-semibold text-gray-800 border-t border-gray-200">
                         <div className="flex justify-between items-center">
                           <span>{formatDate(entry.date)}</span>
                           <span className="text-xs text-gray-400 font-normal">ID Jurnal: #{entry.id}</span>
@@ -288,17 +288,17 @@ export default function GeneralJournalPage() {
                     {/* Item lines */}
                     {entry.items.map((item, idx) => (
                       <tr key={item.id || idx} className="hover:bg-gray-50/30">
-                        <td className="px-3 sm:px-6 py-3"></td>
-                        <td className="px-3 sm:px-6 py-3">
+                        <td className="px-3 sm:px-6 py-1 sm:py-3"></td>
+                        <td className="px-3 sm:px-6 py-1 sm:py-3">
                           <div className={item.credit > 0 ? "pl-8 text-gray-600" : "font-medium text-gray-900"}>
                             <span className="text-xs text-gray-400 font-mono mr-2 bg-gray-100 px-1.5 py-0.5 rounded">{item.account_code}</span>
                             {item.account_name}
                           </div>
                         </td>
-                        <td className="px-6 py-3 text-right text-gray-950 font-medium">
+                        <td className="px-2 sm:px-6 py-1 sm:py-3 text-right text-gray-950 font-medium">
                           {item.debit > 0 ? formatCurrency(item.debit) : '-'}
                         </td>
-                        <td className="px-6 py-3 text-right text-gray-950 font-medium">
+                        <td className="px-2 sm:px-6 py-1 sm:py-3 text-right text-gray-950 font-medium">
                           {item.credit > 0 ? formatCurrency(item.credit) : '-'}
                         </td>
                       </tr>
@@ -350,7 +350,7 @@ export default function GeneralJournalPage() {
                 <button
                   type="button"
                   onClick={handleAddInputRow}
-                  className="text-xs text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1 border border-blue-200 px-2 py-1 rounded hover:bg-blue-50 transition-colors"
+                  className="text-xs text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1 border border-blue-200 px-1 sm:px-2 py-0.5 sm:py-1 rounded hover:bg-blue-50 transition-colors"
                 >
                   + Tambah Baris
                 </button>
@@ -358,7 +358,7 @@ export default function GeneralJournalPage() {
 
               <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
                 {inputItems.map((item, index) => (
-                  <div key={index} className="flex items-center gap-2 bg-gray-50 p-3 rounded-lg border border-gray-200">
+                  <div key={index} className="flex flex-col sm:flex-row sm:items-center gap-2 bg-gray-50 p-3 rounded-lg border border-gray-200">
                     <div className="flex-1 min-w-[200px]">
                       <select
                         required
@@ -375,7 +375,7 @@ export default function GeneralJournalPage() {
                       </select>
                     </div>
 
-                    <div className="w-32">
+                    <div className="w-full sm:w-32">
                       <input
                         type="number"
                         placeholder="Debit"
@@ -386,7 +386,7 @@ export default function GeneralJournalPage() {
                       />
                     </div>
 
-                    <div className="w-32">
+                    <div className="w-full sm:w-32">
                       <input
                         type="number"
                         placeholder="Kredit"
@@ -432,14 +432,14 @@ export default function GeneralJournalPage() {
               <button
                 type="button"
                 onClick={() => setIsOffCanvasOpen(false)}
-                className="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50"
+                className="px-2 sm:px-4 py-1 sm:py-2 border border-gray-300 rounded-lg text-xs sm:text-sm text-gray-700 hover:bg-gray-50"
               >
                 Batal
               </button>
               <button
                 type="submit"
                 disabled={!isBalanced}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium flex items-center gap-2 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
+                className="px-2 sm:px-4 py-1 sm:py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs sm:text-sm font-medium flex items-center gap-2 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
               >
                 <Save size={16} />
                 Simpan Jurnal

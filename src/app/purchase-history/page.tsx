@@ -168,8 +168,8 @@ export default function PurchaseHistoryPage() {
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
           {/* Toolbar */}
           <div className="p-4 border-b border-gray-100 flex flex-col md:flex-row justify-between items-center gap-4 bg-gray-50/50">
-            <div className="flex items-center gap-3 w-full md:w-auto">
-              <div className="relative flex-1 md:w-64">
+            <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
+              <div className="relative w-full md:w-64">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                 <input 
                   type="text" 
@@ -181,11 +181,11 @@ export default function PurchaseHistoryPage() {
               </div>
             </div>
             
-            <div className="flex items-center gap-3 w-full md:w-auto">
-              <div className="flex items-center gap-2 text-sm text-gray-600 bg-white border border-gray-200 px-3 py-2 rounded-lg">
+            <div className="flex items-center gap-3 w-full sm:w-auto">
+              <div className="flex items-center gap-2 text-sm text-gray-600 bg-white border border-gray-200 px-2 py-1.5 sm:px-3 sm:py-2 rounded-lg w-full sm:w-auto">
                 <Filter size={16} className="text-gray-400" />
                 <select 
-                  className="bg-transparent border-none focus:outline-none cursor-pointer"
+                  className="bg-transparent border-none focus:outline-none cursor-pointer w-full sm:w-auto"
                   value={statusFilter}
                   onChange={(e) => setStatusFilter(e.target.value)}
                 >
@@ -329,13 +329,13 @@ export default function PurchaseHistoryPage() {
                 return (
                   <div key={invoiceNumber} className="border border-purple-200 rounded-xl overflow-hidden">
                     <button onClick={() => setExpandedFaktur(isExpanded ? null : invoiceNumber)}
-                      className="w-full flex items-center gap-3 p-4 bg-purple-50 hover:bg-purple-100 transition-colors text-left">
-                      <FileText size={18} className="text-purple-600 shrink-0" />
+                      className="w-full flex items-center gap-2 sm:gap-3 p-3 sm:p-4 bg-purple-50 hover:bg-purple-100 transition-colors text-left">
+                      <FileText size={18} className="text-purple-600 shrink-0 hidden sm:block" />
                       <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-sm text-gray-800">{displayLabel}</p>
-                        <p className="text-xs text-gray-500">{supplierName} · {items.length} produk · {totalQty} pcs · {formatCurrency(totalCost)}</p>
+                        <p className="font-semibold text-xs sm:text-sm text-gray-800 truncate">{displayLabel}</p>
+                        <p className="text-[10px] sm:text-xs text-gray-500 truncate">{supplierName} · {items.length} produk · {totalQty} pcs · {formatCurrency(totalCost)}</p>
                       </div>
-                      <div className="text-[10px] text-gray-400 shrink-0">{new Date(firstDate).toLocaleDateString('id-ID')}</div>
+                      <div className="text-[10px] text-gray-400 shrink-0 hidden sm:block">{new Date(firstDate).toLocaleDateString('id-ID')}</div>
                       <div className="flex gap-1 shrink-0">
                         {Object.entries(statusCounts).map(([s, c]) => (
                           <span key={s} className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
@@ -345,7 +345,7 @@ export default function PurchaseHistoryPage() {
                           }`}>{c} {s === 'approved' ? '✓' : s === 'pending' ? '⏳' : s === 'rejected' ? '✗' : '?'}</span>
                         ))}
                       </div>
-                      <svg className={`w-4 h-4 text-purple-600 transition-transform ${isExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                      <svg className={`w-4 h-4 text-purple-600 shrink-0 transition-transform ${isExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
                     </button>
                     {isExpanded && (
                       <div className="p-3 space-y-2 bg-white border-t border-purple-100">

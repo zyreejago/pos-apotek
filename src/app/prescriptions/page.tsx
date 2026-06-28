@@ -772,9 +772,9 @@ export default function PrescriptionsPage() {
           checkActionPermission('create') && (
             <button 
               onClick={handleOpenAddOffCanvas}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium transition-colors"
+              className="bg-blue-600 hover:bg-blue-700 text-white px-2 sm:px-4 py-1 sm:py-2 rounded-lg flex items-center gap-2 text-xs sm:text-sm font-medium transition-colors"
             >
-              <Plus size={16} />
+              <Plus className="w-3.5 sm:w-4 h-3.5 sm:h-4" />
               Tambah Resep
             </button>
           )
@@ -802,51 +802,51 @@ export default function PrescriptionsPage() {
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full text-sm text-left">
+            <table className="w-full text-xs sm:text-sm text-left">
               <thead className="bg-gray-50 text-gray-500 font-medium">
                 <tr>
-                  <th className="px-3 sm:px-6 py-4">Kode Resep</th>
-                  <th className="px-3 sm:px-6 py-4">Tanggal</th>
-                  <th className="px-3 sm:px-6 py-4">Dokter</th>
-                  <th className="px-3 sm:px-6 py-4">Instansi</th>
-                  <th className="px-3 sm:px-6 py-4">Diupload Oleh</th>
-                  <th className="px-3 sm:px-6 py-4">Gambar</th>
-                  <th className="px-3 sm:px-6 py-4">Items</th>
-                  <th className="px-6 py-4 text-right">Aksi</th>
+                  <th className="px-3 sm:px-6 py-2 sm:py-4">Kode Resep</th>
+                  <th className="px-3 sm:px-6 py-2 sm:py-4">Tanggal</th>
+                  <th className="px-3 sm:px-6 py-2 sm:py-4">Dokter</th>
+                  <th className="px-3 sm:px-6 py-2 sm:py-4">Instansi</th>
+                  <th className="px-3 sm:px-6 py-2 sm:py-4">Diupload Oleh</th>
+                  <th className="px-3 sm:px-6 py-2 sm:py-4">Gambar</th>
+                  <th className="px-3 sm:px-6 py-2 sm:py-4">Items</th>
+                  <th className="px-3 sm:px-6 py-2 sm:py-4 text-right">Aksi</th>
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={8} className="px-6 py-8 text-center text-gray-500">
+                    <td colSpan={8} className="px-3 sm:px-6 py-4 sm:py-8 text-center text-gray-500">
                       Memuat resep...
                     </td>
                   </tr>
                 ) : filteredPrescriptions.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="px-6 py-8 text-center text-gray-500">
+                    <td colSpan={8} className="px-3 sm:px-6 py-4 sm:py-8 text-center text-gray-500">
                       Belum ada resep yang ditambahkan
                     </td>
                   </tr>
                 ) : (
                   filteredPrescriptions.map((prescription) => (
                     <tr key={prescription.id} className="hover:bg-gray-50 transition-colors group">
-                      <td className="px-6 py-4 font-medium text-gray-900">
+                      <td className="px-3 sm:px-6 py-2 sm:py-4 font-medium text-gray-900">
                         {prescription.prescription_code || '-'}
                       </td>
-                      <td className="px-6 py-4 text-gray-600">
+                      <td className="px-3 sm:px-6 py-2 sm:py-4 text-gray-600">
                         {formatDate(prescription.prescription_date)}
                       </td>
-                      <td className="px-6 py-4 text-gray-600">
+                      <td className="px-3 sm:px-6 py-2 sm:py-4 text-gray-600">
                         {prescription.doctor_name || '-'}
                       </td>
-                      <td className="px-6 py-4 text-gray-600">
+                      <td className="px-3 sm:px-6 py-2 sm:py-4 text-gray-600">
                         {prescription.instansi || '-'}
                       </td>
-                      <td className="px-6 py-4 text-gray-600">
+                      <td className="px-3 sm:px-6 py-2 sm:py-4 text-gray-600">
                         {prescription.entered_by_name || '-'}
                       </td>
-                      <td className="px-3 sm:px-6 py-4">
+                      <td className="px-3 sm:px-6 py-2 sm:py-4">
                         {prescription.image_url ? (
                           <button
                             type="button"
@@ -860,7 +860,7 @@ export default function PrescriptionsPage() {
                           '-'
                         )}
                       </td>
-                      <td className="px-3 sm:px-6 py-4">
+                      <td className="px-3 sm:px-6 py-2 sm:py-4">
                         {prescription.items && prescription.items.length > 0 ? (
                           <div className="space-y-1 max-w-xs">
                             {prescription.items.map((item, index) => (
@@ -876,12 +876,12 @@ export default function PrescriptionsPage() {
                           '-'
                         )}
                       </td>
-                      <td className="px-6 py-4 text-right">
-                        <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <td className="px-3 sm:px-6 py-2 sm:py-4 text-right">
+                        <div className="flex justify-end gap-2 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                           {checkActionPermission('edit') && (
                             <button 
                               onClick={() => handleOpenEditOffCanvas(prescription)}
-                              className="p-1 text-blue-600 hover:bg-blue-50 rounded"
+                              className="p-0.5 sm:p-1 text-blue-600 hover:bg-blue-50 rounded"
                               title="Edit"
                             >
                               <Edit size={16} />
@@ -890,7 +890,7 @@ export default function PrescriptionsPage() {
                           {checkActionPermission('delete') && (
                             <button 
                               onClick={() => handleOpenDeleteModal(prescription)}
-                              className="p-1 text-red-600 hover:bg-red-50 rounded"
+                              className="p-0.5 sm:p-1 text-red-600 hover:bg-red-50 rounded"
                               title="Delete"
                             >
                               <Trash2 size={16} />
@@ -1104,21 +1104,21 @@ export default function PrescriptionsPage() {
                   </div>
                   
                   <div className="overflow-x-auto">
-                    <table className="w-full text-sm text-left">
+                    <table className="w-full text-xs sm:text-sm text-left">
                       <thead className="bg-slate-50/50 text-slate-500 font-medium text-xs uppercase tracking-wider">
                         <tr>
-                          <th className="px-4 py-3 w-10 text-center">#</th>
-                          <th className="px-4 py-3">Nama Obat</th>
-                          <th className="px-4 py-3 w-32 text-center">Dosis/Jumlah</th>
-                          <th className="px-4 py-3 text-right">Harga Satuan</th>
-                          <th className="px-4 py-3 text-right">Subtotal</th>
-                          <th className="px-4 py-3 w-16 text-center">Hapus</th>
+                          <th className="px-2 sm:px-4 py-1.5 sm:py-3 w-10 text-center">#</th>
+                          <th className="px-2 sm:px-4 py-1.5 sm:py-3">Nama Obat</th>
+                          <th className="px-2 sm:px-4 py-1.5 sm:py-3 w-32 text-center">Dosis/Jumlah</th>
+                          <th className="px-2 sm:px-4 py-1.5 sm:py-3 text-right">Harga Satuan</th>
+                          <th className="px-2 sm:px-4 py-1.5 sm:py-3 text-right">Subtotal</th>
+                          <th className="px-2 sm:px-4 py-1.5 sm:py-3 w-16 text-center">Hapus</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100">
                         {cart.length === 0 ? (
                           <tr>
-                            <td colSpan={6} className="px-4 py-12 text-center text-gray-400">
+                            <td colSpan={6} className="px-2 sm:px-4 py-6 sm:py-12 text-center text-gray-400">
                               <div className="flex flex-col items-center justify-center">
                                 <FileText size={32} className="mb-2 opacity-20" />
                                 <p>Belum ada obat yang dimasukkan ke resep</p>
@@ -1128,14 +1128,14 @@ export default function PrescriptionsPage() {
                         ) : (
                           cart.map((item, index) => (
                             <tr key={item.id} className="hover:bg-slate-50/50 transition-colors">
-                              <td className="px-4 py-3 text-center text-slate-400">{index + 1}</td>
-                              <td className="px-4 py-3 font-medium text-slate-800">{item.name}</td>
-                              <td className="px-4 py-3">
+                              <td className="px-2 sm:px-4 py-1.5 sm:py-3 text-center text-slate-400">{index + 1}</td>
+                              <td className="px-2 sm:px-4 py-1.5 sm:py-3 font-medium text-slate-800">{item.name}</td>
+                              <td className="px-2 sm:px-4 py-1.5 sm:py-3">
                                 <div className="flex items-center justify-center gap-2 bg-white border border-gray-200 rounded-md p-1 shadow-sm w-fit mx-auto">
                                   <button 
                                     type="button"
                                     onClick={(e) => { e.stopPropagation(); updateQuantity(item.id, -1); }}
-                                    className="w-6 h-6 flex items-center justify-center text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded"
+                                    className="w-5 h-5 sm:w-6 sm:h-6 flex items-center justify-center text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded"
                                   >
                                     <Minus size={14} />
                                   </button>
@@ -1168,19 +1168,19 @@ export default function PrescriptionsPage() {
                                   <button 
                                     type="button"
                                     onClick={(e) => { e.stopPropagation(); updateQuantity(item.id, 1); }}
-                                    className="w-6 h-6 flex items-center justify-center text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded"
+                                    className="w-5 h-5 sm:w-6 sm:h-6 flex items-center justify-center text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded"
                                   >
                                     <Plus size={14} />
                                   </button>
                                 </div>
                               </td>
-                              <td className="px-4 py-3 text-right text-slate-600">{formatCurrency(item.selling_price)}</td>
-                              <td className="px-4 py-3 text-right font-medium text-slate-800">{formatCurrency(item.selling_price * item.quantity)}</td>
-                              <td className="px-4 py-3 text-center">
+                              <td className="px-2 sm:px-4 py-1.5 sm:py-3 text-right text-slate-600">{formatCurrency(item.selling_price)}</td>
+                              <td className="px-2 sm:px-4 py-1.5 sm:py-3 text-right font-medium text-slate-800">{formatCurrency(item.selling_price * item.quantity)}</td>
+                              <td className="px-2 sm:px-4 py-1.5 sm:py-3 text-center">
                                 <button 
                                   type="button"
                                   onClick={(e) => { e.stopPropagation(); removeFromCart(item.id); }}
-                                  className="text-red-400 hover:text-red-600 p-1.5 hover:bg-red-50 rounded-md transition-colors"
+                                  className="text-red-400 hover:text-red-600 p-1 sm:p-1.5 hover:bg-red-50 rounded-md transition-colors"
                                   title="Hapus dari resep"
                                 >
                                   <Trash2 size={16} />
