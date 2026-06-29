@@ -1,0 +1,15 @@
+{
+  "headers": {
+    "x-nextjs-stale-time": "300",
+    "x-nextjs-prerender": "1",
+    "x-next-cache-tags": "_N_T_/layout,_N_T_/recommendations-debug/layout,_N_T_/recommendations-debug/page,_N_T_/recommendations-debug"
+  },
+  "segmentPaths": [
+    "/_tree",
+    "/_full",
+    "/recommendations-debug/__PAGE__",
+    "/recommendations-debug",
+    "/_index",
+    "/_head"
+  ]
+}

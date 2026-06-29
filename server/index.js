@@ -20,7 +20,7 @@ const registerReturnRoutes = require('./routes/returns');
 const registerCustomerRoutes = require('./routes/customers');
 const { registerAuditTrailRoutes, createAuditTrail } = require('./routes/audit-trails');
 
-const envPath = path.join(__dirname, '..', '.env');
+const envPath = path.join(__dirname, '.env');
 console.log('Loading .env from:', envPath);
 dotenv.config({ path: envPath });
 

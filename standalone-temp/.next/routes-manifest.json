@@ -1,0 +1,254 @@
+{
+  "version": 3,
+  "pages404": true,
+  "appType": "app",
+  "caseSensitive": false,
+  "basePath": "",
+  "redirects": [
+    {
+      "source": "/:path+/",
+      "destination": "/:path+",
+      "internal": true,
+      "priority": true,
+      "statusCode": 308,
+      "regex": "^(?:/((?:[^/]+?)(?:/(?:[^/]+?))*))/$"
+    }
+  ],
+  "headers": [],
+  "rewrites": {
+    "beforeFiles": [],
+    "afterFiles": [],
+    "fallback": []
+  },
+  "dynamicRoutes": [],
+  "staticRoutes": [
+    {
+      "page": "/",
+      "regex": "^/(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/(?:/)?$"
+    },
+    {
+      "page": "/_global-error",
+      "regex": "^/_global\\-error(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/_global\\-error(?:/)?$"
+    },
+    {
+      "page": "/_not-found",
+      "regex": "^/_not\\-found(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/_not\\-found(?:/)?$"
+    },
+    {
+      "page": "/api/knowledge",
+      "regex": "^/api/knowledge(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/knowledge(?:/)?$"
+    },
+    {
+      "page": "/api/substitutions",
+      "regex": "^/api/substitutions(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/substitutions(?:/)?$"
+    },
+    {
+      "page": "/approvals",
+      "regex": "^/approvals(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/approvals(?:/)?$"
+    },
+    {
+      "page": "/audit-trails",
+      "regex": "^/audit\\-trails(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/audit\\-trails(?:/)?$"
+    },
+    {
+      "page": "/dashboard",
+      "regex": "^/dashboard(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/dashboard(?:/)?$"
+    },
+    {
+      "page": "/favicon.ico",
+      "regex": "^/favicon\\.ico(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/favicon\\.ico(?:/)?$"
+    },
+    {
+      "page": "/forgot-password",
+      "regex": "^/forgot\\-password(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/forgot\\-password(?:/)?$"
+    },
+    {
+      "page": "/login",
+      "regex": "^/login(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/login(?:/)?$"
+    },
+    {
+      "page": "/prescriptions",
+      "regex": "^/prescriptions(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/prescriptions(?:/)?$"
+    },
+    {
+      "page": "/products",
+      "regex": "^/products(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/products(?:/)?$"
+    },
+    {
+      "page": "/profile",
+      "regex": "^/profile(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/profile(?:/)?$"
+    },
+    {
+      "page": "/purchase-history",
+      "regex": "^/purchase\\-history(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/purchase\\-history(?:/)?$"
+    },
+    {
+      "page": "/purchase-returns",
+      "regex": "^/purchase\\-returns(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/purchase\\-returns(?:/)?$"
+    },
+    {
+      "page": "/recommendations",
+      "regex": "^/recommendations(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/recommendations(?:/)?$"
+    },
+    {
+      "page": "/recommendations-debug",
+      "regex": "^/recommendations\\-debug(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/recommendations\\-debug(?:/)?$"
+    },
+    {
+      "page": "/recommendations-openrouter",
+      "regex": "^/recommendations\\-openrouter(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/recommendations\\-openrouter(?:/)?$"
+    },
+    {
+      "page": "/register",
+      "regex": "^/register(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/register(?:/)?$"
+    },
+    {
+      "page": "/reports/balance",
+      "regex": "^/reports/balance(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/reports/balance(?:/)?$"
+    },
+    {
+      "page": "/reports/financial",
+      "regex": "^/reports/financial(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/reports/financial(?:/)?$"
+    },
+    {
+      "page": "/reports/financial-transactions",
+      "regex": "^/reports/financial\\-transactions(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/reports/financial\\-transactions(?:/)?$"
+    },
+    {
+      "page": "/reports/general-journal",
+      "regex": "^/reports/general\\-journal(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/reports/general\\-journal(?:/)?$"
+    },
+    {
+      "page": "/reports/general-ledger",
+      "regex": "^/reports/general\\-ledger(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/reports/general\\-ledger(?:/)?$"
+    },
+    {
+      "page": "/reports/transactions",
+      "regex": "^/reports/transactions(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/reports/transactions(?:/)?$"
+    },
+    {
+      "page": "/sale-returns",
+      "regex": "^/sale\\-returns(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/sale\\-returns(?:/)?$"
+    },
+    {
+      "page": "/settings",
+      "regex": "^/settings(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/settings(?:/)?$"
+    },
+    {
+      "page": "/settings/role-permissions",
+      "regex": "^/settings/role\\-permissions(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/settings/role\\-permissions(?:/)?$"
+    },
+    {
+      "page": "/settings/transaction-settings",
+      "regex": "^/settings/transaction\\-settings(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/settings/transaction\\-settings(?:/)?$"
+    },
+    {
+      "page": "/stock-opname",
+      "regex": "^/stock\\-opname(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/stock\\-opname(?:/)?$"
+    },
+    {
+      "page": "/substitutions",
+      "regex": "^/substitutions(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/substitutions(?:/)?$"
+    },
+    {
+      "page": "/suppliers",
+      "regex": "^/suppliers(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/suppliers(?:/)?$"
+    },
+    {
+      "page": "/transactions",
+      "regex": "^/transactions(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/transactions(?:/)?$"
+    },
+    {
+      "page": "/users",
+      "regex": "^/users(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/users(?:/)?$"
+    }
+  ],
+  "dataRoutes": [],
+  "rsc": {
+    "header": "rsc",
+    "varyHeader": "rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch",
+    "prefetchHeader": "next-router-prefetch",
+    "didPostponeHeader": "x-nextjs-postponed",
+    "contentTypeHeader": "text/x-component",
+    "suffix": ".rsc",
+    "prefetchSegmentHeader": "next-router-segment-prefetch",
+    "prefetchSegmentSuffix": ".segment.rsc",
+    "prefetchSegmentDirSuffix": ".segments",
+    "clientParamParsing": false,
+    "dynamicRSCPrerender": false
+  },
+  "rewriteHeaders": {
+    "pathHeader": "x-nextjs-rewritten-path",
+    "queryHeader": "x-nextjs-rewritten-query"
+  }
+}

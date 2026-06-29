@@ -806,7 +806,7 @@ export default function POSTransactionsPage() {
             {loading ? (
                 <div className="flex justify-center items-center h-64">Loading products...</div>
             ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-4 pb-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-5 pb-4">
                 {filteredProducts.map(product => {
                     const cartItem = cart.find(item => item.id === product.id);
                     const prescItem = prescriptionItems.find(i => i.product.id === product.id);
@@ -818,7 +818,7 @@ export default function POSTransactionsPage() {
                     <div 
                     key={product.id} 
                     onClick={() => showPrescriptionForm ? addPrescriptionItem(product) : addToCart(product)}
-                    className={`p-2 rounded-lg shadow-sm cursor-pointer transition-all duration-300 group relative ${
+                    className={`p-3 sm:p-4 rounded-lg sm:rounded-xl shadow-sm cursor-pointer transition-all duration-300 group relative ${
                         isActive 
                           ? 'bg-blue-50 border-2 border-blue-500 shadow-md' 
                           : 'bg-white border-2 border-transparent hover:shadow-md hover:border-gray-200'
@@ -826,37 +826,37 @@ export default function POSTransactionsPage() {
                     >
                     {/* Badge Quantity */}
                     {isActive && (
-                        <div className={`absolute -top-2 -right-2 w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-[10px] font-bold shadow-md z-10 ${
+                        <div className={`absolute -top-2 -right-2 w-6 sm:w-8 h-6 sm:h-8 bg-blue-600 text-white rounded-full flex items-center justify-center text-[10px] sm:text-xs font-bold shadow-md z-10 ${
                             isHighlighted ? 'badge-scale-in' : ''
                         }`}>
                         {quantity}
                         </div>
                     )}
                     
-                    <div className="flex justify-between items-start mb-1 gap-1">
-                        <h3 className="font-semibold text-gray-800 line-clamp-1 text-xs">{product.name}</h3>
-                        <span className="text-[9px] font-medium bg-gray-100 text-gray-600 px-1 py-0.5 rounded-full shrink-0">
+                    <div className="flex justify-between items-start mb-1 sm:mb-2 gap-1">
+                        <h3 className="font-semibold text-gray-800 line-clamp-1 text-xs sm:text-sm">{product.name}</h3>
+                        <span className="text-[9px] sm:text-xs font-medium bg-gray-100 text-gray-600 px-1 sm:px-2 py-0.5 rounded-full shrink-0">
                             {formatStock(product.stock, product.unit_multiplier || 1, product.purchase_unit || 'Box', product.unit || 'Tablet')}
                         </span>
                     </div>
                     <div className="flex justify-between items-end">
                         <div>
-                            <p className={`font-bold text-[11px] ${
+                            <p className={`font-bold text-[11px] sm:text-sm ${
                                 isActive ? 'text-blue-700' : 'text-blue-600'
                             }`}>
                                 {formatCurrency(product.selling_price)} 
-                                <span className="text-gray-400 text-[9px] font-normal"> /{product.unit.toLowerCase()}</span>
+                                <span className="text-gray-400 text-[9px] sm:text-xs font-normal"> /{product.unit.toLowerCase()}</span>
                             </p>
                         </div>
-                        <div className="flex items-center gap-1">
+                        <div className="flex items-center gap-1 sm:gap-2">
                           {isActive && !showPrescriptionForm && (
                             <button onClick={(e) => { e.stopPropagation(); decrementProduct(product.id); }}
-                              className="w-6 h-6 flex items-center justify-center rounded-lg transition-all bg-blue-600 text-white shadow-md">
+                              className="w-6 sm:w-8 h-6 sm:h-8 flex items-center justify-center rounded-lg transition-all bg-blue-600 text-white shadow-md">
                               <Minus size={12} />
                             </button>
                           )}
                           <button onClick={(e) => { e.stopPropagation(); if (showPrescriptionForm) addPrescriptionItem(product); else addToCart(product); }}
-                            className={`w-6 h-6 flex items-center justify-center rounded-lg transition-all ${
+                            className={`w-6 sm:w-8 h-6 sm:h-8 flex items-center justify-center rounded-lg transition-all ${
                               isActive && !showPrescriptionForm
                                 ? 'bg-blue-600 text-white shadow-md' 
                                 : 'bg-blue-50 text-blue-600 opacity-0 sm:opacity-0 sm:group-hover:opacity-100'
@@ -877,46 +877,46 @@ export default function POSTransactionsPage() {
         {!showBuyerForm && !showPrescriptionForm && (
           <div className={`
             fixed bottom-0 left-16 right-0 z-30
-            sm:fixed sm:right-6 sm:left-auto sm:top-[5rem] sm:w-96
-            bg-white flex flex-col overflow-hidden
-            sm:h-[calc(100vh-7rem)]
+            lg:fixed lg:right-6 lg:left-auto lg:top-[5rem] lg:w-96
+            bg-white flex flex-col
+            lg:h-[calc(100vh-7rem)]
             transition-all duration-300 ease-out
-            ${!showCartOnTablet ? 'hidden lg:block' : ''}
+            ${!showCartOnTablet ? 'hidden lg:flex' : ''}
             ${cart.length > 0 
-              ? 'max-h-[55vh] sm:max-h-full shadow-2xl rounded-t-2xl sm:rounded-2xl sm:shadow-2xl sm:border sm:border-gray-100' 
+              ? 'max-h-[55vh] lg:max-h-full shadow-2xl rounded-t-2xl lg:rounded-2xl lg:shadow-2xl lg:border lg:border-gray-100' 
               : 'lg:max-h-full lg:shadow-2xl lg:border lg:border-gray-100 lg:rounded-2xl max-h-0 shadow-none'
             }
           `}>
             {/* Cart Header */}
             <div className={`
-              px-3 sm:px-4 py-2 sm:py-3 shrink-0 bg-white border-b border-gray-100 flex items-center justify-between
-              ${cart.length === 0 ? 'border-b-0 sm:border-b' : ''}
+              px-3 lg:px-4 py-2 lg:py-3 shrink-0 bg-white border-b border-gray-100 flex items-center justify-between
+              ${cart.length === 0 ? 'border-b-0 lg:border-b' : ''}
             `}>
-              <h2 className="text-sm sm:text-lg font-bold text-gray-800 flex items-center gap-2">
+              <h2 className="text-sm lg:text-lg font-bold text-gray-800 flex items-center gap-2">
                 <ShoppingCart size={16} className="text-blue-600" />
                 Pesanan Saat Ini
                 {cart.length > 0 && <span className="text-xs bg-blue-600 text-white px-1.5 py-0.5 rounded-full">{cart.length}</span>}
               </h2>
               {cart.length > 0 && (
-                <button onClick={() => { setCart([]); setPrescriptions([]); }} className="text-xs text-red-500 hover:text-red-700 sm:hidden">Hapus Semua</button>
+                <button onClick={() => { setCart([]); setPrescriptions([]); }} className="text-xs text-red-500 hover:text-red-700 lg:hidden">Hapus Semua</button>
               )}
             </div>
 
             {/* Cart Items */}
-            <div className={`flex-1 overflow-y-auto px-3 py-2 space-y-2 bg-white min-h-0 ${cart.length === 0 ? 'hidden sm:block' : ''}`}>
+            <div className={`flex-1 overflow-y-auto px-3 lg:px-4 py-2 space-y-2 bg-white min-h-0 ${cart.length === 0 ? 'hidden lg:block' : ''}`}>
               {/* Prescription badges */}
               {prescriptions.length > 0 && (
                 <div className="space-y-2 pb-1">
                   {prescriptions.map((p, i) => (
-                    <div key={i} className="relative flex items-center gap-2 p-3 bg-purple-50 rounded-xl border border-purple-200">
+                    <div key={i} className="relative flex items-center gap-2 p-2 lg:p-3 bg-purple-50 rounded-xl border border-purple-200">
                       <button onClick={(e) => { e.stopPropagation(); deletePrescription(i); }}
-                        className="absolute -top-1.5 -right-1.5 w-7 h-7 sm:w-5 sm:h-5 bg-red-500 text-white rounded-full flex items-center justify-center shadow-md hover:bg-red-600 transition-colors z-10">
+                        className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center shadow-md hover:bg-red-600 transition-colors z-10">
                         <X size={10} />
                       </button>
                       <Pill size={16} className="text-purple-600 shrink-0" />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
-                          <h4 className="font-semibold text-gray-800 text-xs sm:text-sm">{p.label}</h4>
+                          <h4 className="font-semibold text-gray-800 text-xs lg:text-sm">{p.label}</h4>
                           <span className="text-[10px] font-medium text-purple-600 bg-purple-100 px-1.5 py-0.5 rounded">{p.items.length} item</span>
                         </div>
                         <p className="text-[11px] text-gray-500 truncate">{p.doctor_name || p.instansi ? `${p.doctor_name || ''}${p.doctor_name && p.instansi ? ' - ' : ''}${p.instansi || ''}` : 'Tanpa dokter'}</p>
@@ -937,20 +937,20 @@ export default function POSTransactionsPage() {
                 </div>
               ) : (
                 cart.filter(i => !i.prescriptionLabel).map(item => (
-                <div key={`${item.id}-manual`} className="relative flex gap-2 p-3 bg-white rounded-xl border border-gray-100 hover:shadow-sm transition-shadow">
+                <div key={`${item.id}-manual`} className="relative flex gap-2 p-2 lg:p-3 bg-white rounded-xl border border-gray-100 hover:shadow-sm transition-shadow">
                   <button 
                     onClick={(e) => { e.stopPropagation(); removeFromCart(item.id); }}
-                    className="absolute -top-1.5 -right-1.5 w-7 h-7 sm:w-5 sm:h-5 bg-red-500 text-white rounded-full flex items-center justify-center shadow-md hover:bg-red-600 transition-colors z-10"
+                    className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center shadow-md hover:bg-red-600 transition-colors z-10"
                   >
                     <X size={10} />
                   </button>
                   <div className="flex-1 min-w-0 pr-6">
-                    <h4 className="font-semibold text-gray-800 text-xs sm:text-sm truncate">{item.name}</h4>
-                    <p className="text-blue-600 text-xs sm:text-sm font-bold mt-0.5">{formatCurrency(item.selling_price)}</p>
+                    <h4 className="font-semibold text-gray-800 text-xs lg:text-sm truncate">{item.name}</h4>
+                    <p className="text-blue-600 text-xs lg:text-sm font-bold mt-0.5">{formatCurrency(item.selling_price)}</p>
                   </div>
                   <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1 shrink-0">
                     <button onClick={(e) => { e.stopPropagation(); updateQuantity(item.id, -1); }}
-                      className="w-8 h-8 sm:w-6 sm:h-6 flex items-center justify-center hover:bg-white rounded-md text-gray-700 shadow-sm transition-all">
+                      className="w-6 h-6 flex items-center justify-center hover:bg-white rounded-md text-gray-700 shadow-sm transition-all">
                       <Minus size={12} />
                     </button>
                     {editingQty?.id === item.id ? (
@@ -980,7 +980,7 @@ export default function POSTransactionsPage() {
                       </span>
                     )}
                     <button onClick={(e) => { e.stopPropagation(); updateQuantity(item.id, 1); }}
-                      className="w-8 h-8 sm:w-6 sm:h-6 flex items-center justify-center hover:bg-white rounded-md text-gray-700 shadow-sm transition-all">
+                      className="w-6 h-6 flex items-center justify-center hover:bg-white rounded-md text-gray-700 shadow-sm transition-all">
                       <Plus size={12} />
                     </button>
                   </div>
@@ -990,8 +990,8 @@ export default function POSTransactionsPage() {
             </div>
 
             {/* Payment Footer */}
-            <div className={`${cart.length === 0 ? 'hidden sm:block' : ''} p-2 sm:p-4 bg-gray-50 shrink-0 border-t border-gray-100`}>
-              <div className="space-y-0.5 sm:space-y-1.5 mb-2 sm:mb-3 text-[11px] sm:text-sm">
+            <div className={`${cart.length === 0 ? 'hidden lg:block' : ''} px-3 lg:px-4 py-2 lg:py-3 bg-gray-50 shrink-0 border-t border-gray-100`}>
+              <div className="space-y-1 mb-2 lg:mb-2 text-xs lg:text-sm">
                 <div className="flex justify-between text-gray-600">
                   <span>Sub total</span>
                   <span className="font-medium">{formatCurrency(subtotal)}</span>
@@ -1008,31 +1008,31 @@ export default function POSTransactionsPage() {
                     <span className="font-medium">-{formatCurrency(discount)}</span>
                   </div>
                 )}
-                <div className="flex justify-between text-gray-900 font-bold text-xs sm:text-base pt-1 sm:pt-2 border-t border-gray-100">
+                <div className="flex justify-between text-gray-900 font-bold text-sm lg:text-base pt-1 lg:pt-2 border-t border-gray-100">
                   <span>Total</span>
                   <span>{formatCurrency(total)}</span>
                 </div>
               </div>
 
-              <div className="mb-1.5 sm:mb-3">
-                <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
+              <div className="mb-2">
+                <div className="grid grid-cols-2 gap-2">
                   <button onClick={() => setPaymentMethod('cash')}
-                    className={`p-1.5 sm:p-3 rounded-xl border-2 transition-all text-[11px] sm:text-sm ${
+                    className={`p-2 lg:p-2 rounded-xl border-2 transition-all text-xs lg:text-sm ${
                       paymentMethod === 'cash' 
                         ? 'border-blue-600 bg-blue-50 text-blue-700' 
                         : 'border-gray-200 bg-white text-gray-600'
                     }`}>
                     <div className="font-semibold leading-tight">Cash</div>
-                    <div className="text-[9px] sm:text-xs opacity-75 leading-tight">Tunai</div>
+                    <div className="text-[10px] lg:text-xs opacity-75 leading-tight">Tunai</div>
                   </button>
                   <button onClick={() => setPaymentMethod('midtrans')}
-                    className={`p-1.5 sm:p-3 rounded-xl border-2 transition-all text-[11px] sm:text-sm ${
+                    className={`p-2 lg:p-2 rounded-xl border-2 transition-all text-xs lg:text-sm ${
                       paymentMethod === 'midtrans' 
                         ? 'border-green-600 bg-green-50 text-green-700' 
                         : 'border-gray-200 bg-white text-gray-600'
                     }`}>
                     <div className="font-semibold leading-tight">Midtrans</div>
-                    <div className="text-[9px] sm:text-xs opacity-75 leading-tight">Transfer/QRIS</div>
+                    <div className="text-[10px] lg:text-xs opacity-75 leading-tight">Transfer/QRIS</div>
                   </button>
                 </div>
               </div>
@@ -1040,7 +1040,7 @@ export default function POSTransactionsPage() {
               {/* Data Pembeli */}
               <button
                 onClick={() => setShowBuyerForm(true)}
-                className={`w-full mb-1 sm:mb-2 py-1.5 sm:py-2 rounded-xl border-2 transition-all text-[11px] sm:text-sm flex items-center justify-center gap-1 sm:gap-2 ${
+                className={`w-full mb-1 lg:mb-1 py-1.5 lg:py-1.5 rounded-xl border-2 transition-all text-xs lg:text-sm flex items-center justify-center gap-1 lg:gap-2 ${
                   customerName || customerPhone
                     ? 'border-blue-600 bg-blue-50 text-blue-700'
                     : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
@@ -1053,7 +1053,7 @@ export default function POSTransactionsPage() {
               {/* Resep */}
               <button
                 onClick={openNewPrescription}
-                className={`w-full mb-1 sm:mb-2 py-1.5 sm:py-2 rounded-xl border-2 transition-all text-[11px] sm:text-sm flex items-center justify-center gap-1 sm:gap-2 ${
+                className={`w-full mb-1 lg:mb-1 py-1.5 lg:py-1.5 rounded-xl border-2 transition-all text-xs lg:text-sm flex items-center justify-center gap-1 lg:gap-2 ${
                   prescriptions.length > 0
                     ? 'border-purple-600 bg-purple-50 text-purple-700'
                     : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
@@ -1066,7 +1066,7 @@ export default function POSTransactionsPage() {
               <button 
                 onClick={handlePayment}
                 disabled={processing || cart.length === 0}
-                className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-bold py-2 sm:py-3 rounded-xl shadow-lg shadow-blue-500/30 transition-all flex items-center justify-center gap-1.5 sm:gap-2 text-xs sm:text-base"
+                className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-bold py-2 lg:py-2 rounded-xl shadow-lg shadow-blue-500/30 transition-all flex items-center justify-center gap-1.5 lg:gap-2 text-xs lg:text-sm"
               >
                 {processing ? 'Processing...' : (
                   <><CreditCard size={14} /> Pembayaran</>
