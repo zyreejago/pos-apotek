@@ -46,6 +46,7 @@ interface Faktur {
   id: number;
   product_id: number;
   product_name?: string;
+  product_description?: string;
   product_status?: 'active' | 'pending';
   product_unit?: string;
   product_purchase_unit?: string;
@@ -74,6 +75,7 @@ interface Faktur {
   has_purchase_unit?: number;
   created_by_username?: string;
   created_by_role?: string;
+  purchase_unit_stock?: string | number | null;
 }
 
 interface DbBatch {
@@ -151,6 +153,7 @@ interface FakturFormData {
   due_date: string;
   expired_date: string;
   notes: string;
+  purchase_unit_stock: string;
 }
 
 export default function ProductsPage() {
@@ -231,7 +234,8 @@ export default function ProductsPage() {
       dp_awal: '',
     due_date: '',
       expired_date: '',
-    notes: ''
+    notes: '',
+    purchase_unit_stock: ''
   });
   const [fakturImageFiles, setFakturImageFiles] = useState<File[]>([]);
   const [fakturImagePreviews, setFakturImagePreviews] = useState<string[]>([]);
@@ -278,6 +282,11 @@ export default function ProductsPage() {
   const [multipleProducts, setMultipleProducts] = useState<ProductItem[]>([]);
   const [perbaikanBatchIds, setPerbaikanBatchIds] = useState<Record<string, number>>({});
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(-1);
+  const suggestionRef = useRef<HTMLDivElement>(null);
+  const nameInputRef = useRef<HTMLInputElement>(null);
+  const descriptionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
   const authHeaders = useMemo<Record<string, string>>(() => {
@@ -419,7 +428,8 @@ export default function ProductsPage() {
       dp_awal: '',
       due_date: '',
       expired_date: '',
-      notes: ''
+      notes: '',
+      purchase_unit_stock: ''
     });
     setFakturImageFiles([]); setFakturImagePreviews([]);
   };
@@ -462,7 +472,8 @@ export default function ProductsPage() {
       dp_awal: faktur.dp_payments && faktur.dp_payments.length > 0 ? faktur.dp_payments[0].amount.toString() : faktur.dp_amount?.toString() || '',
       due_date: formatDateForInput(faktur.due_date),
       expired_date: formatDateForInput(faktur.expired_date),
-      notes: faktur.notes || ''
+      notes: faktur.notes || '',
+      purchase_unit_stock: (faktur as any).purchase_unit_stock?.toString() || ''
     });
     setFakturImageFiles([]); setFakturImagePreviews([]);
     if (faktur.image_url) {
@@ -530,6 +541,35 @@ export default function ProductsPage() {
       });
 
       if (res.ok) {
+        // Sync DP ke semua batch lain dalam invoice yg sama
+  const invoiceNo = selectedFaktur.invoice_number || selectedFaktur.batch_number;
+  if (invoiceNo) {
+    try {
+      const lookupRes = await fetch(`${API_URL}/api/returns/purchases/lookup?invoice_no=${encodeURIComponent(invoiceNo)}`, { headers: authHeaders });
+      if (lookupRes.ok) {
+        const lookupData = await lookupRes.json();
+        if (lookupData?.items) {
+          const otherBatchIds = lookupData.items
+            .filter((i: any) => i.batch_id !== selectedFaktur.id)
+            .map((i: any) => i.batch_id);
+          await Promise.all(otherBatchIds.map((batchId: number) =>
+            fetch(`${API_URL}/api/inventory/batches/${batchId}/dp-payments`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', ...authHeaders },
+              body: JSON.stringify({
+                amount: Number(newDPAmount),
+                payment_date: newDPDate,
+                payment_method: newDPPaymentMethod
+              })
+            })
+          ));
+        }
+      }
+    } catch (e) {
+      console.error('Gagal sync DP ke batch lain:', e);
+    }
+  }
+
         goeyToast.success('DP berhasil ditambahkan!');
         setNewDPAmount('');
         setNewDPPaymentMethod('cash');
@@ -708,6 +748,7 @@ export default function ProductsPage() {
       if (fakturFormData.stock_type === 'dp' && fakturFormData.due_date) {
         formData.append('due_date', fakturFormData.due_date);
       }
+      formData.append('purchase_unit_stock', fakturFormData.purchase_unit_stock || '');
       formData.append('notes', fakturFormData.notes || '');
       fakturImageFiles.forEach(file => {
         formData.append('images', file);
@@ -751,7 +792,8 @@ export default function ProductsPage() {
       dp_awal: '',
           due_date: '',
       expired_date: '',
-          notes: ''
+          notes: '',
+          purchase_unit_stock: ''
         });
         setFakturImageFiles([]); setFakturImagePreviews([]);
         setSelectedFaktur(null);
@@ -1154,6 +1196,42 @@ export default function ProductsPage() {
     } catch { setInvoiceNumberError(''); }
   };
 
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (suggestionRef.current && !suggestionRef.current.contains(e.target as Node) &&
+          nameInputRef.current && !nameInputRef.current.contains(e.target as Node)) {
+        setShowSuggestions(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const filteredSuggestions = useMemo(() => {
+    const query = formData.name.trim().toLowerCase();
+    if (!query || query.length < 2 || productOffCanvasMode === 'edit') return [];
+    const exact = allProducts.find(p => p.name.trim().toLowerCase() === query);
+    if (exact) return [];
+    return allProducts
+      .filter(p => p.name.toLowerCase().includes(query))
+      .slice(0, 8);
+  }, [formData.name, allProducts, productOffCanvasMode]);
+
+  const handleSelectProductSuggestion = (product: Product) => {
+    setFormData(prev => ({
+      ...prev,
+      name: product.name,
+      unit: product.unit,
+      purchase_unit: product.purchase_unit || 'Box',
+      unit_multiplier: (product.unit_multiplier || 1).toString(),
+      selling_price: product.selling_price.toString(),
+      location_code: product.location_code || '',
+      cost_price: prev.cost_price,
+    }));
+    setShowSuggestions(false);
+    setSelectedSuggestionIndex(-1);
+  };
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData(prev => {
@@ -1177,23 +1255,32 @@ export default function ProductsPage() {
           updated.cost_price = prev.cost_price; // Keep manual cost price
         }
 
-        // Auto-fill description from AI
-        if (value.trim().length >= 2) {
-          fetch(`${API_URL}/api/knowledge/ai-description`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', ...authHeaders },
-            body: JSON.stringify({ name: value.trim() })
-          })
-            .then(r => r.json())
-            .then(aiResult => {
-              if (aiResult.description) {
-                setFormData(current => ({
-                  ...current,
-                  description: aiResult.description
-                }));
-              }
+        const trimmed = value.trim().toLowerCase();
+        const hasExact = allProducts.some(p => p.name.trim().toLowerCase() === trimmed);
+        setShowSuggestions(trimmed.length >= 2 && !hasExact);
+        setSelectedSuggestionIndex(-1);
+
+        // Auto-fill description via AI with debounce (1 detik)
+        if (descriptionTimerRef.current) clearTimeout(descriptionTimerRef.current);
+        const trimmedName = value.trim();
+        if (trimmedName.length >= 2) {
+          descriptionTimerRef.current = setTimeout(() => {
+            fetch(`${API_URL}/api/knowledge/ai-description`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', ...authHeaders },
+              body: JSON.stringify({ name: trimmedName })
             })
-            .catch(() => {});
+              .then(r => r.json())
+              .then(aiResult => {
+                if (aiResult.description) {
+                  setFormData(current => ({
+                    ...current,
+                    description: aiResult.description
+                  }));
+                }
+              })
+              .catch(() => {});
+          }, 1000);
         }
       }
 
@@ -1274,12 +1361,88 @@ export default function ProductsPage() {
       }
     } else {
       // Add mode
-      try {
-        const saveProductAndBatch = async (item: ProductFormData, imageFiles: File[] = []) => {
-          // Check if product with same name exists in database
-          const existingProduct = allProducts.find(
-            p => p.name.trim().toLowerCase() === item.name.trim().toLowerCase()
-          );
+      const submitName = formData.name.trim().toLowerCase();
+      const exactMatch = allProducts.find(p => p.name.trim().toLowerCase() === submitName);
+      const similarProduct = !exactMatch
+        ? allProducts.find(p => p.name.toLowerCase().includes(submitName) || submitName.includes(p.name.toLowerCase()))
+        : null;
+
+      if (similarProduct && !isMultipleProducts && !isPerbaikanMultiMode) {
+        setConfirmModal({
+          isOpen: true,
+          title: 'Produk Mirip Ditemukan',
+          message: `Produk "${similarProduct.name}" sudah ada di database. Yakin ingin membuat produk BARU dengan nama "${formData.name}"?`,
+          confirmText: 'Ya, Buat Baru',
+          cancelText: 'Batal',
+          variant: 'warning',
+          onConfirm: () => {
+            setConfirmModal(prev => ({ ...prev, isOpen: false }));
+            executeAddMode();
+          },
+          onClose: () => setConfirmModal(prev => ({ ...prev, isOpen: false })),
+        });
+        return;
+      }
+
+      if (isMultipleProducts && multipleProducts.length > 0) {
+        const conflicts: { itemName: string; matchName: string; type: 'sama' | 'mirip' }[] = [];
+        for (const item of multipleProducts) {
+          const name = item.name.trim().toLowerCase();
+          const existing = allProducts.find(p => p.name.trim().toLowerCase() === name);
+          if (existing) {
+            conflicts.push({ itemName: item.name, matchName: existing.name, type: 'sama' });
+          } else {
+            const similar = allProducts.find(
+              p => p.name.toLowerCase().includes(name) || name.includes(p.name.toLowerCase())
+            );
+            if (similar) {
+              conflicts.push({ itemName: item.name, matchName: similar.name, type: 'mirip' });
+            }
+          }
+        }
+        if (conflicts.length > 0) {
+          setConfirmModal({
+            isOpen: true,
+            title: 'Produk Bermasalah Ditemukan',
+            message: (
+              <div className="text-sm space-y-1">
+                <p className="mb-2">Ditemukan produk berikut di database yang bermasalah:</p>
+                {conflicts.map((c, i) => (
+                  <div key={i} className="flex items-start gap-2">
+                    <span className={`mt-0.5 w-2 h-2 rounded-full flex-shrink-0 ${c.type === 'sama' ? 'bg-red-500' : 'bg-yellow-500'}`} />
+                    <div>
+                      <span className="font-medium">{c.itemName}</span>
+                      {' '}{c.type === 'sama' ? 'sama' : 'mirip'} dengan{' '}
+                      <span className="font-medium">{c.matchName}</span>
+                    </div>
+                  </div>
+                ))}
+                <p className="mt-3 text-gray-600">Yakin ingin tetap menyimpan produk-produk ini?</p>
+              </div>
+            ),
+            confirmText: 'Ya, Lanjutkan',
+            cancelText: 'Batal',
+            variant: 'warning',
+            onConfirm: () => {
+              setConfirmModal(prev => ({ ...prev, isOpen: false }));
+              executeAddMode();
+            },
+            onClose: () => setConfirmModal(prev => ({ ...prev, isOpen: false })),
+          });
+          return;
+        }
+      }
+
+      executeAddMode();
+    }
+  };
+
+  const executeAddMode = async () => {
+    try {
+      const saveProductAndBatch = async (item: ProductFormData, imageFiles: File[] = []) => {
+        const existingProduct = allProducts.find(
+          p => p.name.trim().toLowerCase() === item.name.trim().toLowerCase()
+        );
 
           const multiplier = Number(item.unit_multiplier) || 1;
           const calculatedStock = Number(item.stock);
@@ -1357,6 +1520,7 @@ export default function ProductsPage() {
             if (item.dp_amount) batchFormData.append('dp_amount', item.dp_amount);
             if (item.due_date) batchFormData.append('due_date', item.due_date);
             batchFormData.append('has_purchase_unit', Number(item.unit_multiplier) > 1 ? '1' : '0');
+            if (item.purchase_unit_stock) batchFormData.append('purchase_unit_stock', item.purchase_unit_stock);
             imageFiles.forEach(f => batchFormData.append('images', f));
 
             const existingBatchId = (item as any).id ? perbaikanBatchIds[(item as any).id] : undefined;
@@ -1406,7 +1570,8 @@ export default function ProductsPage() {
               if (item.stock_type === 'dp' && item.dp_awal) batchFormData.append('dp_awal', item.dp_awal);
               if (item.stock_type === 'dp' && item.dp_amount) batchFormData.append('dp_amount', item.dp_amount);
               if (item.stock_type === 'dp' && item.due_date) batchFormData.append('due_date', item.due_date);
-              batchFormData.append('has_purchase_unit', Number(formData.unit_multiplier) > 1 ? '1' : '0');
+              batchFormData.append('has_purchase_unit', Number(item.unit_multiplier) > 1 ? '1' : '0');
+              if (item.purchase_unit_stock) batchFormData.append('purchase_unit_stock', item.purchase_unit_stock);
               (item.imageFiles || []).forEach(f => batchFormData.append('images', f));
 
               const batchRes = await fetch(`${API_URL}/api/inventory/batches/${existingBatchId}`, {
@@ -1472,6 +1637,7 @@ export default function ProductsPage() {
             if (formData.stock_type === 'dp' && formData.dp_amount) batchFormData.append('dp_amount', formData.dp_amount);
             if (formData.stock_type === 'dp' && formData.due_date) batchFormData.append('due_date', formData.due_date);
             batchFormData.append('has_purchase_unit', Number(formData.unit_multiplier) > 1 ? '1' : '0');
+            if (formData.purchase_unit_stock) batchFormData.append('purchase_unit_stock', formData.purchase_unit_stock);
             [...productFormImageFiles, ...fakturImageFiles].forEach(f => batchFormData.append('images', f));
 
             const res = await fetch(`${API_URL}/api/inventory/batches/${singleBatchId}`, {
@@ -1533,7 +1699,6 @@ export default function ProductsPage() {
         console.error('Error adding product:', error);
         goeyToast.error(error.message || 'Gagal menambahkan produk');
       }
-    }
   };
 
   const handleOpenDeleteModal = (product: Product) => {
@@ -2015,17 +2180,59 @@ export default function ProductsPage() {
             {/* Render form based on single/multiple */}
             {productOffCanvasMode === 'edit' || (!isMultipleProducts && !isPerbaikanMultiMode) ? (
               <React.Fragment>
-                <div>
+                <div className="relative">
                   <label className="block text-sm font-medium text-gray-700 mb-1">Product Name <span className="text-red-500">*</span></label>
                   <input
+                    ref={nameInputRef}
                     type="text"
                     name="name"
                     required
                     value={formData.name}
                     onChange={handleInputChange}
+                    onKeyDown={(e) => {
+                      if (!showSuggestions || filteredSuggestions.length === 0) return;
+                      if (e.key === 'ArrowDown') {
+                        e.preventDefault();
+                        setSelectedSuggestionIndex(prev => Math.min(prev + 1, filteredSuggestions.length - 1));
+                      } else if (e.key === 'ArrowUp') {
+                        e.preventDefault();
+                        setSelectedSuggestionIndex(prev => Math.max(prev - 1, 0));
+                      } else if (e.key === 'Enter' && selectedSuggestionIndex >= 0) {
+                        e.preventDefault();
+                        handleSelectProductSuggestion(filteredSuggestions[selectedSuggestionIndex]);
+                      } else if (e.key === 'Escape') {
+                        setShowSuggestions(false);
+                      }
+                    }}
+                    onFocus={() => {
+                      const trimmed = formData.name.trim().toLowerCase();
+                      if (trimmed.length >= 2 && !allProducts.some(p => p.name.trim().toLowerCase() === trimmed)) {
+                        setShowSuggestions(true);
+                      }
+                    }}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                     placeholder="Enter product name"
                   />
+                  {showSuggestions && filteredSuggestions.length > 0 && (
+                    <div
+                      ref={suggestionRef}
+                      className="absolute z-50 left-0 right-0 mt-0.5 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto"
+                    >
+                      {filteredSuggestions.map((p, i) => (
+                        <button
+                          key={p.id}
+                          type="button"
+                          className={`w-full text-left px-3 py-2 text-sm hover:bg-blue-50 transition-colors ${
+                            i === selectedSuggestionIndex ? 'bg-blue-100 font-medium' : ''
+                          }`}
+                          onClick={() => handleSelectProductSuggestion(p)}
+                        >
+                          <span className="text-gray-900">{p.name}</span>
+                          <span className="text-gray-400 ml-2 text-xs">{p.unit}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 <div>
@@ -2258,16 +2465,57 @@ export default function ProductsPage() {
                 <div className="border border-gray-200 rounded-lg p-4">
                   <h3 className="font-medium text-gray-700 mb-3">Tambahkan Produk</h3>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-3">
-                    <div>
+                    <div className="relative">
                       <label className="block text-xs text-gray-600 mb-1">Nama Produk <span className="text-red-500">*</span></label>
                       <input
                         type="text"
                         name="name"
                         value={formData.name}
                         onChange={handleInputChange}
+                        onKeyDown={(e) => {
+                          if (!showSuggestions || filteredSuggestions.length === 0) return;
+                          if (e.key === 'ArrowDown') {
+                            e.preventDefault();
+                            setSelectedSuggestionIndex(prev => Math.min(prev + 1, filteredSuggestions.length - 1));
+                          } else if (e.key === 'ArrowUp') {
+                            e.preventDefault();
+                            setSelectedSuggestionIndex(prev => Math.max(prev - 1, 0));
+                          } else if (e.key === 'Enter' && selectedSuggestionIndex >= 0) {
+                            e.preventDefault();
+                            handleSelectProductSuggestion(filteredSuggestions[selectedSuggestionIndex]);
+                          } else if (e.key === 'Escape') {
+                            setShowSuggestions(false);
+                          }
+                        }}
+                        onFocus={() => {
+                          const trimmed = formData.name.trim().toLowerCase();
+                          if (trimmed.length >= 2 && !allProducts.some(p => p.name.trim().toLowerCase() === trimmed)) {
+                            setShowSuggestions(true);
+                          }
+                        }}
                         className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm"
                         placeholder="Nama Produk"
                       />
+                      {showSuggestions && filteredSuggestions.length > 0 && (
+                        <div
+                          ref={suggestionRef}
+                          className="absolute z-50 left-0 right-0 mt-0.5 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto"
+                        >
+                          {filteredSuggestions.map((p, i) => (
+                            <button
+                              key={p.id}
+                              type="button"
+                              className={`w-full text-left px-3 py-2 text-sm hover:bg-blue-50 transition-colors ${
+                                i === selectedSuggestionIndex ? 'bg-blue-100 font-medium' : ''
+                              }`}
+                              onClick={() => handleSelectProductSuggestion(p)}
+                            >
+                              <span className="text-gray-900">{p.name}</span>
+                              <span className="text-gray-400 ml-2 text-xs">{p.unit}</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </div>
                     <div>
                       <label className="block text-xs text-gray-600 mb-1">Kategori Produk</label>
@@ -2561,6 +2809,7 @@ export default function ProductsPage() {
                                   invoice_number: item.invoice_number || '',
                                   batch_number: item.batch_number || '',
                                   dp_amount: item.dp_amount || '',
+                                  dp_awal: item.dp_awal || '',
                                   due_date: item.due_date || '',
                                   purchase_unit: item.purchase_unit || 'Box',
                                   unit_multiplier: item.unit_multiplier || '1',
@@ -2638,7 +2887,8 @@ export default function ProductsPage() {
       dp_awal: '',
               due_date: '',
       expired_date: '',
-              notes: ''
+              notes: '',
+              purchase_unit_stock: ''
             });
             setFakturImageFiles([]); setFakturImagePreviews([]);
           }}
@@ -2786,7 +3036,17 @@ export default function ProductsPage() {
                         <td className="px-2 sm:px-4 py-1.5 sm:py-3 text-right">
                           <div className="flex justify-end gap-2">
                             <button
-                              onClick={() => setDetailFaktur(faktur)}
+                              onClick={() => {
+                                setDetailFaktur(faktur);
+                                fetch(`${API_URL}/api/returns/purchases/lookup?invoice_no=${encodeURIComponent(faktur.invoice_number || faktur.batch_number || '')}`, { headers: authHeaders })
+                                  .then(r => r.ok ? r.json() : null)
+                                  .then(data => {
+                                    if (data?.purchase?.total) {
+                                      setDetailFaktur(prev => prev ? { ...prev, total_amount: data.purchase.total } : prev);
+                                    }
+                                  })
+                                  .catch(() => {});
+                              }}
                               className="p-0.5 sm:p-1 text-gray-500 hover:bg-gray-100 rounded"
                               title="Detail Faktur"
                             >
@@ -3324,7 +3584,8 @@ export default function ProductsPage() {
               dp_awal: '',
                       due_date: '',
               expired_date: '',
-                      notes: ''
+                      notes: '',
+                      purchase_unit_stock: ''
                     });
                     setSelectedFaktur(null);
                     setFakturModalMode('add');
@@ -3492,8 +3753,8 @@ export default function ProductsPage() {
                                     <AlertCircle size={16} className="text-orange-500 shrink-0 mt-0.5" />
                                     <div>
                                       <p className="text-[11px] font-bold text-orange-800 uppercase tracking-wider">Catatan Perbaikan:</p>
-                                      {items.filter(i => i.notes).map(i => (
-                                        <p key={i.id} className="text-sm text-orange-700 mt-0.5 leading-relaxed">{i.product_name}: {i.notes}</p>
+                                      {[...new Set(items.filter(i => i.notes).map(i => i.notes))].map((note, idx) => (
+                                        <p key={idx} className="text-sm text-orange-700 mt-0.5 leading-relaxed">{note}</p>
                                       ))}
                                     </div>
                                   </div>
@@ -3538,30 +3799,32 @@ export default function ProductsPage() {
                                       const dpAwalVal = firstRev.dp_payments && firstRev.dp_payments.length > 0 ? firstRev.dp_payments[0].amount.toString() : firstRev.dp_amount?.toString() || '';
                                       const sellingPrice = (firstRev as any).product_selling_price || allProducts.find(p => p.id === firstRev.product_id)?.selling_price?.toString() || '';
                                       if (items.length === 1) {
-                                        // Single product: open single product offcanvas
-                                        setPerbaikanBatchIds({ single: firstRev.id, productId: firstRev.product_id });
-                                        const fmtDate = (d: string | null | undefined) => d ? d.substring(0, 10) : '';
-                                        setFormData({
-                                          name: firstRev.product_name || '',
-                                          cost_price: firstRev.cost_price.toString(),
-                                          selling_price: sellingPrice,
-                                          stock: (firstRev.initial_quantity || firstRev.quantity || 0).toString(),
-                                          unit: firstRev.product_unit || 'Tablet',
-                                          expired_date: fmtDate(firstRev.expired_date),
-                                          location_code: (firstRev as any).product_location_code || allProducts.find(p => p.id === firstRev.product_id)?.location_code || '',
-                                          supplier_id: firstRev.supplier_id?.toString() || '',
-                                          stock_type: firstRev.stock_type,
-                                          purchase_date: fmtDate(firstRev.purchase_date),
-                                          invoice_number: firstRev.invoice_number || '',
-                                          dp_amount: firstRev.dp_amount?.toString() || '',
-                                          dp_awal: dpAwalVal,
-                                          due_date: fmtDate(firstRev.due_date),
-                                          purchase_unit: firstRev.product_purchase_unit || 'Box',
-                                          unit_multiplier: (firstRev.product_unit_multiplier || 1).toString(),
-                                          product_category: 'OBAT',
-                                          purchase_unit_stock: '',
-                                          batch_number: firstRev.batch_number || '',
-                                        });
+                                         // Single product: open single product offcanvas
+                                         setPerbaikanBatchIds({ single: firstRev.id, productId: firstRev.product_id });
+                                         const fmtDate = (d: string | null | undefined) => d ? d.substring(0, 10) : '';
+                                         const calcPurchaseStock = (qty: any, mult: any) => { const q = Number(qty || 0); const m = Number(mult || 1); return q && m ? Math.round(q / m).toString() : ''; };
+                                         setFormData({
+                                           name: firstRev.product_name || '',
+                                           cost_price: firstRev.cost_price.toString(),
+                                           selling_price: sellingPrice,
+                                           stock: (firstRev.initial_quantity || firstRev.quantity || 0).toString(),
+                                           unit: firstRev.product_unit || 'Tablet',
+                                           expired_date: fmtDate(firstRev.expired_date),
+                                           location_code: (firstRev as any).product_location_code || allProducts.find(p => p.id === firstRev.product_id)?.location_code || '',
+                                           supplier_id: firstRev.supplier_id?.toString() || '',
+                                           stock_type: firstRev.stock_type,
+                                           purchase_date: fmtDate(firstRev.purchase_date),
+                                           invoice_number: firstRev.invoice_number || '',
+                                           dp_amount: firstRev.dp_amount?.toString() || '',
+                                           dp_awal: dpAwalVal,
+                                           due_date: fmtDate(firstRev.due_date),
+                                           purchase_unit: firstRev.product_purchase_unit || 'Box',
+                                           unit_multiplier: (firstRev.product_unit_multiplier || 1).toString(),
+                                           product_category: 'OBAT',
+                                           purchase_unit_stock: calcPurchaseStock(firstRev.initial_quantity || firstRev.quantity, firstRev.product_unit_multiplier),
+                                           batch_number: firstRev.batch_number || '',
+                                           description: firstRev.product_description || allProducts.find(p => p.id === firstRev.product_id)?.description || '',
+                                         });
                                         if (firstRev.image_url) {
                                           const urls = getImageUrls(firstRev.image_url).map(u => `${API_URL}${u}`);
                                           setProductFormImagePreviews(urls);
@@ -3583,6 +3846,7 @@ export default function ProductsPage() {
                                           return {
                                             id: itemId,
                                             name: i.product_name || '',
+                                            description: i.product_description || allProducts.find(p => p.id === i.product_id)?.description || '',
                                             product_category: 'OBAT' as const,
                                             location_code: (i as any).product_location_code || allProducts.find(p => p.id === i.product_id)?.location_code || '',
                                             cost_price: i.cost_price.toString(),
@@ -3591,12 +3855,12 @@ export default function ProductsPage() {
                                             unit: i.product_unit || 'Tablet',
                                             purchase_unit: i.product_purchase_unit || 'Box',
                                             unit_multiplier: (i.product_unit_multiplier || 1).toString(),
-                                            purchase_unit_stock: '',
+                                            purchase_unit_stock: (() => { const q = Number(i.initial_quantity || i.quantity || 0); const m = Number(i.product_unit_multiplier || 1); return q && m ? Math.round(q / m).toString() : ''; })(),
                                             expired_date: i.expired_date ? i.expired_date.substring(0, 10) : '',
                                             batch_number: i.batch_number || '',
                                             invoice_number: i.invoice_number || '',
                                             dp_amount: i.dp_amount?.toString() || '',
-                                            dp_awal: '',
+                                            dp_awal: i.dp_payments && i.dp_payments.length > 0 ? i.dp_payments[0].amount.toString() : i.dp_amount?.toString() || '',
                                             due_date: i.due_date ? i.due_date.substring(0, 10) : '',
                                             supplier_id: i.supplier_id?.toString() || '',
                                             stock_type: i.stock_type,
@@ -3625,8 +3889,9 @@ export default function ProductsPage() {
                                           purchase_unit: firstRev.product_purchase_unit || 'Box',
                                           unit_multiplier: (firstRev.product_unit_multiplier || 1).toString(),
                                           product_category: 'OBAT',
-                                          purchase_unit_stock: '',
+                                          purchase_unit_stock: (() => { const q = Number(firstRev.initial_quantity || firstRev.quantity || 0); const m = Number(firstRev.product_unit_multiplier || 1); return q && m ? Math.round(q / m).toString() : ''; })(),
                                           batch_number: '',
+                                          description: firstRev.product_description || allProducts.find(p => p.id === firstRev.product_id)?.description || '',
                                         });
                                         if (firstRev.image_url) {
                                           const urls = getImageUrls(firstRev.image_url).map(u => `${API_URL}${u}`);
@@ -3870,6 +4135,10 @@ export default function ProductsPage() {
                     <p className="text-sm font-bold text-purple-800 mt-1">{detailFaktur.qty_restored > 0 ? `${detailFaktur.qty_restored} ${selectedProduct?.unit || 'Tablet'}` : '0'}</p>
                   </div>
                 )}
+                <div className="bg-red-50 p-3 rounded-xl">
+                  <p className="text-xs text-red-600 font-medium uppercase tracking-wider">Qty Retur Pembelian</p>
+                  <p className="text-sm font-bold text-red-800 mt-1">{(detailFaktur as any).qty_returned > 0 ? `${(detailFaktur as any).qty_returned} ${selectedProduct?.unit || 'Tablet'}` : '0'}</p>
+                </div>
                 <div className="bg-gray-50 p-3 rounded-xl">
                   <p className="text-xs text-gray-500 font-medium uppercase tracking-wider">Harga Beli</p>
                   <p className="text-sm font-bold text-gray-900 mt-1">{formatCurrency(detailFaktur.cost_price)}</p>
@@ -3926,8 +4195,10 @@ export default function ProductsPage() {
                       <p className="text-xs text-orange-600 font-medium uppercase tracking-wider">Sisa DP</p>
                       <p className="text-sm font-bold text-orange-800 mt-1">
                         {formatCurrency(
-                          Math.max(0, (detailFaktur.dp_amount ? Number(detailFaktur.dp_amount) : 0) - 
-                          (detailFaktur.dp_payments || []).reduce((sum: number, dp: any) => sum + Number(dp.amount), 0))
+                          Math.max(0,
+                            (Number(detailFaktur.total_amount) || (detailFaktur.cost_price * (detailFaktur.initial_quantity || detailFaktur.quantity))) -
+                            (detailFaktur.dp_payments || []).reduce((sum: number, dp: any) => sum + Number(dp.amount), 0)
+                          )
                         )}
                       </p>
                     </div>

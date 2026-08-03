@@ -556,17 +556,24 @@ Format jawaban HANYA teks deskripsi saja, tanpa kata lain, tanpa label.`;
       await connection.beginTransaction();
       const today = new Date().toISOString().split('T')[0];
 
-      // Create stock opname session
-      const changedItems = items.filter(item => item.actual_stock !== item.system_stock);
+      // Get ALL active products for snapshot
+      const [allProducts] = await connection.query("SELECT id, stock FROM products WHERE status = 'active' AND is_active = 1");
+
+      // Create stock opname session (total_items = all products count)
       const [sessionResult] = await connection.query(
         'INSERT INTO stock_opname_sessions (date, user_id, total_items) VALUES (?, ?, ?)',
-        [today, req.user.id, changedItems.length]
+        [today, req.user.id, allProducts.length]
       );
       const sessionId = sessionResult.insertId;
+
+      // Track which products were counted
+      const countedIds = new Set();
 
       for (const item of items) {
         const { id, system_stock, actual_stock } = item;
         const difference = actual_stock - system_stock;
+
+        countedIds.add(id);
 
         if (difference !== 0) {
           await connection.query('UPDATE products SET stock = ? WHERE id = ?', [
@@ -574,7 +581,6 @@ Format jawaban HANYA teks deskripsi saja, tanpa kata lain, tanpa label.`;
             id,
           ]);
 
-          // Get product cost price, product_category, and name
           const [productResult] = await connection.query('SELECT cost_price, product_category, name FROM products WHERE id = ?', [id]);
           const costPrice = productResult[0]?.cost_price || 0;
           const isObat = productResult[0]?.product_category === 'OBAT';
@@ -582,16 +588,13 @@ Format jawaban HANYA teks deskripsi saja, tanpa kata lain, tanpa label.`;
           const productName = productResult[0]?.name || `Produk #${id}`;
           const differenceValue = difference * costPrice;
 
-          // Create journal entry
           const journalItems = [];
           if (difference > 0) {
-            // Stock increased: Debit Persediaan (Obat/Non-Obat), Credit Pendapatan Selisih Stok (404)
             journalItems.push(
               { accountCode: persediaanCode, debit: differenceValue },
               { accountCode: '404', credit: differenceValue }
             );
           } else {
-            // Stock decreased: Debit Beban Selisih Stok (527), Credit Persediaan (Obat/Non-Obat)
             const absValue = Math.abs(differenceValue);
             journalItems.push(
               { accountCode: '527', debit: absValue },
@@ -613,6 +616,39 @@ Format jawaban HANYA teks deskripsi saja, tanpa kata lain, tanpa label.`;
               system_stock,
               actual_stock,
               note || 'Stock Opname Adjustment',
+              req.user.id,
+              sessionId,
+            ]
+          );
+        } else {
+          await connection.query(
+            'INSERT INTO inventory_history (product_id, type, quantity_change, previous_stock, new_stock, note, user_id, session_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+            [
+              id,
+              'opname',
+              0,
+              system_stock,
+              actual_stock,
+              note || 'Stock Opname - Dihitung (stok sesuai)',
+              req.user.id,
+              sessionId,
+            ]
+          );
+        }
+      }
+
+      // Record snapshot for products NOT counted in this session
+      for (const product of allProducts) {
+        if (!countedIds.has(product.id)) {
+          await connection.query(
+            'INSERT INTO inventory_history (product_id, type, quantity_change, previous_stock, new_stock, note, user_id, session_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+            [
+              product.id,
+              'opname',
+              0,
+              product.stock,
+              product.stock,
+              note || 'Stock Opname Snapshot - Tidak dihitung',
               req.user.id,
               sessionId,
             ]

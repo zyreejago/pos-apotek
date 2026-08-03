@@ -1,0 +1,251 @@
+FLOW APLIKASI POS - APOTEK SUMBER WARAS
+=========================================
+
+1. LOGIN & REGISTER
+===================
+- User register dengan email & password.
+- Login dengan email & password.
+- Setiap user punya ROLE (superadmin, admin, staff, dll).
+- Role menentukan PERMISSION (lihat/tambah/edit/hapus) di tiap modul.
+
+2. DASHBOARD
+============
+- Menampilkan ringkasan: total stok, produk hampir kadaluarsa, penjualan hari ini, dll.
+
+3. PRODUK (Menu: Products)
+==========================
+
+3.1. Lihat Daftar Produk
+-------------------------
+- Tabel produk: Nama, Harga Beli, Harga Jual, Stok, Kadaluarsa, Suplier.
+- Kolom Kadaluarsa: mengambil tanggal expired PALING DEKAT (MIN) dari semua batch
+  produk tsb yang statusnya 'approved' dan belum diarsipkan.
+- Filter & Search: cari produk, filter kategori (OBAT/NON_OBAT), sortir.
+
+3.2. Tambah Produk Baru
+------------------------
+- Isi: Nama, Kategori (OBAT/NON_OBAT), Harga Beli, Harga Jual, Stok Awal, Satuan,
+  Suplier, Tanggal Kadaluarsa, Lokasi.
+- Jika satuan punya konversi (misal 1 Box = 10 Tablet), centang "Satuan Pembelian"
+  dan isi "Isi per Box".
+- Simpan -> Produk tersimpan.
+
+3.3. Edit Produk
+-----------------
+- Klik tombol Edit pada produk.
+- Ubah data produk (nama, harga, stok, dll).
+- Simpan.
+
+3.4. Detail Produk
+-------------------
+- Klik tombol Detail (ikon mata) pada produk.
+- Menampilkan info lengkap produk + daftar FAKTUR (batch) yang terkait.
+
+3.5. Faktur (Batch)
+-------------------
+- Setiap produk bisa punya banyak FAKTUR / BATCH.
+- Satu faktur = 1 pembelian dari suplier (bisa multi-produk dalam 1 invoice).
+
+3.5.1. Tambah Faktur
+---------------------
+- Klik "Tambah Faktur" di detail produk.
+- Isi: No Invoice, No Batch, Suplier, Tipe Stok (Lunas/Belum Bayar/DP/Konsinyasi),
+  Tanggal Pembelian, Jumlah, Harga, Tanggal Kadaluarsa, DP, Bukti Faktur.
+- Simpan -> Status: PENDING (menunggu approval admin).
+
+3.5.2. Edit Faktur
+--------------------
+- Klik tombol Edit pada faktur di daftar faktur.
+- Ubah data.
+- Ringkasan Pembayaran (khusus tipe DP):
+  - Tombol "Tambah DP" untuk menambah cicilan DP.
+  - Isi: Jumlah, Tanggal Bayar, Metode (Cash/Transfer).
+  - Total DP = jumlah semua DP yang sudah dibayar.
+  - Sisa Hutang = Total Faktur - Total DP.
+- Simpan.
+
+3.5.3. Hapus / Arsipkan / Tandai Expired
+------------------------------------------
+- Tombol hapus, arsip, dan expired ada di setiap faktur (tergantung kondisi).
+
+3.6. Perbaikan Data (Revision)
+-------------------------------
+- Ketika admin menolak/meminta revisi faktur, status faktur jadi 'revision'.
+- Di halaman produk, muncul tombol "Perbaiki" pada faktur status revision.
+- Bisa perbaiki 1 produk atau multi-produk (1 invoice).
+- Catatan perbaikan dari approver ditampilkan tanpa nama produk (hanya isi notes).
+- Setelah diperbaiki, status kembali ke 'pending' untuk di-approve ulang.
+
+4. APPROVALS (Menu: Approval Faktur)
+=====================================
+- Menampilkan faktur dengan status PENDING, REVISION, REJECTED.
+- Approver bisa:
+  - SETUJUI (approve) -> stok produk bertambah, status jadi 'approved'.
+  - TOLAK (reject) -> status jadi 'rejected'.
+  - REVISI -> status jadi 'revision', memberi catatan perbaikan.
+- Multi-select: bisa pilih beberapa faktur sekaligus untuk approve/reject.
+
+5. TRANSAKSI PENJUALAN (Menu: Transactions / POS)
+==================================================
+
+5.1. Proses Transaksi
+----------------------
+- Cari produk (search by nama).
+- Klik produk -> masuk ke keranjang.
+- Atur jumlah (qty).
+- Pilih metode bayar:
+  - TUNAI (Cash) -> langsung lunas.
+  - TEMPO (Hutang) -> mencatat piutang.
+- Proses pembayaran -> transaksi selesai.
+
+5.2. Pembayaran Non-Tunai
+--------------------------
+- Untuk pembayaran via QRIS / Midtrans -> redirect ke halaman pembayaran.
+- Status pembayaran di-update setelah konfirmasi dari Midtrans.
+
+5.3. Riwayat Transaksi
+-----------------------
+- Melihat semua transaksi yang sudah terjadi.
+- Filter berdasarkan tanggal, status pembayaran, dll.
+
+6. RETUR PENJUALAN (Menu: Sale Returns / Retur Jual)
+=====================================================
+
+Fungsi: Pelanggan mengembalikan barang yang sudah dibeli.
+
+6.1. Cari Transaksi
+--------------------
+- Masukkan ID Transaksi (nomor penjualan).
+- Klik "Cari".
+- Sistem akan mengambil data transaksi yang statusnya 'completed'.
+
+6.2. Pilih Barang yang Dikembalikan
+-------------------------------------
+- Untuk setiap produk, isi:
+  a) JUMLAH RETUR: berapa banyak yang dikembalikan.
+  b) KONDISI BARANG (dropdown):
+     - "Baik" -> Barang bagus, stok dikembalikan ke gudang.
+     - "Rusak" -> Barang rusak, stok TIDAK dikembalikan (write-off).
+  c) Catatan: alasan retur.
+
+6.3. Metode Refund (Dropdown)
+------------------------------
+Ada 2 pilihan:
+
+  1. TUNAI (Cash) -> Rp 101 (Kas)
+     - Uang dikembalikan langsung ke pelanggan.
+     - Jurnal: Debit Retur Penjualan (403), Kredit Kas (101).
+
+  2. CREDIT NOTE (Piutang Pelanggan) -> Rp 106
+     - Tidak kembalikan uang, dicatat sebagai piutang pelanggan.
+     - Bisa digunakan untuk pembelian berikutnya.
+     - Jurnal: Debit Retur Penjualan (403), Kredit Piutang (106).
+
+6.4. Proses Retur
+------------------
+- Setelah submit:
+  a) Stok dikembalikan (jika kondisi "Baik"):
+     - batches.remaining_quantity = +qty
+     - products.stock = +qty
+  b) Distribusi FEFO: retur dialokasikan ke batch dengan expired date terdekat.
+  c) Jurnal akuntansi dibuat.
+  d) Nomor retur: RJ-TAHUN-NOMOR (misal: RJ-2026-0001).
+  e) Jika semua item di transaksi asal sudah diretur penuh,
+     transaksi ditandai is_fully_returned = TRUE.
+
+7. RETUR PEMBELIAN (Menu: Purchase Returns / Retur Beli)
+=========================================================
+
+Fungsi: Toko mengembalikan barang ke suplier.
+
+7.1. Cari Faktur Pembelian
+---------------------------
+- Masukkan NO INVOICE (nomor faktur pembelian).
+- Klik "Cari".
+- Sistem mengambil semua batch yang punya nomor invoice tersebut.
+
+7.2. Pilih Barang yang Dikembalikan
+-------------------------------------
+- Untuk setiap batch, isi:
+  a) JUMLAH RETUR: berapa banyak yang dikembalikan.
+  b) KONDISI BARANG (dropdown):
+     - "Rusak" (Damaged)
+     - "Kadaluarsa" (Expired)
+     - "Salah Barang" (Wrong Item)
+
+7.3. Metode Penanganan (Dropdown)
+----------------------------------
+Ada 3 pilihan:
+
+  1. KURANGI HUTANG (Reduce Payable) -> Rp 201 (Hutang Usaha)
+     - Suplier menerima barang kembali, hutang ke suplier berkurang.
+     - Syarat: suplier harus menerima retur (accepts_return = TRUE).
+     - Jurnal: Debit Persediaan (103/104), Kredit Hutang Usaha (201).
+
+  2. CREDIT NOTE (Piutang ke Suplier) -> Rp 105
+     - Suplier TIDAK mengurangi hutang Anda (hutang tetap).
+     - Suplier mengeluarkan "Credit Note" — dokumen yang menyatakan suplier
+       berutang ke Anda.
+     - Dicatat sebagai Piutang Supplier.
+     - Credit note bisa dipakai untuk potong pembelian berikutnya.
+     - Jurnal: Debit Piutang Supplier (105), Kredit Persediaan (103/104).
+     - Juga membuat record di tabel supplier_credits sebagai bukti.
+
+  3. WRITE-OFF (Beban Lain-lain) -> Rp 528
+     - Suplier menolak retur / barang rusak total.
+     - Dicatat sebagai kerugian (beban).
+     - Jurnal: Debit Persediaan (103/104), Kredit Beban Lain-lain (528).
+     - Ini SATU-SATUNYA opsi jika suplier tidak menerima retur.
+
+7.4. Proses Retur
+------------------
+- Setelah submit:
+  a) Stok dikurangi:
+     - batches.remaining_quantity = -qty
+     - products.stock = -qty
+  b) Nomor retur: RP-TAHUN-NOMOR (misal: RP-2026-0001).
+  c) Jurnal akuntansi dibuat sesuai metode penanganan.
+  d) Audit trail dicatat.
+
+8. LAPORAN (Menu: Reports)
+==========================
+- Laporan Keuangan: Laba/Rugi, Neraca.
+- Jurnal Umum, Buku Besar.
+- Transaksi Historis.
+
+9. PENGATURAN (Menu: Settings)
+==============================
+- Role & Permission: atur hak akses tiap role.
+- Transaction Settings: metode pembayaran, dll.
+
+10. AKUNTANSI & JURNAL
+======================
+Setiap transaksi bisnis otomatis membuat jurnal akuntansi:
+
+| Transaksi            | Debit                               | Kredit                    |
+|----------------------|-------------------------------------|---------------------------|
+| Pembelian (approve)  | Persediaan (103/104)                | Kas (101) / Hutang (201)  |
+| Bayar DP             | Hutang Usaha (201)                  | Kas (101) / Bank (102)    |
+| Penjualan Tunai      | Kas (101)                           | Penjualan (401)           |
+| Retur Jual (Cash)    | Retur Penjualan (403)               | Kas (101)                 |
+| Retur Jual (Piutang) | Retur Penjualan (403)               | Piutang (106)             |
+| Retur Beli (Hutang)  | Hutang Usaha (201)                  | Persediaan (103/104)      |
+| Retur Beli (CN)      | Piutang Supplier (105)              | Persediaan (103/104)      |
+| Retur Beli (WO)      | Beban Lain-lain (528)               | Persediaan (103/104)      |
+| Stok Opname (lebih)  | Persediaan (103/104)                | Selisih Stok (529)        |
+| Stok Opname (kurang) | Selisih Stok (529)                  | Persediaan (103/104)      |
+
+KODE AKUN:
+- 101: Kas
+- 102: Bank
+- 103: Persediaan Obat
+- 104: Persediaan Non-Obat
+- 105: Piutang Supplier
+- 106: Piutang Pelanggan
+- 201: Hutang Usaha Supplier
+- 401: Penjualan
+- 403: Retur Penjualan
+- 501: HPP Obat
+- 502: HPP Non-Obat
+- 528: Beban Lain-lain
+- 529: Selisih Stok

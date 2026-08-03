@@ -32,6 +32,7 @@ interface HistoryFaktur {
   due_date: string | null;
   expired_date: string | null;
   image_url: string | null;
+  invoice_number: string | null;
   status: string;
   is_archived: number;
   notes: string | null;
@@ -214,7 +215,7 @@ export default function PurchaseHistoryPage() {
             ) : (() => {
               const grouped: Record<string, HistoryFaktur[]> = {};
               for (const f of filteredAndSortedFakturs) {
-                const key = f.batch_number || '__NO_INVOICE__';
+                const key = f.invoice_number || f.batch_number || '__NO_INVOICE__';
                 if (!grouped[key]) grouped[key] = [];
                 grouped[key].push(f);
               }
@@ -323,7 +324,7 @@ export default function PurchaseHistoryPage() {
                 const statusCounts: Record<string, number> = {};
                 items.forEach(b => { statusCounts[b.status] = (statusCounts[b.status] || 0) + 1; });
                 const isExpanded = expandedFaktur === invoiceNumber;
-                const displayLabel = invoiceNumber === '__NO_INVOICE__' ? 'Tanpa No. Batch' : invoiceNumber;
+                const displayLabel = invoiceNumber === '__NO_INVOICE__' ? 'Tanpa No. Faktur' : invoiceNumber;
                 const supplierName = items[0]?.supplier_name || '-';
                 const firstDate = items.reduce((latest, b) => b.created_at > latest ? b.created_at : latest, items[0]?.created_at || '');
 

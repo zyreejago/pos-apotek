@@ -338,6 +338,16 @@ const initDB = async () => {
       // Column already exists, ignore
     }
 
+    // Add purchase_unit_stock column if not exists (migration)
+    try {
+      await connection.query(`
+        ALTER TABLE batches ADD COLUMN purchase_unit_stock VARCHAR(50) DEFAULT ''
+      `);
+      console.log('Added purchase_unit_stock column to batches');
+    } catch (e) {
+      // Column already exists, ignore
+    }
+
     // Migrate existing dp_amount from batches to batch_dp_payments
     try {
       await connection.query(`

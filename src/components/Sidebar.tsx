@@ -255,7 +255,10 @@ export default function Sidebar() {
       <div className="flex-1 overflow-y-auto py-2 px-3 space-y-1 custom-scrollbar">
         
         <NavItem href="/dashboard" icon={<LayoutDashboard size={20} />} label="Dashboards" active={isActive('/dashboard') || isActive('/')} isCollapsed={isCollapsed} />
-        
+
+        {canShow('Transactions') && (
+          <NavItem href="/transactions" icon={<ShoppingCart size={20} />} label="Transactions" active={isActive('/transactions')} isCollapsed={isCollapsed} />
+        )}
 
         {canShow('Management Product') && (
           <NavItem href="/products" icon={<Package size={20} />} label="Products" active={isActive('/products')} isCollapsed={isCollapsed} />
@@ -272,11 +275,6 @@ export default function Sidebar() {
         {canShow('Resep Dokter') && (
           <NavItem href="/prescriptions" icon={<FileText size={20} />} label="Resep Dokter" active={isActive('/prescriptions')} isCollapsed={isCollapsed} />
         )}
-        
-        {canShow('Transactions') && (
-          <NavItem href="/transactions" icon={<ShoppingCart size={20} />} label="Transactions" active={isActive('/transactions')} isCollapsed={isCollapsed} />
-        )}
-
         {canShow('Riwayat Pembelian') && (
           <NavItem href="/purchase-history" icon={<Repeat size={20} />} label="Riwayat Pembelian" active={isActive('/purchase-history')} isCollapsed={isCollapsed} />
         )}

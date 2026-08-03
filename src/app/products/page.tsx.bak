@@ -1,5 +1,6 @@
 'use client';
 
+import { API_URL } from '@/lib/api-config';
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import { Search, Plus, Edit, Trash2, FileText, Info, UploadCloud, Camera, X, Check, AlertCircle, CheckCircle, Package, Users, Calendar, AlertTriangle, ArrowUpDown, Wallet } from 'lucide-react';
@@ -30,6 +31,7 @@ interface Product {
   unit_multiplier?: number;
   product_category?: 'OBAT' | 'NON_OBAT';
   nearest_expired?: string | null;
+  description?: string | null;
 }
 
 interface DpPayment {
@@ -44,6 +46,7 @@ interface Faktur {
   id: number;
   product_id: number;
   product_name?: string;
+  product_description?: string;
   product_status?: 'active' | 'pending';
   product_unit?: string;
   product_purchase_unit?: string;
@@ -72,6 +75,7 @@ interface Faktur {
   has_purchase_unit?: number;
   created_by_username?: string;
   created_by_role?: string;
+  purchase_unit_stock?: string | number | null;
 }
 
 interface DbBatch {
@@ -122,6 +126,7 @@ interface ProductFormData {
   unit_multiplier?: string;
   purchase_unit_stock?: string;
   product_category: 'OBAT' | 'NON_OBAT';
+  description?: string;
 }
 
 // For multiple products
@@ -148,6 +153,7 @@ interface FakturFormData {
   due_date: string;
   expired_date: string;
   notes: string;
+  purchase_unit_stock: string;
 }
 
 export default function ProductsPage() {
@@ -228,7 +234,8 @@ export default function ProductsPage() {
       dp_awal: '',
     due_date: '',
       expired_date: '',
-    notes: ''
+    notes: '',
+    purchase_unit_stock: ''
   });
   const [fakturImageFiles, setFakturImageFiles] = useState<File[]>([]);
   const [fakturImagePreviews, setFakturImagePreviews] = useState<string[]>([]);
@@ -265,18 +272,20 @@ export default function ProductsPage() {
     stock_type: 'belum_bayar',
     purchase_date: new Date().toISOString().split('T')[0],
     invoice_number: '',
-    dp_amount: '',
-      dp_awal: '',
-    due_date: '',
     purchase_unit: 'Box',
     unit_multiplier: '1',
-    product_category: 'OBAT'
+    product_category: 'OBAT',
+    description: ''
   });
   const [productFormImageFiles, setProductFormImageFiles] = useState<File[]>([]);
   const [productFormImagePreviews, setProductFormImagePreviews] = useState<string[]>([]);
   const [multipleProducts, setMultipleProducts] = useState<ProductItem[]>([]);
   const [perbaikanBatchIds, setPerbaikanBatchIds] = useState<Record<string, number>>({});
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(-1);
+  const suggestionRef = useRef<HTMLDivElement>(null);
+  const nameInputRef = useRef<HTMLInputElement>(null);
 
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
   const authHeaders = useMemo<Record<string, string>>(() => {
@@ -287,7 +296,7 @@ export default function ProductsPage() {
   const fetchProducts = useCallback(async () => {
     setLoading(true);
     try {
-      let url = `http://localhost:5000/api/products?page=${currentPage}&limit=${itemsPerPage}`;
+      let url = `${API_URL}/api/products?page=${currentPage}&limit=${itemsPerPage}`;
       if (debouncedSearchQuery) {
         url += `&search=${encodeURIComponent(debouncedSearchQuery)}`;
       }
@@ -304,7 +313,7 @@ export default function ProductsPage() {
       });
       
       // Fetch all products for local reference if needed (optional, but let's keep allProducts updated)
-      const allRes = await fetch(`http://localhost:5000/api/products?limit=1000`, { headers: authHeaders });
+      const allRes = await fetch(`${API_URL}/api/products?limit=1000`, { headers: authHeaders });
       if (allRes.ok) {
         const allJson = await allRes.json();
         setAllProducts(allJson.data || []);
@@ -318,7 +327,7 @@ export default function ProductsPage() {
 
   const fetchSuppliers = useCallback(async () => {
     try {
-      const res = await fetch(`http://localhost:5000/api/suppliers?limit=1000`, { headers: authHeaders });
+      const res = await fetch(`${API_URL}/api/suppliers?limit=1000`, { headers: authHeaders });
       if (res.ok) {
         const json = await res.json();
         setSuppliers(json.data || []);
@@ -330,7 +339,7 @@ export default function ProductsPage() {
 
   const fetchFakturs = useCallback(async (productId: number) => {
     try {
-      const res = await fetch(`http://localhost:5000/api/inventory/batches/${productId}`, {
+      const res = await fetch(`${API_URL}/api/inventory/batches/${productId}`, {
         headers: authHeaders
       });
       if (res.ok) {
@@ -363,7 +372,7 @@ export default function ProductsPage() {
   const fetchGlobalPendingFakturs = useCallback(async () => {
     setIsFetchingPending(true);
     try {
-      const res = await fetch('http://localhost:5000/api/inventory/pending-batches', {
+      const res = await fetch(`${API_URL}/api/inventory/pending-batches`, {
         headers: authHeaders
       });
       if (res.ok) {
@@ -418,7 +427,8 @@ export default function ProductsPage() {
       dp_awal: '',
       due_date: '',
       expired_date: '',
-      notes: ''
+      notes: '',
+      purchase_unit_stock: ''
     });
     setFakturImageFiles([]); setFakturImagePreviews([]);
   };
@@ -461,12 +471,13 @@ export default function ProductsPage() {
       dp_awal: faktur.dp_payments && faktur.dp_payments.length > 0 ? faktur.dp_payments[0].amount.toString() : faktur.dp_amount?.toString() || '',
       due_date: formatDateForInput(faktur.due_date),
       expired_date: formatDateForInput(faktur.expired_date),
-      notes: faktur.notes || ''
+      notes: faktur.notes || '',
+      purchase_unit_stock: (faktur as any).purchase_unit_stock?.toString() || ''
     });
     setFakturImageFiles([]); setFakturImagePreviews([]);
     if (faktur.image_url) {
       const urls = getImageUrls(faktur.image_url);
-      setFakturImagePreviews(urls.map(u => `http://localhost:5000${u}`));
+      setFakturImagePreviews(urls.map(u => `${API_URL}${u}`));
     }
   };
 
@@ -515,7 +526,7 @@ export default function ProductsPage() {
     }
 
     try {
-      const res = await fetch(`http://localhost:5000/api/inventory/batches/${selectedFaktur.id}/dp-payments`, {
+      const res = await fetch(`${API_URL}/api/inventory/batches/${selectedFaktur.id}/dp-payments`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -529,6 +540,35 @@ export default function ProductsPage() {
       });
 
       if (res.ok) {
+        // Sync DP ke semua batch lain dalam invoice yg sama
+  const invoiceNo = selectedFaktur.invoice_number || selectedFaktur.batch_number;
+  if (invoiceNo) {
+    try {
+      const lookupRes = await fetch(`${API_URL}/api/returns/purchases/lookup?invoice_no=${encodeURIComponent(invoiceNo)}`, { headers: authHeaders });
+      if (lookupRes.ok) {
+        const lookupData = await lookupRes.json();
+        if (lookupData?.items) {
+          const otherBatchIds = lookupData.items
+            .filter((i: any) => i.batch_id !== selectedFaktur.id)
+            .map((i: any) => i.batch_id);
+          await Promise.all(otherBatchIds.map((batchId: number) =>
+            fetch(`${API_URL}/api/inventory/batches/${batchId}/dp-payments`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', ...authHeaders },
+              body: JSON.stringify({
+                amount: Number(newDPAmount),
+                payment_date: newDPDate,
+                payment_method: newDPPaymentMethod
+              })
+            })
+          ));
+        }
+      }
+    } catch (e) {
+      console.error('Gagal sync DP ke batch lain:', e);
+    }
+  }
+
         goeyToast.success('DP berhasil ditambahkan!');
         setNewDPAmount('');
         setNewDPPaymentMethod('cash');
@@ -560,7 +600,7 @@ export default function ProductsPage() {
       onConfirm: async () => {
         setConfirmModal(prev => ({ ...prev, isOpen: false }));
         try {
-          const res = await fetch(`http://localhost:5000/api/inventory/batches/${selectedFaktur.id}/dp-payments/${paymentId}`, {
+          const res = await fetch(`${API_URL}/api/inventory/batches/${selectedFaktur.id}/dp-payments/${paymentId}`, {
             method: 'DELETE',
             headers: authHeaders
           });
@@ -582,7 +622,7 @@ export default function ProductsPage() {
 
   // const handleApproveFaktur = async (fakturId: number) => {
   //   try {
-  //     const res = await fetch(`http://localhost:5000/api/inventory/batches/${fakturId}/approve`, {
+  //     const res = await fetch(`${API_URL}/api/inventory/batches/${fakturId}/approve`, {
   //       method: 'PUT',
   //       headers: authHeaders
   //     });
@@ -602,7 +642,7 @@ export default function ProductsPage() {
 
   // const handleRejectFaktur = async (fakturId: number) => {
   //   try {
-  //     const res = await fetch(`http://localhost:5000/api/inventory/batches/${fakturId}/reject`, {
+  //     const res = await fetch(`${API_URL}/api/inventory/batches/${fakturId}/reject`, {
   //       method: 'PUT',
   //       headers: authHeaders
   //     });
@@ -621,7 +661,7 @@ export default function ProductsPage() {
 
   // const handleRequestRevision = async (fakturId: number) => {
   //   try {
-  //     const res = await fetch(`http://localhost:5000/api/inventory/batches/${fakturId}/revision`, {
+  //     const res = await fetch(`${API_URL}/api/inventory/batches/${fakturId}/revision`, {
   //       method: 'PUT',
   //       headers: authHeaders
   //     });
@@ -651,7 +691,7 @@ export default function ProductsPage() {
       };
 
       // First, update the product's details
-      const productUpdateRes = await fetch(`http://localhost:5000/api/products/${selectedProduct.id}`, {
+      const productUpdateRes = await fetch(`${API_URL}/api/products/${selectedProduct.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -679,8 +719,8 @@ export default function ProductsPage() {
 
       // Then, save the batch/faktur
       const url = fakturModalMode === 'add'
-        ? 'http://localhost:5000/api/inventory/batches'
-        : `http://localhost:5000/api/inventory/batches/${selectedFaktur?.id}`;
+        ? `${API_URL}/api/inventory/batches`
+        : `${API_URL}/api/inventory/batches/${selectedFaktur?.id}`;
       const method = fakturModalMode === 'add' ? 'POST' : 'PUT';
 
       // Convert from purchase unit (box) to base unit (tablet)
@@ -707,6 +747,7 @@ export default function ProductsPage() {
       if (fakturFormData.stock_type === 'dp' && fakturFormData.due_date) {
         formData.append('due_date', fakturFormData.due_date);
       }
+      formData.append('purchase_unit_stock', fakturFormData.purchase_unit_stock || '');
       formData.append('notes', fakturFormData.notes || '');
       fakturImageFiles.forEach(file => {
         formData.append('images', file);
@@ -750,7 +791,8 @@ export default function ProductsPage() {
       dp_awal: '',
           due_date: '',
       expired_date: '',
-          notes: ''
+          notes: '',
+          purchase_unit_stock: ''
         });
         setFakturImageFiles([]); setFakturImagePreviews([]);
         setSelectedFaktur(null);
@@ -773,7 +815,7 @@ export default function ProductsPage() {
       variant: 'danger',
       onConfirm: async () => {
         try {
-          const res = await fetch(`http://localhost:5000/api/inventory/batches/${faktur.id}`, {
+          const res = await fetch(`${API_URL}/api/inventory/batches/${faktur.id}`, {
             method: 'DELETE',
             headers: authHeaders
           });
@@ -807,7 +849,7 @@ export default function ProductsPage() {
       variant: 'danger',
       onConfirm: async () => {
         try {
-          const res = await fetch(`http://localhost:5000/api/inventory/batches/${faktur.id}/expire`, {
+          const res = await fetch(`${API_URL}/api/inventory/batches/${faktur.id}/expire`, {
             method: 'PUT',
             headers: authHeaders
           });
@@ -854,7 +896,7 @@ export default function ProductsPage() {
       variant: 'warning',
       onConfirm: async () => {
         try {
-          const res = await fetch(`http://localhost:5000/api/inventory/batches/${faktur.id}/archive`, {
+          const res = await fetch(`${API_URL}/api/inventory/batches/${faktur.id}/archive`, {
             method: 'PUT',
             headers: {
               ...authHeaders,
@@ -987,13 +1029,13 @@ export default function ProductsPage() {
   };
 
   const SortableHeader = ({ field, label }: { field: keyof Product | 'name', label: string }) => (
-    <th 
-      className="px-6 py-4 cursor-pointer hover:bg-gray-100 transition-colors select-none"
-      onClick={() => handleSort(field)}
-    >
-      <div className="flex items-center gap-2">
-        <span>{label}</span>
-        <ArrowUpDown size={14} className={`text-gray-400 ${sortField === field ? 'text-blue-500' : ''}`} />
+      <th 
+          className="px-3 sm:px-6 py-2 sm:py-4 text-xs sm:text-sm cursor-pointer hover:bg-gray-100 transition-colors select-none"
+          onClick={() => handleSort(field)}
+        >
+          <div className="flex items-center gap-2">
+            <span>{label}</span>
+            <ArrowUpDown size={14} className={`text-gray-400 ${sortField === field ? 'text-blue-500' : ''}`} />
       </div>
     </th>
   );
@@ -1007,7 +1049,8 @@ export default function ProductsPage() {
       result = result.filter(p => 
         p.name.toLowerCase().includes(query) ||
         (p.supplier_name?.toLowerCase().includes(query)) ||
-        (p.location_code?.toLowerCase().includes(query))
+        (p.location_code?.toLowerCase().includes(query)) ||
+        (p.description?.toLowerCase().includes(query))
       );
     }
 
@@ -1064,7 +1107,8 @@ export default function ProductsPage() {
       purchase_unit: 'Box',
       unit_multiplier: '1',
       purchase_unit_stock: '',
-      product_category: 'OBAT'
+      product_category: 'OBAT',
+      description: ''
     });
     setIsProductOffCanvasOpen(true);
   };
@@ -1093,7 +1137,8 @@ export default function ProductsPage() {
       purchase_unit: product.purchase_unit || 'Box',
       unit_multiplier: multiplier.toString(),
       purchase_unit_stock: calculatedPurchaseStock,
-      product_category: product.product_category || 'OBAT'
+      product_category: product.product_category || 'OBAT',
+      description: product.description || ''
     });
     setIsProductOffCanvasOpen(true);
   };
@@ -1121,7 +1166,8 @@ export default function ProductsPage() {
       due_date: '',
       purchase_unit: 'Box',
       unit_multiplier: '1',
-      product_category: 'OBAT'
+      product_category: 'OBAT',
+      description: ''
     });
     setIsMultipleProducts(false);
     setMultipleProducts([]);
@@ -1139,7 +1185,7 @@ export default function ProductsPage() {
     if (existsInLocal) { setInvoiceNumberError('No. Faktur sudah digunakan'); return; }
 
     try {
-      const res = await fetch(`http://localhost:5000/api/inventory/batches/check-invoice/${encodeURIComponent(trimmed)}`, {
+      const res = await fetch(`${API_URL}/api/inventory/batches/check-invoice/${encodeURIComponent(trimmed)}`, {
         headers: authHeaders
       });
       if (res.ok) {
@@ -1149,7 +1195,43 @@ export default function ProductsPage() {
     } catch { setInvoiceNumberError(''); }
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (suggestionRef.current && !suggestionRef.current.contains(e.target as Node) &&
+          nameInputRef.current && !nameInputRef.current.contains(e.target as Node)) {
+        setShowSuggestions(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const filteredSuggestions = useMemo(() => {
+    const query = formData.name.trim().toLowerCase();
+    if (!query || query.length < 2 || productOffCanvasMode === 'edit') return [];
+    const exact = allProducts.find(p => p.name.trim().toLowerCase() === query);
+    if (exact) return [];
+    return allProducts
+      .filter(p => p.name.toLowerCase().includes(query))
+      .slice(0, 8);
+  }, [formData.name, allProducts, productOffCanvasMode]);
+
+  const handleSelectProductSuggestion = (product: Product) => {
+    setFormData(prev => ({
+      ...prev,
+      name: product.name,
+      unit: product.unit,
+      purchase_unit: product.purchase_unit || 'Box',
+      unit_multiplier: (product.unit_multiplier || 1).toString(),
+      selling_price: product.selling_price.toString(),
+      location_code: product.location_code || '',
+      cost_price: prev.cost_price,
+    }));
+    setShowSuggestions(false);
+    setSelectedSuggestionIndex(-1);
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData(prev => {
       let updated = { ...prev, [name]: value };
@@ -1170,6 +1252,30 @@ export default function ProductsPage() {
           updated.selling_price = matchedProduct.selling_price.toString();
           updated.location_code = matchedProduct.location_code || '';
           updated.cost_price = prev.cost_price; // Keep manual cost price
+        }
+
+        const trimmed = value.trim().toLowerCase();
+        const hasExact = allProducts.some(p => p.name.trim().toLowerCase() === trimmed);
+        setShowSuggestions(trimmed.length >= 2 && !hasExact);
+        setSelectedSuggestionIndex(-1);
+
+        // Auto-fill description from AI
+        if (value.trim().length >= 2) {
+          fetch(`${API_URL}/api/knowledge/ai-description`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', ...authHeaders },
+            body: JSON.stringify({ name: value.trim() })
+          })
+            .then(r => r.json())
+            .then(aiResult => {
+              if (aiResult.description) {
+                setFormData(current => ({
+                  ...current,
+                  description: aiResult.description
+                }));
+              }
+            })
+            .catch(() => {});
         }
       }
 
@@ -1231,9 +1337,10 @@ export default function ProductsPage() {
           location_code: formData.location_code || null,
           purchase_unit: formData.purchase_unit || 'Box',
           unit_multiplier: multiplier,
-          product_category: formData.product_category
+          product_category: formData.product_category,
+          description: formData.description || null
         };
-        const res = await fetch(`http://localhost:5000/api/products/${selectedProduct.id}`, {
+        const res = await fetch(`${API_URL}/api/products/${selectedProduct.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json', ...authHeaders },
           body: JSON.stringify(payload)
@@ -1249,12 +1356,88 @@ export default function ProductsPage() {
       }
     } else {
       // Add mode
-      try {
-        const saveProductAndBatch = async (item: ProductFormData, imageFiles: File[] = []) => {
-          // Check if product with same name exists in database
-          const existingProduct = allProducts.find(
-            p => p.name.trim().toLowerCase() === item.name.trim().toLowerCase()
-          );
+      const submitName = formData.name.trim().toLowerCase();
+      const exactMatch = allProducts.find(p => p.name.trim().toLowerCase() === submitName);
+      const similarProduct = !exactMatch
+        ? allProducts.find(p => p.name.toLowerCase().includes(submitName) || submitName.includes(p.name.toLowerCase()))
+        : null;
+
+      if (similarProduct && !isMultipleProducts && !isPerbaikanMultiMode) {
+        setConfirmModal({
+          isOpen: true,
+          title: 'Produk Mirip Ditemukan',
+          message: `Produk "${similarProduct.name}" sudah ada di database. Yakin ingin membuat produk BARU dengan nama "${formData.name}"?`,
+          confirmText: 'Ya, Buat Baru',
+          cancelText: 'Batal',
+          variant: 'warning',
+          onConfirm: () => {
+            setConfirmModal(prev => ({ ...prev, isOpen: false }));
+            executeAddMode();
+          },
+          onClose: () => setConfirmModal(prev => ({ ...prev, isOpen: false })),
+        });
+        return;
+      }
+
+      if (isMultipleProducts && multipleProducts.length > 0) {
+        const conflicts: { itemName: string; matchName: string; type: 'sama' | 'mirip' }[] = [];
+        for (const item of multipleProducts) {
+          const name = item.name.trim().toLowerCase();
+          const existing = allProducts.find(p => p.name.trim().toLowerCase() === name);
+          if (existing) {
+            conflicts.push({ itemName: item.name, matchName: existing.name, type: 'sama' });
+          } else {
+            const similar = allProducts.find(
+              p => p.name.toLowerCase().includes(name) || name.includes(p.name.toLowerCase())
+            );
+            if (similar) {
+              conflicts.push({ itemName: item.name, matchName: similar.name, type: 'mirip' });
+            }
+          }
+        }
+        if (conflicts.length > 0) {
+          setConfirmModal({
+            isOpen: true,
+            title: 'Produk Bermasalah Ditemukan',
+            message: (
+              <div className="text-sm space-y-1">
+                <p className="mb-2">Ditemukan produk berikut di database yang bermasalah:</p>
+                {conflicts.map((c, i) => (
+                  <div key={i} className="flex items-start gap-2">
+                    <span className={`mt-0.5 w-2 h-2 rounded-full flex-shrink-0 ${c.type === 'sama' ? 'bg-red-500' : 'bg-yellow-500'}`} />
+                    <div>
+                      <span className="font-medium">{c.itemName}</span>
+                      {' '}{c.type === 'sama' ? 'sama' : 'mirip'} dengan{' '}
+                      <span className="font-medium">{c.matchName}</span>
+                    </div>
+                  </div>
+                ))}
+                <p className="mt-3 text-gray-600">Yakin ingin tetap menyimpan produk-produk ini?</p>
+              </div>
+            ),
+            confirmText: 'Ya, Lanjutkan',
+            cancelText: 'Batal',
+            variant: 'warning',
+            onConfirm: () => {
+              setConfirmModal(prev => ({ ...prev, isOpen: false }));
+              executeAddMode();
+            },
+            onClose: () => setConfirmModal(prev => ({ ...prev, isOpen: false })),
+          });
+          return;
+        }
+      }
+
+      executeAddMode();
+    }
+  };
+
+  const executeAddMode = async () => {
+    try {
+      const saveProductAndBatch = async (item: ProductFormData, imageFiles: File[] = []) => {
+        const existingProduct = allProducts.find(
+          p => p.name.trim().toLowerCase() === item.name.trim().toLowerCase()
+        );
 
           const multiplier = Number(item.unit_multiplier) || 1;
           const calculatedStock = Number(item.stock);
@@ -1277,9 +1460,10 @@ export default function ProductsPage() {
               location_code: item.location_code || existingProduct.location_code || null,
               purchase_unit: item.purchase_unit || existingProduct.purchase_unit || 'Box',
               unit_multiplier: multiplier,
-              product_category: item.product_category
+              product_category: item.product_category,
+              description: item.description || existingProduct.description || null
             };
-            await fetch(`http://localhost:5000/api/products/${productId}`, {
+            await fetch(`${API_URL}/api/products/${productId}`, {
               method: 'PUT',
               headers: { 'Content-Type': 'application/json', ...authHeaders },
               body: JSON.stringify(payload)
@@ -1301,10 +1485,11 @@ export default function ProductsPage() {
               location_code: item.location_code || null,
               purchase_unit: item.purchase_unit || 'Box',
               unit_multiplier: multiplier,
-              needsApproval: needsApproval, // Pass flag to backend
-              product_category: item.product_category
+              needsApproval: needsApproval,
+              product_category: item.product_category,
+              description: item.description || null
             };
-            const res = await fetch(`http://localhost:5000/api/products`, {
+            const res = await fetch(`${API_URL}/api/products`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json', ...authHeaders },
               body: JSON.stringify(payload)
@@ -1330,12 +1515,13 @@ export default function ProductsPage() {
             if (item.dp_amount) batchFormData.append('dp_amount', item.dp_amount);
             if (item.due_date) batchFormData.append('due_date', item.due_date);
             batchFormData.append('has_purchase_unit', Number(item.unit_multiplier) > 1 ? '1' : '0');
+            if (item.purchase_unit_stock) batchFormData.append('purchase_unit_stock', item.purchase_unit_stock);
             imageFiles.forEach(f => batchFormData.append('images', f));
 
             const existingBatchId = (item as any).id ? perbaikanBatchIds[(item as any).id] : undefined;
             const isUpdate = !!existingBatchId;
 
-            const res = await fetch(`http://localhost:5000/api/inventory/batches${isUpdate ? `/${existingBatchId}` : ''}`, {
+            const res = await fetch(`${API_URL}/api/inventory/batches${isUpdate ? `/${existingBatchId}` : ''}`, {
               method: isUpdate ? 'PUT' : 'POST',
               headers: {
                 ...authHeaders
@@ -1379,10 +1565,11 @@ export default function ProductsPage() {
               if (item.stock_type === 'dp' && item.dp_awal) batchFormData.append('dp_awal', item.dp_awal);
               if (item.stock_type === 'dp' && item.dp_amount) batchFormData.append('dp_amount', item.dp_amount);
               if (item.stock_type === 'dp' && item.due_date) batchFormData.append('due_date', item.due_date);
-              batchFormData.append('has_purchase_unit', Number(formData.unit_multiplier) > 1 ? '1' : '0');
+              batchFormData.append('has_purchase_unit', Number(item.unit_multiplier) > 1 ? '1' : '0');
+              if (item.purchase_unit_stock) batchFormData.append('purchase_unit_stock', item.purchase_unit_stock);
               (item.imageFiles || []).forEach(f => batchFormData.append('images', f));
 
-              const batchRes = await fetch(`http://localhost:5000/api/inventory/batches/${existingBatchId}`, {
+              const batchRes = await fetch(`${API_URL}/api/inventory/batches/${existingBatchId}`, {
                 method: 'PUT', headers: { ...authHeaders }, body: batchFormData
               });
               if (!batchRes.ok) {
@@ -1395,7 +1582,7 @@ export default function ProductsPage() {
               if (prodId) {
                 let prodData = allProducts.find((p: any) => p.id === prodId);
                 if (!prodData) {
-                  const refreshRes = await fetch(`http://localhost:5000/api/products?limit=1000`, { headers: authHeaders });
+                  const refreshRes = await fetch(`${API_URL}/api/products?limit=1000`, { headers: authHeaders });
                   if (refreshRes.ok) {
                     const refreshJson = await refreshRes.json();
                     setAllProducts(refreshJson.data || []);
@@ -1413,9 +1600,10 @@ export default function ProductsPage() {
                   expired_date: item.expired_date || prodData?.expired_date || null,
                   location_code: item.location_code || prodData?.location_code || null,
                   purchase_unit: item.purchase_unit || prodData?.purchase_unit || 'Box',
-                  unit_multiplier: Number(item.unit_multiplier) || prodData?.unit_multiplier || 1
+                  unit_multiplier: Number(item.unit_multiplier) || prodData?.unit_multiplier || 1,
+                  description: item.description || (prodData as any)?.description || null
                 };
-                await fetch(`http://localhost:5000/api/products/${prodId}`, {
+                await fetch(`${API_URL}/api/products/${prodId}`, {
                   method: 'PUT',
                   headers: { 'Content-Type': 'application/json', ...authHeaders },
                   body: JSON.stringify(payload)
@@ -1444,9 +1632,10 @@ export default function ProductsPage() {
             if (formData.stock_type === 'dp' && formData.dp_amount) batchFormData.append('dp_amount', formData.dp_amount);
             if (formData.stock_type === 'dp' && formData.due_date) batchFormData.append('due_date', formData.due_date);
             batchFormData.append('has_purchase_unit', Number(formData.unit_multiplier) > 1 ? '1' : '0');
+            if (formData.purchase_unit_stock) batchFormData.append('purchase_unit_stock', formData.purchase_unit_stock);
             [...productFormImageFiles, ...fakturImageFiles].forEach(f => batchFormData.append('images', f));
 
-            const res = await fetch(`http://localhost:5000/api/inventory/batches/${singleBatchId}`, {
+            const res = await fetch(`${API_URL}/api/inventory/batches/${singleBatchId}`, {
               method: 'PUT', headers: { ...authHeaders }, body: batchFormData
             });
             if (!res.ok) {
@@ -1459,7 +1648,7 @@ export default function ProductsPage() {
             if (productId) {
               let prodData = allProducts.find(p => p.id === productId);
               if (!prodData) {
-                const refreshRes = await fetch(`http://localhost:5000/api/products?limit=1000`, { headers: authHeaders });
+                const refreshRes = await fetch(`${API_URL}/api/products?limit=1000`, { headers: authHeaders });
                 if (refreshRes.ok) {
                   const refreshJson = await refreshRes.json();
                   setAllProducts(refreshJson.data || []);
@@ -1477,10 +1666,11 @@ export default function ProductsPage() {
                 expired_date: formData.expired_date || prodData?.expired_date || null,
                 location_code: formData.location_code || prodData?.location_code || null,
                 purchase_unit: formData.purchase_unit || prodData?.purchase_unit || 'Box',
-                unit_multiplier: Number(formData.unit_multiplier) || prodData?.unit_multiplier || 1
+                unit_multiplier: Number(formData.unit_multiplier) || prodData?.unit_multiplier || 1,
+                description: formData.description || (prodData as any)?.description || null
               };
               console.log('[Submit Perbaikan] SENDING product PUT for productId:', productId, 'payload:', payload);
-              const prodRes = await fetch(`http://localhost:5000/api/products/${productId}`, {
+              const prodRes = await fetch(`${API_URL}/api/products/${productId}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json', ...authHeaders },
                 body: JSON.stringify(payload)
@@ -1504,7 +1694,6 @@ export default function ProductsPage() {
         console.error('Error adding product:', error);
         goeyToast.error(error.message || 'Gagal menambahkan produk');
       }
-    }
   };
 
   const handleOpenDeleteModal = (product: Product) => {
@@ -1533,7 +1722,7 @@ export default function ProductsPage() {
     }
 
     try {
-      const res = await fetch(`http://localhost:5000/api/products/${product.id}`, {
+      const res = await fetch(`${API_URL}/api/products/${product.id}`, {
         method: 'DELETE',
         headers: authHeaders
       });
@@ -1560,9 +1749,9 @@ export default function ProductsPage() {
           checkPermission('create') && (
             <button 
               onClick={handleOpenAddOffCanvas}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium transition-colors"
+              className="bg-blue-600 hover:bg-blue-700 text-white px-2 sm:px-4 py-1 sm:py-2 rounded-lg flex items-center gap-2 text-xs sm:text-sm font-medium transition-colors"
             >
-              <Plus size={16} />
+              <Plus className="w-3.5 sm:w-4 h-3.5 sm:h-4" />
               Add Products
             </button>
           )
@@ -1598,7 +1787,7 @@ export default function ProductsPage() {
 
         {/* Table */}
         <div className="overflow-x-auto">
-          <table className="w-full text-sm text-left">
+          <table className="w-full text-xs sm:text-sm text-left">
             <thead className="bg-gray-50 text-gray-500 font-medium">
               <tr>
                 {/* <th className="px-6 py-4 cursor-pointer hover:text-gray-700">ID ↕</th> */}
@@ -1611,19 +1800,19 @@ export default function ProductsPage() {
                 <SortableHeader field="selling_price" label="Harga Jual" />
                 <SortableHeader field="expired_date" label="Kadaluarsa" />
                 <SortableHeader field="stock" label="Stock" />
-                <th className="px-6 py-4 text-right">Actions</th>
+                <th className="px-3 sm:px-6 py-2 sm:py-4 text-xs sm:text-sm text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="">
               {loading ? (
                 <tr>
-                  <td colSpan={10} className="px-6 py-8 text-center text-gray-500">
+                  <td colSpan={10} className="px-3 sm:px-6 py-4 sm:py-8 text-center text-gray-500">
                     Loading products...
                   </td>
                 </tr>
               ) : filteredAndSortedProducts.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="px-6 py-8 text-center text-gray-500">
+                  <td colSpan={10} className="px-3 sm:px-6 py-4 sm:py-8 text-center text-gray-500">
                     No products found.
                   </td>
                 </tr>
@@ -1633,8 +1822,8 @@ export default function ProductsPage() {
                   .map((product) => (
                   <tr key={product.id} className="hover:bg-gray-50 transition-colors group">
                     {/* <td className="px-6 py-4 text-gray-500">#{product.id}</td> */}
-                    <td className="px-6 py-4 font-medium text-gray-900">{product.name}</td>
-                    <td className="px-6 py-4 text-gray-600">
+                    <td className="px-3 sm:px-6 py-2 sm:py-4 font-medium text-gray-900">{product.name}</td>
+                    <td className="px-3 sm:px-6 py-2 sm:py-4 text-gray-600">
                       <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold ${
                         product.product_category === 'NON_OBAT' 
                           ? 'bg-amber-100 text-amber-800' 
@@ -1643,9 +1832,9 @@ export default function ProductsPage() {
                         {product.product_category === 'NON_OBAT' ? 'Non-Obat' : 'Obat'}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-gray-600 font-medium">{product.location_code || '-'}</td>
-                    <td className="px-6 py-4 text-gray-600">{product.supplier_name || '-'}</td>
-                    <td className="px-3 sm:px-6 py-4">
+                    <td className="px-3 sm:px-6 py-2 sm:py-4 text-gray-600 font-medium">{product.location_code || '-'}</td>
+                    <td className="px-3 sm:px-6 py-2 sm:py-4 text-gray-600">{product.supplier_name || '-'}</td>
+                    <td className="px-3 sm:px-6 py-2 sm:py-4">
                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                         product.stock_type === 'lunas' 
                           ? 'bg-green-100 text-green-700 border border-green-200'
@@ -1666,18 +1855,18 @@ export default function ProductsPage() {
                          product.stock_type === 'retur' ? 'Retur' : '-'}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-gray-600">{formatCurrency(product.cost_price)}</td>
-                    <td className="px-6 py-4 text-gray-600">{formatCurrency(product.selling_price)}</td>
-                    <td className="px-3 sm:px-6 py-4">
+                    <td className="px-3 sm:px-6 py-2 sm:py-4 text-gray-600">{formatCurrency(product.cost_price)}</td>
+                    <td className="px-3 sm:px-6 py-2 sm:py-4 text-gray-600">{formatCurrency(product.selling_price)}</td>
+                    <td className="px-3 sm:px-6 py-2 sm:py-4">
                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getExpiredStatusColor(product.nearest_expired || product.expired_date)}`}>
                         {formatDate(product.nearest_expired || product.expired_date)}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-gray-600">
+                    <td className="px-3 sm:px-6 py-2 sm:py-4 text-gray-600">
                       {formatStock(product.stock, product.unit_multiplier || 1, product.purchase_unit || 'Box', product.unit || 'Tablet')}
                     </td>
-                    <td className="px-6 py-4 text-right">
-                      <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <td className="px-3 sm:px-6 py-2 sm:py-4 text-right">
+                      <div className="flex justify-end gap-2 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                         <button 
                           onClick={() => setDetailProduct(product)}
                           className="p-1 text-gray-500 hover:bg-gray-100 rounded"
@@ -1867,7 +2056,7 @@ export default function ProductsPage() {
                   <div className="flex flex-col gap-4 items-start">
                     {/* Image Input UI */}
                     <div className="w-full flex flex-col gap-3">
-                      <div className="flex gap-2">
+                      <div className="flex flex-col sm:flex-row gap-2">
                         <button
                           type="button"
                           onClick={() => productFileInputRef.current?.click()}
@@ -1986,17 +2175,59 @@ export default function ProductsPage() {
             {/* Render form based on single/multiple */}
             {productOffCanvasMode === 'edit' || (!isMultipleProducts && !isPerbaikanMultiMode) ? (
               <React.Fragment>
-                <div>
+                <div className="relative">
                   <label className="block text-sm font-medium text-gray-700 mb-1">Product Name <span className="text-red-500">*</span></label>
                   <input
+                    ref={nameInputRef}
                     type="text"
                     name="name"
                     required
                     value={formData.name}
                     onChange={handleInputChange}
+                    onKeyDown={(e) => {
+                      if (!showSuggestions || filteredSuggestions.length === 0) return;
+                      if (e.key === 'ArrowDown') {
+                        e.preventDefault();
+                        setSelectedSuggestionIndex(prev => Math.min(prev + 1, filteredSuggestions.length - 1));
+                      } else if (e.key === 'ArrowUp') {
+                        e.preventDefault();
+                        setSelectedSuggestionIndex(prev => Math.max(prev - 1, 0));
+                      } else if (e.key === 'Enter' && selectedSuggestionIndex >= 0) {
+                        e.preventDefault();
+                        handleSelectProductSuggestion(filteredSuggestions[selectedSuggestionIndex]);
+                      } else if (e.key === 'Escape') {
+                        setShowSuggestions(false);
+                      }
+                    }}
+                    onFocus={() => {
+                      const trimmed = formData.name.trim().toLowerCase();
+                      if (trimmed.length >= 2 && !allProducts.some(p => p.name.trim().toLowerCase() === trimmed)) {
+                        setShowSuggestions(true);
+                      }
+                    }}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                     placeholder="Enter product name"
                   />
+                  {showSuggestions && filteredSuggestions.length > 0 && (
+                    <div
+                      ref={suggestionRef}
+                      className="absolute z-50 left-0 right-0 mt-0.5 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto"
+                    >
+                      {filteredSuggestions.map((p, i) => (
+                        <button
+                          key={p.id}
+                          type="button"
+                          className={`w-full text-left px-3 py-2 text-sm hover:bg-blue-50 transition-colors ${
+                            i === selectedSuggestionIndex ? 'bg-blue-100 font-medium' : ''
+                          }`}
+                          onClick={() => handleSelectProductSuggestion(p)}
+                        >
+                          <span className="text-gray-900">{p.name}</span>
+                          <span className="text-gray-400 ml-2 text-xs">{p.unit}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 <div>
@@ -2011,6 +2242,18 @@ export default function ProductsPage() {
                     <option value="OBAT">Obat</option>
                     <option value="NON_OBAT">Non-Obat</option>
                   </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Deskripsi / Penjelasan</label>
+                  <textarea
+                    name="description"
+                    value={formData.description || ''}
+                    onChange={handleInputChange}
+                    rows={3}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-sm"
+                    placeholder="Penjelasan obat akan terisi otomatis dari database pengetahuan saat mengetik nama produk"
+                  />
                 </div>
                 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -2216,17 +2459,58 @@ export default function ProductsPage() {
               <div className="space-y-4">
                 <div className="border border-gray-200 rounded-lg p-4">
                   <h3 className="font-medium text-gray-700 mb-3">Tambahkan Produk</h3>
-                  <div className="grid grid-cols-2 gap-4 mb-3">
-                    <div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-3">
+                    <div className="relative">
                       <label className="block text-xs text-gray-600 mb-1">Nama Produk <span className="text-red-500">*</span></label>
                       <input
                         type="text"
                         name="name"
                         value={formData.name}
                         onChange={handleInputChange}
+                        onKeyDown={(e) => {
+                          if (!showSuggestions || filteredSuggestions.length === 0) return;
+                          if (e.key === 'ArrowDown') {
+                            e.preventDefault();
+                            setSelectedSuggestionIndex(prev => Math.min(prev + 1, filteredSuggestions.length - 1));
+                          } else if (e.key === 'ArrowUp') {
+                            e.preventDefault();
+                            setSelectedSuggestionIndex(prev => Math.max(prev - 1, 0));
+                          } else if (e.key === 'Enter' && selectedSuggestionIndex >= 0) {
+                            e.preventDefault();
+                            handleSelectProductSuggestion(filteredSuggestions[selectedSuggestionIndex]);
+                          } else if (e.key === 'Escape') {
+                            setShowSuggestions(false);
+                          }
+                        }}
+                        onFocus={() => {
+                          const trimmed = formData.name.trim().toLowerCase();
+                          if (trimmed.length >= 2 && !allProducts.some(p => p.name.trim().toLowerCase() === trimmed)) {
+                            setShowSuggestions(true);
+                          }
+                        }}
                         className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm"
                         placeholder="Nama Produk"
                       />
+                      {showSuggestions && filteredSuggestions.length > 0 && (
+                        <div
+                          ref={suggestionRef}
+                          className="absolute z-50 left-0 right-0 mt-0.5 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto"
+                        >
+                          {filteredSuggestions.map((p, i) => (
+                            <button
+                              key={p.id}
+                              type="button"
+                              className={`w-full text-left px-3 py-2 text-sm hover:bg-blue-50 transition-colors ${
+                                i === selectedSuggestionIndex ? 'bg-blue-100 font-medium' : ''
+                              }`}
+                              onClick={() => handleSelectProductSuggestion(p)}
+                            >
+                              <span className="text-gray-900">{p.name}</span>
+                              <span className="text-gray-400 ml-2 text-xs">{p.unit}</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </div>
                     <div>
                       <label className="block text-xs text-gray-600 mb-1">Kategori Produk</label>
@@ -2402,6 +2686,17 @@ export default function ProductsPage() {
                         placeholder="Masukkan nomor batch"
                       />
                     </div>
+                    <div className="col-span-2">
+                      <label className="block text-xs text-gray-600 mb-1">Deskripsi / Penjelasan</label>
+                      <textarea
+                        name="description"
+                        value={formData.description || ''}
+                        onChange={handleInputChange}
+                        rows={2}
+                        className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm"
+                        placeholder="Penjelasan akan terisi otomatis saat mengetik nama produk"
+                      />
+                    </div>
                 </div>
                   {/* DP Fields for multiple products */}
                 
@@ -2457,7 +2752,8 @@ export default function ProductsPage() {
                         expired_date: '',
                         purchase_unit: 'Box',
                         unit_multiplier: '1',
-                        purchase_unit_stock: ''
+                        purchase_unit_stock: '',
+                        description: ''
                       });
                     }}
                     className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-md transition-colors"
@@ -2508,11 +2804,13 @@ export default function ProductsPage() {
                                   invoice_number: item.invoice_number || '',
                                   batch_number: item.batch_number || '',
                                   dp_amount: item.dp_amount || '',
+                                  dp_awal: item.dp_awal || '',
                                   due_date: item.due_date || '',
                                   purchase_unit: item.purchase_unit || 'Box',
                                   unit_multiplier: item.unit_multiplier || '1',
                                   purchase_unit_stock: item.purchase_unit_stock || '',
-                                  product_category: item.product_category || 'OBAT'
+                                  product_category: item.product_category || 'OBAT',
+                                  description: item.description || ''
                                 });
                                 setMultipleProducts(multipleProducts.filter(p => p.id !== item.id));
                               }}
@@ -2541,17 +2839,17 @@ export default function ProductsPage() {
             )}
           </div>
           
-          <div className="flex justify-end gap-3 mt-8">
+          <div className="flex flex-col sm:flex-row justify-end gap-3 mt-8">
             <button
               type="button"
               onClick={handleCloseProductOffCanvas}
-              className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium transition-colors"
+              className="w-full sm:w-auto px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium transition-colors"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-4 py-2 text-white bg-blue-600 hover:bg-blue-700 rounded-lg text-sm font-medium transition-colors"
+              className="w-full sm:w-auto px-4 py-2 text-white bg-blue-600 hover:bg-blue-700 rounded-lg text-sm font-medium transition-colors"
             >
               {productOffCanvasMode === 'add' ? 'Create Product' : 'Save Changes'}
             </button>
@@ -2584,7 +2882,8 @@ export default function ProductsPage() {
       dp_awal: '',
               due_date: '',
       expired_date: '',
-              notes: ''
+              notes: '',
+              purchase_unit_stock: ''
             });
             setFakturImageFiles([]); setFakturImagePreviews([]);
           }}
@@ -2611,22 +2910,22 @@ export default function ProductsPage() {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-sm text-left">
+              <table className="w-full text-xs sm:text-sm text-left">
                 <thead className="bg-gray-50 text-gray-500 font-medium">
                   <tr>
-                    <th className="px-4 py-3">No. Faktur</th>
-                    <th className="px-4 py-3">Supplier</th>
-                    <th className="px-4 py-3">Tipe Stok</th>
-                    <th className="px-4 py-3">Tgl Pembelian</th>
-                    <th className="px-4 py-3">Status</th>
-                    <th className="px-4 py-3">Qty Awal</th>
-                    <th className="px-4 py-3">Qty Tersisa</th>
-                    <th className="px-4 py-3">Qty Terjual</th>
-                    <th className="px-4 py-3">Qty Retur</th>
-                    <th className="px-4 py-3">Expired Date</th>
-                    <th className="px-4 py-3">Harga Beli</th>
-                    <th className="px-4 py-3">Total</th>
-                    <th className="px-4 py-3 text-right">Aksi</th>
+                    <th className="px-2 sm:px-4 py-1.5 sm:py-3">No. Faktur</th>
+                    <th className="px-2 sm:px-4 py-1.5 sm:py-3">Supplier</th>
+                    <th className="px-2 sm:px-4 py-1.5 sm:py-3">Tipe Stok</th>
+                    <th className="px-2 sm:px-4 py-1.5 sm:py-3">Tgl Pembelian</th>
+                    <th className="px-2 sm:px-4 py-1.5 sm:py-3">Status</th>
+                    <th className="px-2 sm:px-4 py-1.5 sm:py-3">Qty Awal</th>
+                    <th className="px-2 sm:px-4 py-1.5 sm:py-3">Qty Tersisa</th>
+                    <th className="px-2 sm:px-4 py-1.5 sm:py-3">Qty Terjual</th>
+                    <th className="px-2 sm:px-4 py-1.5 sm:py-3">Qty Retur</th>
+                    <th className="px-2 sm:px-4 py-1.5 sm:py-3">Expired Date</th>
+                    <th className="px-2 sm:px-4 py-1.5 sm:py-3">Harga Beli</th>
+                    <th className="px-2 sm:px-4 py-1.5 sm:py-3">Total</th>
+                    <th className="px-2 sm:px-4 py-1.5 sm:py-3 text-right">Aksi</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -2668,7 +2967,7 @@ export default function ProductsPage() {
 
                     return (
                       <tr key={faktur.id} className="border-b border-gray-100 hover:bg-gray-50">
-                        <td className="px-4 py-3 font-medium">
+                        <td className="px-2 sm:px-4 py-1.5 sm:py-3 font-medium">
                           {faktur.invoice_number}
                           {faktur.notes === 'Expired' && (
                             <div className="mt-1">
@@ -2678,8 +2977,8 @@ export default function ProductsPage() {
                             </div>
                           )}
                         </td>
-                        <td className="px-4 py-3">{faktur.supplier_name || '-'}</td>
-                        <td className="px-4 py-3">
+                        <td className="px-2 sm:px-4 py-1.5 sm:py-3">{faktur.supplier_name || '-'}</td>
+                        <td className="px-2 sm:px-4 py-1.5 sm:py-3">
                           <span className={`px-2 py-1 rounded-full text-xs font-medium ${
                             statusText === 'Lunas'
                               ? 'bg-green-100 text-green-700'
@@ -2692,8 +2991,8 @@ export default function ProductsPage() {
                             {statusText}
                           </span>
                         </td>
-                        <td className="px-4 py-3">{faktur.purchase_date ? new Date(faktur.purchase_date).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }) : '-'}</td>
-                        <td className="px-4 py-3">
+                        <td className="px-2 sm:px-4 py-1.5 sm:py-3">{faktur.purchase_date ? new Date(faktur.purchase_date).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }) : '-'}</td>
+                        <td className="px-2 sm:px-4 py-1.5 sm:py-3">
                           <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
                             faktur.status === 'approved' 
                               ? 'bg-green-100 text-green-700' 
@@ -2708,39 +3007,49 @@ export default function ProductsPage() {
                              faktur.status === 'revision' ? 'Menunggu Perbaikan' : 'Approved'}
                           </span>
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="px-2 sm:px-4 py-1.5 sm:py-3">
                           <span>{initialQty} {selectedProduct?.unit || 'Tablet'}</span>
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="px-2 sm:px-4 py-1.5 sm:py-3">
                           <span>{remainingQty} {selectedProduct?.unit || 'Tablet'}</span>
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="px-2 sm:px-4 py-1.5 sm:py-3">
                           <span className={soldQty > 0 ? 'text-blue-600' : ''}>{soldQty} {selectedProduct?.unit || 'Tablet'}</span>
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="px-2 sm:px-4 py-1.5 sm:py-3">
                           {(faktur.qty_returned ?? 0) > 0 ? (
                             <span className="text-red-600 font-medium">{faktur.qty_returned ?? 0} {selectedProduct?.unit || 'Tablet'}</span>
                           ) : (
                             <span className="text-gray-300">0</span>
                           )}
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="px-2 sm:px-4 py-1.5 sm:py-3">
                           {faktur.expired_date ? new Date(faktur.expired_date).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }) : '-'}
                         </td>
-                        <td className="px-4 py-3">{formatCurrency(faktur.cost_price)}</td>
-                        <td className="px-4 py-3 font-medium">{formatCurrency(totalAmount)}</td>
-                        <td className="px-4 py-3 text-right">
+                        <td className="px-2 sm:px-4 py-1.5 sm:py-3">{formatCurrency(faktur.cost_price)}</td>
+                        <td className="px-2 sm:px-4 py-1.5 sm:py-3 font-medium">{formatCurrency(totalAmount)}</td>
+                        <td className="px-2 sm:px-4 py-1.5 sm:py-3 text-right">
                           <div className="flex justify-end gap-2">
                             <button
-                              onClick={() => setDetailFaktur(faktur)}
-                              className="p-1 text-gray-500 hover:bg-gray-100 rounded"
+                              onClick={() => {
+                                setDetailFaktur(faktur);
+                                fetch(`${API_URL}/api/returns/purchases/lookup?invoice_no=${encodeURIComponent(faktur.invoice_number || faktur.batch_number || '')}`, { headers: authHeaders })
+                                  .then(r => r.ok ? r.json() : null)
+                                  .then(data => {
+                                    if (data?.purchase?.total) {
+                                      setDetailFaktur(prev => prev ? { ...prev, total_amount: data.purchase.total } : prev);
+                                    }
+                                  })
+                                  .catch(() => {});
+                              }}
+                              className="p-0.5 sm:p-1 text-gray-500 hover:bg-gray-100 rounded"
                               title="Detail Faktur"
                             >
                               <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
                             </button>
                             <button
                               onClick={() => handleOpenEditFakturModal(faktur)}
-                              className={`p-1 rounded ${faktur.status === 'revision' || faktur.status === 'rejected' ? 'text-orange-600 bg-orange-50 border border-orange-200' : 'text-blue-600 hover:bg-blue-50'}`}
+                              className={`p-0.5 sm:p-1 rounded ${faktur.status === 'revision' || faktur.status === 'rejected' ? 'text-orange-600 bg-orange-50 border border-orange-200' : 'text-blue-600 hover:bg-blue-50'}`}
                               title={faktur.status === 'revision' || faktur.status === 'rejected' ? 'Perbaiki' : 'Edit'}
                             >
                               <Edit size={14} />
@@ -2748,7 +3057,7 @@ export default function ProductsPage() {
                             {faktur.status === 'approved' && faktur.notes !== 'Expired' && (
                               <button
                                 onClick={() => handleExpireBatch(faktur)}
-                                className="p-1 text-amber-600 hover:bg-amber-50 rounded"
+                                className="p-0.5 sm:p-1 text-amber-600 hover:bg-amber-50 rounded"
                                 title="Tandai Kadaluarsa"
                               >
                                 <AlertTriangle size={14} />
@@ -2757,7 +3066,7 @@ export default function ProductsPage() {
                             {(canArchive || faktur.notes === 'Expired') && (
                               <button
                                 onClick={() => handleArchiveFaktur(faktur)}
-                                className="p-1 text-gray-500 hover:bg-gray-100 rounded"
+                                className="p-0.5 sm:p-1 text-gray-500 hover:bg-gray-100 rounded"
                                 title="Arsipkan Faktur"
                               >
                                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="21 8 21 21 3 21 3 8"></polyline><rect x="1" y="3" width="22" height="5"></rect><line x1="10" y1="12" x2="14" y2="12"></line></svg>
@@ -2775,7 +3084,7 @@ export default function ProductsPage() {
 
           {/* Faktur Pagination */}
           {fakturs.length > fakturPerPage && (
-            <div className="px-4 py-3 flex items-center justify-between text-sm text-gray-500 border-t border-gray-100">
+            <div className="px-4 py-3 flex flex-col sm:flex-row items-center justify-between gap-2 text-sm text-gray-500 border-t border-gray-100">
               <span>
                 {(fakturPage - 1) * fakturPerPage + 1}-{Math.min(fakturPage * fakturPerPage, fakturs.length)} of {fakturs.length}
               </span>
@@ -2804,7 +3113,7 @@ export default function ProductsPage() {
               <h3 className="font-semibold text-gray-700 mb-4">
                 {fakturModalMode === 'add' ? 'Tambah Faktur Baru' : 'Edit Faktur'}
               </h3>
-              <div className="grid grid-cols-2 md:grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">No. Faktur <span className="text-red-500">*</span></label>
                   <input
@@ -3125,7 +3434,7 @@ export default function ProductsPage() {
                       </button>
                     ) : (
                       <div className="mt-3 space-y-3">
-                        <div className="grid grid-cols-2 gap-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">Jumlah DP</label>
                             <input
@@ -3157,7 +3466,7 @@ export default function ProductsPage() {
                             </select>
                           </div>
                         </div>
-                        <div className="flex gap-2">
+              <div className="flex flex-col sm:flex-row gap-2">
                           <button
                             type="button"
                             onClick={() => { setShowAddDPForm(false); setNewDPAmount(''); setNewDPPaymentMethod('cash'); }}
@@ -3192,7 +3501,7 @@ export default function ProductsPage() {
                   <div className="flex flex-col gap-4 items-start">
                     {/* Image Input UI */}
                     <div className="w-full flex flex-col gap-3">
-                      <div className="flex gap-2">
+                      <div className="flex flex-col sm:flex-row gap-2">
                         <button
                           type="button"
                           onClick={() => fakturFileInputRef.current?.click()}
@@ -3250,7 +3559,7 @@ export default function ProductsPage() {
                   </div>
                 </div>
               </div>
-              <div className="flex justify-end gap-3 mt-6">
+              <div className="flex flex-col sm:flex-row justify-end gap-3 mt-6">
                 <button
                   type="button"
                   onClick={() => {
@@ -3267,23 +3576,24 @@ export default function ProductsPage() {
                       unit_multiplier: '1',
                       stock_type: 'belum_bayar',
                       dp_amount: '',
-      dp_awal: '',
+              dp_awal: '',
                       due_date: '',
-      expired_date: '',
-                      notes: ''
+              expired_date: '',
+                      notes: '',
+                      purchase_unit_stock: ''
                     });
                     setSelectedFaktur(null);
                     setFakturModalMode('add');
                     setShowFakturForm(false);
                   }}
-                  className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium transition-colors"
+                  className="w-full sm:w-auto px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium transition-colors"
                 >
                   Batal
                 </button>
                 <button
                   type="button"
                   onClick={handleSaveFaktur}
-                  className="px-4 py-2 text-white bg-blue-600 hover:bg-blue-700 rounded-lg text-sm font-medium transition-colors"
+                  className="w-full sm:w-auto px-4 py-2 text-white bg-blue-600 hover:bg-blue-700 rounded-lg text-sm font-medium transition-colors"
                 >
                   {fakturModalMode === 'add' ? 'Tambah Faktur' : 'Simpan Faktur'}
                 </button>
@@ -3313,23 +3623,23 @@ export default function ProductsPage() {
             className="bg-white rounded-2xl shadow-2xl w-full max-w-full sm:max-w-5xl max-h-[85vh] sm:max-h-[90vh] flex flex-col overflow-hidden" 
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex justify-between items-center px-6 py-4 border-b border-gray-100 bg-gray-50/50 shrink-0">
-              <div>
-                <h3 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-                  <CheckCircle className="text-yellow-600" size={24} />
-                  Approval Faktur Pembelian
+            <div className="flex justify-between items-center px-4 sm:px-6 py-4 border-b border-gray-100 bg-gray-50/50 shrink-0">
+              <div className="min-w-0">
+                <h3 className="text-lg sm:text-xl font-bold text-gray-800 flex items-center gap-2">
+                  <CheckCircle className="text-yellow-600 shrink-0" size={24} />
+                  <span className="truncate">Approval Faktur Pembelian</span>
                 </h3>
                 <p className="text-sm text-gray-500 mt-1">Daftar faktur yang memerlukan persetujuan</p>
               </div>
               <button 
                 onClick={() => setIsApprovalModalOpen(false)} 
-                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-white rounded-full transition-all border border-transparent hover:border-gray-200"
+                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-white rounded-full transition-all border border-transparent hover:border-gray-200 shrink-0"
               >
                 <X size={20} />
               </button>
             </div>
 
-            <div className="p-6 flex-1 overflow-auto custom-scrollbar">
+            <div className="p-4 sm:p-6 flex-1 overflow-auto custom-scrollbar">
               {isFetchingPending ? (
                 <div className="flex flex-col items-center justify-center py-20 gap-4">
                   <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
@@ -3373,7 +3683,7 @@ export default function ProductsPage() {
                             </button>
                           )}
                           <div className="p-5">
-                            <div className="flex flex-row justify-between items-start gap-5">
+                            <div className="flex flex-col sm:flex-row justify-between items-start gap-5">
                               <div className="flex-1 space-y-3">
                                 <div className="flex items-start gap-4">
                                   <div className="bg-blue-50 p-2.5 rounded-xl text-blue-600 shrink-0 group-hover:bg-blue-100 transition-colors">
@@ -3438,8 +3748,8 @@ export default function ProductsPage() {
                                     <AlertCircle size={16} className="text-orange-500 shrink-0 mt-0.5" />
                                     <div>
                                       <p className="text-[11px] font-bold text-orange-800 uppercase tracking-wider">Catatan Perbaikan:</p>
-                                      {items.filter(i => i.notes).map(i => (
-                                        <p key={i.id} className="text-sm text-orange-700 mt-0.5 leading-relaxed">{i.product_name}: {i.notes}</p>
+                                      {[...new Set(items.filter(i => i.notes).map(i => i.notes))].map((note, idx) => (
+                                        <p key={idx} className="text-sm text-orange-700 mt-0.5 leading-relaxed">{note}</p>
                                       ))}
                                     </div>
                                   </div>
@@ -3447,7 +3757,7 @@ export default function ProductsPage() {
                               </div>
 
                               {/* Financial Info */}
-                              <div className="w-56 bg-blue-50/50 p-4 rounded-xl border border-blue-100/50 flex flex-col justify-center gap-1.5 shrink-0">
+                              <div className="w-full sm:w-56 bg-blue-50/50 p-4 rounded-xl border border-blue-100/50 flex flex-col justify-center gap-1.5 shrink-0">
                                 <div className="flex justify-between text-[13px]">
                                   <span className="text-gray-500">Total Qty:</span>
                                   <span className="font-bold text-gray-900">{totalQty} {first.product_unit}</span>
@@ -3464,7 +3774,7 @@ export default function ProductsPage() {
                                   <button
                                     onClick={() => {
                                       const firstWithImage = items.find(i => i.image_url)!;
-                                      const urls = getImageUrls(firstWithImage.image_url).map(u => `http://localhost:5000${u}`);
+                                      const urls = getImageUrls(firstWithImage.image_url).map(u => `${API_URL}${u}`);
                                       if (urls.length > 0) openImagePreview(urls[0], urls);
                                     }}
                                     className="flex items-center gap-2 px-4 py-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-all text-xs font-bold border border-blue-200"
@@ -3484,32 +3794,34 @@ export default function ProductsPage() {
                                       const dpAwalVal = firstRev.dp_payments && firstRev.dp_payments.length > 0 ? firstRev.dp_payments[0].amount.toString() : firstRev.dp_amount?.toString() || '';
                                       const sellingPrice = (firstRev as any).product_selling_price || allProducts.find(p => p.id === firstRev.product_id)?.selling_price?.toString() || '';
                                       if (items.length === 1) {
-                                        // Single product: open single product offcanvas
-                                        setPerbaikanBatchIds({ single: firstRev.id, productId: firstRev.product_id });
-                                        const fmtDate = (d: string | null | undefined) => d ? d.substring(0, 10) : '';
-                                        setFormData({
-                                          name: firstRev.product_name || '',
-                                          cost_price: firstRev.cost_price.toString(),
-                                          selling_price: sellingPrice,
-                                          stock: (firstRev.initial_quantity || firstRev.quantity || 0).toString(),
-                                          unit: firstRev.product_unit || 'Tablet',
-                                          expired_date: fmtDate(firstRev.expired_date),
-                                          location_code: (firstRev as any).product_location_code || allProducts.find(p => p.id === firstRev.product_id)?.location_code || '',
-                                          supplier_id: firstRev.supplier_id?.toString() || '',
-                                          stock_type: firstRev.stock_type,
-                                          purchase_date: fmtDate(firstRev.purchase_date),
-                                          invoice_number: firstRev.invoice_number || '',
-                                          dp_amount: firstRev.dp_amount?.toString() || '',
-                                          dp_awal: dpAwalVal,
-                                          due_date: fmtDate(firstRev.due_date),
-                                          purchase_unit: firstRev.product_purchase_unit || 'Box',
-                                          unit_multiplier: (firstRev.product_unit_multiplier || 1).toString(),
-                                          product_category: 'OBAT',
-                                          purchase_unit_stock: '',
-                                          batch_number: firstRev.batch_number || '',
-                                        });
+                                         // Single product: open single product offcanvas
+                                         setPerbaikanBatchIds({ single: firstRev.id, productId: firstRev.product_id });
+                                         const fmtDate = (d: string | null | undefined) => d ? d.substring(0, 10) : '';
+                                         const calcPurchaseStock = (qty: any, mult: any) => { const q = Number(qty || 0); const m = Number(mult || 1); return q && m ? Math.round(q / m).toString() : ''; };
+                                         setFormData({
+                                           name: firstRev.product_name || '',
+                                           cost_price: firstRev.cost_price.toString(),
+                                           selling_price: sellingPrice,
+                                           stock: (firstRev.initial_quantity || firstRev.quantity || 0).toString(),
+                                           unit: firstRev.product_unit || 'Tablet',
+                                           expired_date: fmtDate(firstRev.expired_date),
+                                           location_code: (firstRev as any).product_location_code || allProducts.find(p => p.id === firstRev.product_id)?.location_code || '',
+                                           supplier_id: firstRev.supplier_id?.toString() || '',
+                                           stock_type: firstRev.stock_type,
+                                           purchase_date: fmtDate(firstRev.purchase_date),
+                                           invoice_number: firstRev.invoice_number || '',
+                                           dp_amount: firstRev.dp_amount?.toString() || '',
+                                           dp_awal: dpAwalVal,
+                                           due_date: fmtDate(firstRev.due_date),
+                                           purchase_unit: firstRev.product_purchase_unit || 'Box',
+                                           unit_multiplier: (firstRev.product_unit_multiplier || 1).toString(),
+                                           product_category: 'OBAT',
+                                           purchase_unit_stock: calcPurchaseStock(firstRev.initial_quantity || firstRev.quantity, firstRev.product_unit_multiplier),
+                                           batch_number: firstRev.batch_number || '',
+                                           description: firstRev.product_description || allProducts.find(p => p.id === firstRev.product_id)?.description || '',
+                                         });
                                         if (firstRev.image_url) {
-                                          const urls = getImageUrls(firstRev.image_url).map(u => `http://localhost:5000${u}`);
+                                          const urls = getImageUrls(firstRev.image_url).map(u => `${API_URL}${u}`);
                                           setProductFormImagePreviews(urls);
                                         }
                                         setIsPerbaikanMultiMode(false);
@@ -3529,6 +3841,7 @@ export default function ProductsPage() {
                                           return {
                                             id: itemId,
                                             name: i.product_name || '',
+                                            description: i.product_description || allProducts.find(p => p.id === i.product_id)?.description || '',
                                             product_category: 'OBAT' as const,
                                             location_code: (i as any).product_location_code || allProducts.find(p => p.id === i.product_id)?.location_code || '',
                                             cost_price: i.cost_price.toString(),
@@ -3537,12 +3850,12 @@ export default function ProductsPage() {
                                             unit: i.product_unit || 'Tablet',
                                             purchase_unit: i.product_purchase_unit || 'Box',
                                             unit_multiplier: (i.product_unit_multiplier || 1).toString(),
-                                            purchase_unit_stock: '',
+                                            purchase_unit_stock: (() => { const q = Number(i.initial_quantity || i.quantity || 0); const m = Number(i.product_unit_multiplier || 1); return q && m ? Math.round(q / m).toString() : ''; })(),
                                             expired_date: i.expired_date ? i.expired_date.substring(0, 10) : '',
                                             batch_number: i.batch_number || '',
                                             invoice_number: i.invoice_number || '',
                                             dp_amount: i.dp_amount?.toString() || '',
-                                            dp_awal: '',
+                                            dp_awal: i.dp_payments && i.dp_payments.length > 0 ? i.dp_payments[0].amount.toString() : i.dp_amount?.toString() || '',
                                             due_date: i.due_date ? i.due_date.substring(0, 10) : '',
                                             supplier_id: i.supplier_id?.toString() || '',
                                             stock_type: i.stock_type,
@@ -3571,11 +3884,12 @@ export default function ProductsPage() {
                                           purchase_unit: firstRev.product_purchase_unit || 'Box',
                                           unit_multiplier: (firstRev.product_unit_multiplier || 1).toString(),
                                           product_category: 'OBAT',
-                                          purchase_unit_stock: '',
+                                          purchase_unit_stock: (() => { const q = Number(firstRev.initial_quantity || firstRev.quantity || 0); const m = Number(firstRev.product_unit_multiplier || 1); return q && m ? Math.round(q / m).toString() : ''; })(),
                                           batch_number: '',
+                                          description: firstRev.product_description || allProducts.find(p => p.id === firstRev.product_id)?.description || '',
                                         });
                                         if (firstRev.image_url) {
-                                          const urls = getImageUrls(firstRev.image_url).map(u => `http://localhost:5000${u}`);
+                                          const urls = getImageUrls(firstRev.image_url).map(u => `${API_URL}${u}`);
                                           setProductFormImagePreviews(urls);
                                         }
                                         setIsPerbaikanMultiMode(true);
@@ -3604,18 +3918,18 @@ export default function ProductsPage() {
               )}
             </div>
             
-            <div className="px-6 py-4 border-t border-gray-100 bg-gray-50/50 shrink-0 flex justify-between items-center">
-              <p className="text-xs text-gray-400 italic font-medium">*Approval hanya dapat dilakukan di halaman khusus Approval Faktur.</p>
-              <div className="flex gap-3">
+            <div className="px-4 sm:px-6 py-4 border-t border-gray-100 bg-gray-50/50 shrink-0 flex flex-col sm:flex-row justify-between items-center gap-3">
+              <p className="text-xs text-gray-400 italic font-medium text-center sm:text-left">*Approval hanya dapat dilakukan di halaman khusus Approval Faktur.</p>
+              <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
                 <Link 
                   href="/approvals"
-                  className="px-6 py-2 bg-blue-600 text-white rounded-xl text-sm font-bold hover:bg-blue-700 transition-all shadow-sm"
+                  className="w-full sm:w-auto text-center px-6 py-2 bg-blue-600 text-white rounded-xl text-sm font-bold hover:bg-blue-700 transition-all shadow-sm"
                 >
                   Ke Halaman Approval
                 </Link>
                 <button 
                   onClick={() => setIsApprovalModalOpen(false)}
-                  className="px-6 py-2 bg-white border border-gray-300 rounded-xl text-sm font-bold text-gray-700 hover:bg-gray-50 transition-all shadow-sm"
+                  className="w-full sm:w-auto text-center px-6 py-2 bg-white border border-gray-300 rounded-xl text-sm font-bold text-gray-700 hover:bg-gray-50 transition-all shadow-sm"
                 >
                   Tutup
                 </button>
@@ -3635,7 +3949,7 @@ export default function ProductsPage() {
             className="bg-white rounded-2xl shadow-2xl w-full max-w-full sm:max-w-lg max-h-[85vh] sm:max-h-[90vh] overflow-y-auto" 
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex justify-between items-center px-6 py-4 border-b border-gray-100 bg-gray-50/50 sticky top-0 bg-white">
+            <div className="flex justify-between items-center px-4 sm:px-6 py-4 border-b border-gray-100 bg-gray-50/50 sticky top-0 bg-white">
               <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
                 Detail Produk
@@ -3648,7 +3962,7 @@ export default function ProductsPage() {
               </button>
             </div>
 
-            <div className="p-6 space-y-4">
+            <div className="p-4 sm:p-6 space-y-4">
               {/* Nama & Kategori */}
               <div className="bg-blue-50 p-4 rounded-xl">
                 <p className="text-xs text-blue-500 font-medium uppercase tracking-wider">Nama Produk</p>
@@ -3658,8 +3972,16 @@ export default function ProductsPage() {
                 </span>
               </div>
 
+              {/* Deskripsi */}
+              {detailProduct.description && (
+                <div className="bg-gray-50 p-4 rounded-xl">
+                  <p className="text-xs text-gray-500 font-medium uppercase tracking-wider mb-1">Penjelasan</p>
+                  <p className="text-sm text-gray-700 leading-relaxed">{detailProduct.description}</p>
+                </div>
+              )}
+
               {/* Info Grid */}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="bg-gray-50 p-3 rounded-xl">
                   <p className="text-xs text-gray-500 font-medium uppercase tracking-wider">Harga Beli</p>
                   <p className="text-sm font-bold text-gray-900 mt-1">{formatCurrency(detailProduct.cost_price)}</p>
@@ -3712,10 +4034,10 @@ export default function ProductsPage() {
               )}
             </div>
 
-            <div className="px-6 py-4 border-t border-gray-100 flex justify-end">
+            <div className="px-4 sm:px-6 py-4 border-t border-gray-100 flex justify-end">
               <button
                 onClick={() => setDetailProduct(null)}
-                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors"
+                className="w-full sm:w-auto px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors"
               >
                 Tutup
               </button>
@@ -3734,7 +4056,7 @@ export default function ProductsPage() {
             className="bg-white rounded-2xl shadow-2xl w-full max-w-full sm:max-w-2xl max-h-[85vh] sm:max-h-[90vh] overflow-y-auto" 
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex justify-between items-center px-6 py-4 border-b border-gray-100 bg-gray-50/50 sticky top-0 bg-white">
+            <div className="flex justify-between items-center px-4 sm:px-6 py-4 border-b border-gray-100 bg-gray-50/50 sticky top-0 bg-white">
               <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
                 Detail Faktur
@@ -3747,7 +4069,7 @@ export default function ProductsPage() {
               </button>
             </div>
 
-            <div className="p-6 space-y-5">
+            <div className="p-4 sm:p-6 space-y-5">
               {/* Info Umum */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="bg-gray-50 p-3 rounded-xl">
@@ -3808,6 +4130,10 @@ export default function ProductsPage() {
                     <p className="text-sm font-bold text-purple-800 mt-1">{detailFaktur.qty_restored > 0 ? `${detailFaktur.qty_restored} ${selectedProduct?.unit || 'Tablet'}` : '0'}</p>
                   </div>
                 )}
+                <div className="bg-red-50 p-3 rounded-xl">
+                  <p className="text-xs text-red-600 font-medium uppercase tracking-wider">Qty Retur Pembelian</p>
+                  <p className="text-sm font-bold text-red-800 mt-1">{(detailFaktur as any).qty_returned > 0 ? `${(detailFaktur as any).qty_returned} ${selectedProduct?.unit || 'Tablet'}` : '0'}</p>
+                </div>
                 <div className="bg-gray-50 p-3 rounded-xl">
                   <p className="text-xs text-gray-500 font-medium uppercase tracking-wider">Harga Beli</p>
                   <p className="text-sm font-bold text-gray-900 mt-1">{formatCurrency(detailFaktur.cost_price)}</p>
@@ -3845,7 +4171,7 @@ export default function ProductsPage() {
               {detailFaktur.stock_type === 'dp' && (
                 <div>
                   {/* Ringkasan DP */}
-                  <div className="grid grid-cols-3 gap-3 mb-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
                     <div className="bg-blue-50 p-3 rounded-xl">
                       <p className="text-xs text-blue-600 font-medium uppercase tracking-wider">Total Hutang</p>
                       <p className="text-sm font-bold text-blue-800 mt-1">
@@ -3864,8 +4190,10 @@ export default function ProductsPage() {
                       <p className="text-xs text-orange-600 font-medium uppercase tracking-wider">Sisa DP</p>
                       <p className="text-sm font-bold text-orange-800 mt-1">
                         {formatCurrency(
-                          Math.max(0, (detailFaktur.dp_amount ? Number(detailFaktur.dp_amount) : 0) - 
-                          (detailFaktur.dp_payments || []).reduce((sum: number, dp: any) => sum + Number(dp.amount), 0))
+                          Math.max(0,
+                            (Number(detailFaktur.total_amount) || (detailFaktur.cost_price * (detailFaktur.initial_quantity || detailFaktur.quantity))) -
+                            (detailFaktur.dp_payments || []).reduce((sum: number, dp: any) => sum + Number(dp.amount), 0)
+                          )
                         )}
                       </p>
                     </div>
@@ -3904,7 +4232,7 @@ export default function ProductsPage() {
                   <h4 className="text-sm font-bold text-gray-700 mb-2">Bukti Faktur ({getImageUrls(detailFaktur.image_url).length})</h4>
                   <div className="flex flex-wrap gap-3">
                     {(() => {
-                      const urls = getImageUrls(detailFaktur.image_url).map((u: string) => `http://localhost:5000${u}`);
+                      const urls = getImageUrls(detailFaktur.image_url).map((u: string) => `${API_URL}${u}`);
                       return urls.map((fullUrl: string, idx: number) => (
                       <div key={idx} className="relative inline-block group">
                         <img 
@@ -3944,10 +4272,10 @@ export default function ProductsPage() {
               )}
             </div>
 
-            <div className="px-6 py-4 border-t border-gray-100 flex justify-end">
+            <div className="px-4 sm:px-6 py-4 border-t border-gray-100 flex justify-end">
               <button
                 onClick={() => setDetailFaktur(null)}
-                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors"
+                className="w-full sm:w-auto px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors"
               >
                 Tutup
               </button>
@@ -3966,7 +4294,7 @@ export default function ProductsPage() {
             className="bg-white rounded-2xl shadow-2xl w-full max-w-full sm:max-w-4xl max-h-full overflow-hidden flex flex-col" 
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex justify-between items-center px-6 py-4 border-b border-gray-100 shrink-0">
+            <div className="flex justify-between items-center px-4 sm:px-6 py-4 border-b border-gray-100 shrink-0">
               <h3 className="text-lg font-semibold text-gray-800">Bukti Faktur {previewImageList.length > 1 ? `(${previewImageIndex + 1}/${previewImageList.length})` : ''}</h3>
               <button 
                  onClick={() => { setPreviewImageUrl(null); setPreviewImageList([]); }} 

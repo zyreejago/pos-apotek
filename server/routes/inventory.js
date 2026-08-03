@@ -242,7 +242,7 @@ function registerInventoryRoutes(app, pool, authenticate, checkPermission, uploa
   app.get('/api/inventory/pending-batches', authenticate, checkPermission('Approval Faktur', 'show'), async (req, res) => {
     try {
       const [rows] = await pool.query(`
-        SELECT b.*, s.name as supplier_name, p.name as product_name, p.status as product_status, p.unit as product_unit, p.purchase_unit as product_purchase_unit, p.unit_multiplier as product_unit_multiplier, p.location_code as product_location_code, p.selling_price as product_selling_price
+        SELECT b.*, s.name as supplier_name, p.name as product_name, p.status as product_status, p.unit as product_unit, p.purchase_unit as product_purchase_unit, p.unit_multiplier as product_unit_multiplier, p.location_code as product_location_code, p.selling_price as product_selling_price, p.description as product_description
         FROM batches b 
         LEFT JOIN suppliers s ON b.supplier_id = s.id 
         LEFT JOIN products p ON b.product_id = p.id
@@ -267,7 +267,7 @@ function registerInventoryRoutes(app, pool, authenticate, checkPermission, uploa
   // Create a new batch
   app.post('/api/inventory/batches', authenticate, checkPermission('Management Product', 'create'), upload.array('images', 10), async (req, res) => {
     try {
-      const { product_id, supplier_id, batch_number, invoice_number, stock_type, purchase_date, initial_quantity, cost_price, expired_date, dp_amount: dpAmountRaw, dp_awal, due_date, notes, has_purchase_unit } = req.body;
+      const { product_id, supplier_id, batch_number, invoice_number, stock_type, purchase_date, initial_quantity, cost_price, expired_date, dp_amount: dpAmountRaw, dp_awal, due_date, notes, has_purchase_unit, purchase_unit_stock } = req.body;
       const dp_amount = dpAmountRaw && dpAmountRaw !== '' ? Number(dpAmountRaw) : (dp_awal && dp_awal !== '' ? Number(dp_awal) : null);
       const files = req.files;
       const imageUrls = files && Array.isArray(files) && files.length > 0 ? files.map(f => `/uploads/${f.filename}`) : [];
@@ -282,8 +282,8 @@ function registerInventoryRoutes(app, pool, authenticate, checkPermission, uploa
       const status = 'pending';
 
       const [result] = await pool.query(`
-        INSERT INTO batches (product_id, supplier_id, batch_number, invoice_number, stock_type, purchase_date, initial_quantity, remaining_quantity, cost_price, expired_date, dp_amount, due_date, image_url, status, notes, created_by, has_purchase_unit)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO batches (product_id, supplier_id, batch_number, invoice_number, stock_type, purchase_date, initial_quantity, remaining_quantity, cost_price, expired_date, dp_amount, due_date, image_url, status, notes, created_by, has_purchase_unit, purchase_unit_stock)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `, [
         product_id, 
         supplier_id && supplier_id !== '' ? Number(supplier_id) : null, 
@@ -301,7 +301,8 @@ function registerInventoryRoutes(app, pool, authenticate, checkPermission, uploa
         status,
         notes || null,
         req.user.id,
-        has_purchase_unit === '1' ? 1 : 0
+        has_purchase_unit === '1' ? 1 : 0,
+        purchase_unit_stock || null
       ]);
       
       // Auto-create DP 1 payment record (use dp_awal if provided, otherwise dp_amount)
@@ -388,7 +389,7 @@ function registerInventoryRoutes(app, pool, authenticate, checkPermission, uploa
   app.put('/api/inventory/batches/:id', authenticate, checkPermission('Management Product', 'edit'), upload.array('images', 10), async (req, res) => {
     try {
       const { id } = req.params;
-      const { supplier_id, batch_number, invoice_number, stock_type, purchase_date, initial_quantity, remaining_quantity, cost_price, expired_date, dp_amount, due_date, notes, has_purchase_unit } = req.body;
+      const { supplier_id, batch_number, invoice_number, stock_type, purchase_date, initial_quantity, remaining_quantity, cost_price, expired_date, dp_amount, due_date, notes, has_purchase_unit, purchase_unit_stock } = req.body;
       
       // Get the old batch first
       const [oldBatch] = await pool.query('SELECT remaining_quantity, product_id, image_url, status, stock_type FROM batches WHERE id = ?', [id]);
@@ -432,7 +433,7 @@ function registerInventoryRoutes(app, pool, authenticate, checkPermission, uploa
       console.log('[Backend PUT] batchId:', id, 'has_purchase_unit:', has_purchase_unit, 'hasPUValue:', hasPUValue, 'initial_quantity:', initial_quantity, 'stock_type:', stock_type);
       await pool.query(`
         UPDATE batches 
-        SET supplier_id = ?, batch_number = ?, invoice_number = ?, stock_type = ?, purchase_date = ?, initial_quantity = ?, remaining_quantity = ?, cost_price = ?, expired_date = ?, dp_amount = ?, due_date = ?, image_url = ?, status = ?, notes = ?, has_purchase_unit = ?
+        SET supplier_id = ?, batch_number = ?, invoice_number = ?, stock_type = ?, purchase_date = ?, initial_quantity = ?, remaining_quantity = ?, cost_price = ?, expired_date = ?, dp_amount = ?, due_date = ?, image_url = ?, status = ?, notes = ?, has_purchase_unit = ?, purchase_unit_stock = ?
         WHERE id = ?
       `, [
         supplier_id && supplier_id !== '' ? Number(supplier_id) : null, 
@@ -450,6 +451,7 @@ function registerInventoryRoutes(app, pool, authenticate, checkPermission, uploa
         status,
         finalNotes,
         hasPUValue,
+        purchase_unit_stock || null,
         id
       ]);
       

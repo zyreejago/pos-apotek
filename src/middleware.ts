@@ -31,7 +31,14 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL('/dashboard', request.url))
   }
  
-  return NextResponse.next()
+  const response = NextResponse.next()
+
+  response.headers.set(
+    'Content-Security-Policy',
+    "script-src 'self' 'unsafe-inline' https://snap-assets.sandbox.midtrans.com https://api.sandbox.midtrans.com https://app.sandbox.midtrans.com https://pay.google.com https://gwk.gopayapi.com/sdk/stable/gp-container.min.js https://www.googletagmanager.com"
+  )
+
+  return response
 }
  
 export const config = {

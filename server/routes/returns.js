@@ -23,21 +23,23 @@ module.exports = function registerReturnRoutes(app, pool, authenticate, checkPer
   const ensurePurchaseRecord = async (connection, batchNumber, supplierId) => {
     // Check if a purchase with this batch_number exists (using invoice_no as batch_number)
     const [existing] = await connection.query(
-      'SELECT id FROM purchases WHERE invoice_no = ?', [batchNumber]
+      'SELECT id, payment_status FROM purchases WHERE invoice_no = ?', [batchNumber]
     );
     if (existing.length > 0) return existing[0].id;
 
     // Calculate total from batches with this batch_number
     const [batchRows] = await connection.query(
-      `SELECT SUM(b.initial_quantity * b.cost_price) as total
+      `SELECT SUM(b.initial_quantity * b.cost_price) as total,
+              (SELECT b2.stock_type FROM batches b2 WHERE b2.batch_number = ? AND b2.supplier_id = ? LIMIT 1) as stock_type
        FROM batches b WHERE b.batch_number = ? AND b.supplier_id = ?`,
-      [batchNumber, supplierId]
+      [batchNumber, supplierId, batchNumber, supplierId]
     );
     const totalAmount = Number(batchRows[0]?.total || 0);
+    const stockTypeFromBatch = batchRows[0]?.stock_type || 'hutang';
 
     const [result] = await connection.query(
-      'INSERT INTO purchases (supplier_id, total_amount, invoice_no) VALUES (?, ?, ?)',
-      [supplierId, totalAmount, batchNumber]
+      'INSERT INTO purchases (supplier_id, total_amount, invoice_no, payment_status) VALUES (?, ?, ?, ?)',
+      [supplierId, totalAmount, batchNumber, stockTypeFromBatch === 'belum_bayar' ? 'hutang' : stockTypeFromBatch === 'dp' ? 'dp' : 'lunas']
     );
     return result.insertId;
   };
@@ -173,14 +175,43 @@ module.exports = function registerReturnRoutes(app, pool, authenticate, checkPer
         else throw new Error('Purchase tidak ditemukan');
       }
 
-      // Get all batches with this batch_number for supplier info
+      // Get batches with this invoice/batch_number (optional, fallback jika tidak ada batch)
       const [batchRows] = await connection.query(
-        'SELECT b.*, p.product_category FROM batches b JOIN products p ON b.product_id = p.id WHERE b.batch_number = ? AND b.is_archived = FALSE',
-        [batchNumber]
+        'SELECT b.*, p.product_category FROM batches b JOIN products p ON b.product_id = p.id WHERE (b.batch_number = ? OR b.invoice_number = ?) AND b.is_archived = FALSE',
+        [batchNumber, batchNumber]
       );
-      if (batchRows.length === 0) throw new Error('Batch tidak ditemukan');
 
-      const supplierId = batchRows[0].supplier_id;
+      let supplierId;
+      if (batchRows.length > 0) {
+        supplierId = batchRows[0].supplier_id;
+      } else {
+        // Fallback: cari supplier dari purchase record
+        const [pRows] = await connection.query(
+          'SELECT supplier_id FROM purchases WHERE invoice_no = ? LIMIT 1',
+          [batchNumber]
+        );
+        if (pRows.length > 0) {
+          supplierId = pRows[0].supplier_id;
+        } else if (items.length > 0 && items[0].product_id) {
+          const [sRows] = await connection.query(
+            'SELECT supplier_id FROM batches WHERE product_id = ? AND is_archived = FALSE LIMIT 1',
+            [items[0].product_id]
+          );
+          supplierId = sRows.length > 0 ? sRows[0].supplier_id : null;
+        } else {
+          supplierId = null;
+        }
+      }
+
+      // Jika supplier tidak ditemukan, ambil supplier pertama
+      if (!supplierId) {
+        const [anySupplier] = await connection.query('SELECT id FROM suppliers LIMIT 1');
+        if (anySupplier.length > 0) {
+          supplierId = anySupplier[0].id;
+        } else {
+          throw new Error('Tidak ada supplier ditemukan. Buat supplier terlebih dahulu.');
+        }
+      }
 
       // Check supplier accepts_return
       const [suppRows] = await connection.query('SELECT accepts_return FROM suppliers WHERE id = ?', [supplierId]);
@@ -196,50 +227,53 @@ module.exports = function registerReturnRoutes(app, pool, authenticate, checkPer
       let totalValue = 0;
 
       for (const item of items) {
-        const { batch_id, qty_returned, condition } = item;
-        if (!batch_id || !qty_returned || !condition) {
-          throw new Error('Setiap item wajib memiliki batch_id, qty_returned, dan condition');
+        const { product_name, qty_returned, condition, batch_id, buy_price } = item;
+        if (!qty_returned || !condition) {
+          throw new Error('Setiap item wajib memiliki qty_returned dan condition');
         }
         if (qty_returned <= 0) throw new Error('qty_returned harus > 0');
 
-        // Find batch
-        const batch = batchRows.find(b => b.id === batch_id);
-        if (!batch) throw new Error(`Batch #${batch_id} tidak ditemukan dalam faktur ini`);
+        let batch;
+        if (batch_id) {
+          batch = batchRows.find(b => b.id === batch_id);
+          if (!batch) throw new Error(`Batch #${batch_id} tidak ditemukan dalam faktur ini`);
 
-        // Already returned for this batch
-        const [retRows] = await connection.query(
-          `SELECT COALESCE(SUM(pri.qty_returned), 0) as qty
-           FROM purchase_return_items pri
-           JOIN purchase_returns pr ON pri.return_id = pr.id
-           WHERE pri.batch_id = ? AND pr.original_purchase_id = ?`,
-          [batch_id, resolvedPurchaseId]
-        );
-        const qtyAlreadyReturned = Number(retRows[0].qty);
-        const qtyReturnable = batch.initial_quantity - qtyAlreadyReturned;
-        if (qty_returned > qtyReturnable) throw new Error(
-          `qty_returned (${qty_returned}) melebihi sisa retur (${qtyReturnable}) untuk batch #${batch_id}`
-        );
+          // Already returned for this batch
+          const [retRows] = await connection.query(
+            `SELECT COALESCE(SUM(pri.qty_returned), 0) as qty
+             FROM purchase_return_items pri
+             JOIN purchase_returns pr ON pri.return_id = pr.id
+             WHERE pri.batch_id = ? AND pr.original_purchase_id = ?`,
+            [batch_id, resolvedPurchaseId]
+          );
+          const qtyAlreadyReturned = Number(retRows[0].qty);
+          const qtyReturnable = batch.initial_quantity - qtyAlreadyReturned;
+          if (qty_returned > qtyReturnable) throw new Error(
+            `qty_returned (${qty_returned}) melebihi sisa retur (${qtyReturnable}) untuk batch #${batch_id}`
+          );
 
-        // Check current stock in batch
-        const currentStock = Number(batch.remaining_quantity);
-        if (qty_returned > currentStock) throw new Error(
-          `Stok batch (${currentStock}) tidak mencukupi untuk retur ${qty_returned}`
-        );
+          // Check current stock in batch
+          const currentStock = Number(batch.remaining_quantity);
+          if (qty_returned > currentStock) throw new Error(
+            `Stok batch (${currentStock}) tidak mencukupi untuk retur ${qty_returned}`
+          );
+        }
 
-        // Ensure purchase_item record exists
-        const purchaseItemId = await ensurePurchaseItemRecord(connection, resolvedPurchaseId, batch);
-
-        const itemValue = qty_returned * Number(batch.cost_price);
+        const itemBuyPrice = buy_price || (batch ? Number(batch.cost_price) : 0);
+        const itemValue = qty_returned * itemBuyPrice;
         totalValue += itemValue;
+
+        const purchaseItemId = batch ? await ensurePurchaseItemRecord(connection, resolvedPurchaseId, batch) : null;
 
         returnItems.push({
           purchase_item_id: purchaseItemId,
-          batch_id: batch.id,
-          product_id: batch.product_id,
+          batch_id: batch ? batch.id : null,
+          product_id: batch ? batch.product_id : null,
+          product_name: product_name || null,
           qty_returned,
-          buy_price: Number(batch.cost_price),
+          buy_price: itemBuyPrice,
           condition,
-          product_category: batch.product_category,
+          product_category: batch ? batch.product_category : null,
           itemValue,
         });
       }
@@ -269,12 +303,6 @@ module.exports = function registerReturnRoutes(app, pool, authenticate, checkPer
         await connection.query(
           'UPDATE batches SET remaining_quantity = GREATEST(remaining_quantity - ?, 0) WHERE id = ?',
           [ri.qty_returned, ri.batch_id]
-        );
-
-        // Mark batch as returned
-        await connection.query(
-          'UPDATE batches SET stock_type = ? WHERE id = ?',
-          ['retur', ri.batch_id]
         );
 
         // Reduce product stock
